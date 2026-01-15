@@ -362,3 +362,22 @@ func (a *App) GetAppRunApplicationVersion(profileName, applicationID string, ver
 	}
 	return service.GetApplicationVersion(a.ctx, applicationID, version)
 }
+
+// Bills
+func (a *App) GetBills(profileName, accountID string) ([]sakura.BillInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewBillService(client)
+	return service.ListByContract(a.ctx, accountID)
+}
+
+func (a *App) GetBillDetails(profileName, memberCode, billID string) ([]sakura.BillDetailInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewBillService(client)
+	return service.GetDetails(a.ctx, memberCode, billID)
+}

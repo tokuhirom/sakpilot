@@ -25,8 +25,9 @@ import { SwitchDetail } from './components/SwitchDetail';
 import { PacketFilterList } from './components/PacketFilterList';
 import { PacketFilterDetail } from './components/PacketFilterDetail';
 import { ArchiveList } from './components/ArchiveList';
+import { BillList } from './components/BillList';
 
-type Page = 'servers' | 'disks' | 'archives' | 'databases' | 'switches' | 'switch-detail' | 'packetfilters' | 'packetfilter-detail' | 'dns' | 'dns-detail' | 'gslb' | 'gslb-detail' | 'monitors' | 'monitoring' | 'container-registry' | 'container-registry-detail' | 'apprun';
+type Page = 'servers' | 'disks' | 'archives' | 'databases' | 'switches' | 'switch-detail' | 'packetfilters' | 'packetfilter-detail' | 'dns' | 'dns-detail' | 'gslb' | 'gslb-detail' | 'monitors' | 'monitoring' | 'container-registry' | 'container-registry-detail' | 'apprun' | 'bills';
 
 function App() {
   const [profiles, setProfiles] = useState<sakura.ProfileInfo[]>([]);
@@ -220,6 +221,16 @@ function App() {
             クラスタ
           </div>
         </div>
+
+        <div className="nav-section">
+          <h3>アカウント</h3>
+          <div
+            className={`nav-item ${currentPage === 'bills' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('bills')}
+          >
+            請求
+          </div>
+        </div>
       </div>
 
       <div className="main-content">
@@ -247,7 +258,8 @@ function App() {
              currentPage === 'monitors' ? 'シンプル監視' :
              currentPage === 'monitoring' ? 'モニタリングスイート' :
              currentPage === 'container-registry' || currentPage === 'container-registry-detail' ? 'コンテナレジストリ' :
-             currentPage === 'apprun' ? 'AppRun' : ''}
+             currentPage === 'apprun' ? 'AppRun' :
+             currentPage === 'bills' ? '請求' : ''}
           </span>
           {(currentPage === 'dns-detail' || currentPage === 'gslb-detail' || currentPage === 'container-registry-detail' || currentPage === 'switch-detail' || currentPage === 'packetfilter-detail') && (
             <>
@@ -396,6 +408,14 @@ function App() {
 
         {currentPage === 'apprun' && (
           <AppRunList profile={currentProfile} />
+        )}
+
+        {currentPage === 'bills' && authInfo && (
+          <BillList
+            profile={currentProfile}
+            accountId={authInfo.accountId}
+            memberCode={authInfo.memberCode}
+          />
         )}
       </div>
     </div>
