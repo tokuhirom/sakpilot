@@ -43,6 +43,7 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
   const [buckets, setBuckets] = useState<sakura.BucketInfo[]>([]);
   const [accessKeys, setAccessKeys] = useState<AccessKeyWithSaved[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingAccessKeys, setLoadingAccessKeys] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('sites');
   const [selectedAccessKeyId, setSelectedAccessKeyId] = useState('');
   const [secretKey, setSecretKey] = useState('');
@@ -87,6 +88,7 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
   const loadAccessKeys = useCallback(async (siteId: string) => {
     if (!profile || !siteId) return;
 
+    setLoadingAccessKeys(true);
     try {
       const keys = await GetObjectStorageAccessKeys(profile, siteId);
       // Check which keys have saved secrets
@@ -100,6 +102,8 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
     } catch (err) {
       console.error('[ObjectStorageList] loadAccessKeys error:', err);
       setAccessKeys([]);
+    } finally {
+      setLoadingAccessKeys(false);
     }
   }, [profile]);
 
@@ -453,26 +457,36 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
               <label style={{ fontSize: '0.75rem', color: '#888', display: 'block', marginBottom: '0.25rem' }}>
                 アクセスキー
               </label>
-              <select
-                value={selectedAccessKeyId}
-                onChange={(e) => handleAccessKeySelect(e.target.value)}
-                style={{
-                  width: '100%',
+              {loadingAccessKeys ? (
+                <div style={{
                   padding: '0.5rem',
-                  borderRadius: '4px',
-                  border: '1px solid #444',
-                  backgroundColor: '#0f0f1a',
-                  color: '#fff',
+                  color: '#888',
                   fontSize: '0.85rem',
-                }}
-              >
-                <option value="">選択してください</option>
-                {accessKeys.map((key) => (
-                  <option key={key.id} value={key.id}>
-                    {key.id}{key.hasSavedSecret ? ' (保存済み)' : ''}
-                  </option>
-                ))}
-              </select>
+                }}>
+                  読み込み中...
+                </div>
+              ) : (
+                <select
+                  value={selectedAccessKeyId}
+                  onChange={(e) => handleAccessKeySelect(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    borderRadius: '4px',
+                    border: '1px solid #444',
+                    backgroundColor: '#0f0f1a',
+                    color: '#fff',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  <option value="">選択してください</option>
+                  {accessKeys.map((key) => (
+                    <option key={key.id} value={key.id}>
+                      {key.id}{key.hasSavedSecret ? ' (保存済み)' : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {selectedAccessKeyId && (
