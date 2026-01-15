@@ -445,3 +445,29 @@ func (a *App) DownloadObjectStorageObject(endpoint, accessKey, secretKey, bucket
 	}
 	return sakura.DownloadObject(a.ctx, endpoint, accessKey, secretKey, bucketName, key, savePath)
 }
+
+// Container Registry Secret Key management (Keychain)
+func (a *App) SaveContainerRegistrySecret(registryID, userName, password string) error {
+	return sakura.SaveContainerRegistrySecret(registryID, userName, password)
+}
+
+func (a *App) GetContainerRegistrySecret(registryID, userName string) (string, error) {
+	return sakura.GetContainerRegistrySecret(registryID, userName)
+}
+
+func (a *App) DeleteContainerRegistrySecret(registryID, userName string) error {
+	return sakura.DeleteContainerRegistrySecret(registryID, userName)
+}
+
+func (a *App) HasContainerRegistrySecret(registryID, userName string) bool {
+	return sakura.HasContainerRegistrySecret(registryID, userName)
+}
+
+// Container Registry Image management
+func (a *App) ListContainerRegistryImages(fqdn, userName, password string) ([]sakura.RegistryImage, error) {
+	return sakura.ListRegistryImages(a.ctx, fqdn, userName, password)
+}
+
+func (a *App) GetContainerRegistryImageTags(fqdn, userName, password, imageName string) ([]sakura.RegistryTag, error) {
+	return sakura.GetImageTags(a.ctx, fqdn, userName, password, imageName)
+}
