@@ -22,6 +22,20 @@ interface AccessKeyWithSaved extends sakura.AccessKeyInfo {
 
 type ViewMode = 'sites' | 'buckets';
 
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return 'Invalid Date';
+
+  const Y = date.getFullYear();
+  const M = String(date.getMonth() + 1).padStart(2, '0');
+  const D = String(date.getDate()).padStart(2, '0');
+  const h = String(date.getHours()).padStart(2, '0');
+  const m = String(date.getMinutes()).padStart(2, '0');
+  const s = String(date.getSeconds()).padStart(2, '0');
+
+  return `${Y}/${M}/${D} ${h}:${m}:${s}`;
+};
+
 export function ObjectStorageList({ profile }: ObjectStorageListProps) {
   const [sites, setSites] = useState<sakura.SiteInfo[]>([]);
   const [selectedSite, setSelectedSite] = useState<sakura.SiteInfo | null>(null);
@@ -352,7 +366,7 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
               {filteredBuckets.map((bucket) => (
                 <tr key={bucket.name}>
                   <td style={{ color: '#00adb5', fontWeight: 'bold' }}>{bucket.name}</td>
-                  <td>{bucket.creationDate ? new Date(bucket.creationDate).toLocaleString() : '-'}</td>
+                  <td>{bucket.creationDate ? formatDate(bucket.creationDate) : '-'}</td>
                 </tr>
               ))}
             </tbody>

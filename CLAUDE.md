@@ -55,3 +55,23 @@ SakPilot is a desktop app for managing Sakura Cloud infrastructure, built with W
 
 - `<td>` elements should be **left-aligned** by default. Avoid centering text in table cells as it reduces readability.
 - When creating detail pages or tables, always use `textAlign: 'left'` for td elements if needed.
+
+### Date Formatting
+
+- Date/time should be formatted as `YYYY/MM/DD HH:MM:SS`
+- Use this helper function:
+```typescript
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return 'Invalid Date';
+
+  const Y = date.getFullYear();
+  const M = String(date.getMonth() + 1).padStart(2, '0');
+  const D = String(date.getDate()).padStart(2, '0');
+  const h = String(date.getHours()).padStart(2, '0');
+  const m = String(date.getMinutes()).padStart(2, '0');
+  const s = String(date.getSeconds()).padStart(2, '0');
+
+  return `${Y}/${M}/${D} ${h}:${m}:${s}`;
+};
+```
