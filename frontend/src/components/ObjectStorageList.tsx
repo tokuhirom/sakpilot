@@ -352,12 +352,37 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
           </button>
         </div>
 
-        {currentPrefix && (
-          <div style={{ marginBottom: '0.5rem', padding: '0.5rem', backgroundColor: '#1a1a2e', borderRadius: '4px' }}>
-            <span style={{ color: '#888', fontSize: '0.85rem' }}>パス: </span>
-            <span style={{ color: '#00adb5', fontSize: '0.85rem' }}>{currentPrefix}</span>
-          </div>
-        )}
+        <div style={{ marginBottom: '0.5rem', padding: '0.5rem', backgroundColor: '#1a1a2e', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '0.25rem', flexWrap: 'wrap' }}>
+          <span
+            onClick={() => handlePrefixClick('')}
+            style={{
+              color: currentPrefix ? '#00adb5' : '#888',
+              fontSize: '0.85rem',
+              cursor: currentPrefix ? 'pointer' : 'default',
+            }}
+          >
+            /
+          </span>
+          {currentPrefix.split('/').filter(p => p).map((part, index, arr) => {
+            const pathUpTo = arr.slice(0, index + 1).join('/') + '/';
+            const isLast = index === arr.length - 1;
+            return (
+              <span key={pathUpTo} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <span style={{ color: '#666', fontSize: '0.85rem' }}>/</span>
+                <span
+                  onClick={() => !isLast && handlePrefixClick(pathUpTo)}
+                  style={{
+                    color: isLast ? '#888' : '#00adb5',
+                    fontSize: '0.85rem',
+                    cursor: isLast ? 'default' : 'pointer',
+                  }}
+                >
+                  {part}
+                </span>
+              </span>
+            );
+          })}
+        </div>
 
         {objectsError && (
           <div style={{
