@@ -38,18 +38,27 @@ export function DNSDetail({ profile, dnsId }: DNSDetailProps) {
         <h2>DNS詳細: {dns.name}</h2>
       </div>
 
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '0.5rem', fontSize: '0.9rem' }}>
-          <div style={{ color: '#888' }}>ID:</div>
-          <div>{dns.id}</div>
-          <div style={{ color: '#888' }}>ゾーン名:</div>
-          <div>{dns.zone}</div>
-          <div style={{ color: '#888' }}>説明:</div>
-          <div>{dns.description || '-'}</div>
-        </div>
+      <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem', background: '#2a2a2a', borderRadius: '8px' }}>
+        <h4 style={{ color: '#00adb5', marginTop: 0, marginBottom: '1rem' }}>基本情報</h4>
+        <table style={{ borderCollapse: 'collapse' }}>
+          <tbody>
+            <tr>
+              <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>ID</td>
+              <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{dns.id}</td>
+            </tr>
+            <tr>
+              <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>ゾーン名</td>
+              <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{dns.zone}</td>
+            </tr>
+            <tr>
+              <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>説明</td>
+              <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{dns.description || '-'}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
-      <h3>リソースレコード</h3>
+      <h3 style={{ color: '#00adb5' }}>リソースレコード</h3>
       <table className="table">
         <thead>
           <tr>
@@ -61,14 +70,14 @@ export function DNSDetail({ profile, dnsId }: DNSDetailProps) {
         </thead>
         <tbody>
           {dns.records && dns.records.length > 0 ? (
-            dns.records.map((record, index) => (
+            [...dns.records].sort((a, b) => a.name.localeCompare(b.name)).map((record, index) => (
               <tr key={index}>
-                <td>{record.name}</td>
-                <td>
+                <td style={{ textAlign: 'left' }}>{record.name}</td>
+                <td style={{ textAlign: 'left' }}>
                   <span className="badge" style={{ backgroundColor: '#2d3748' }}>{record.type}</span>
                 </td>
-                <td style={{ wordBreak: 'break-all' }}>{record.rdata}</td>
-                <td>{record.ttl}</td>
+                <td style={{ textAlign: 'left', wordBreak: 'break-all' }}>{record.rdata}</td>
+                <td style={{ textAlign: 'left' }}>{record.ttl}</td>
               </tr>
             ))
           ) : (

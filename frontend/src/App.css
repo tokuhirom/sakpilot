@@ -453,3 +453,8 @@ body {
   font-size: 0.75rem;
   color: #888;
 }
+
+.auth-loading {
+  font-size: 0.8rem;
+  color: #666;
+}

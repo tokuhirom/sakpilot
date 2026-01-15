@@ -79,6 +79,7 @@ function App() {
     console.log('[App] handleSwitchProfile:', profileName);
     setLoading(true);
     try {
+      setAuthInfo(null);
       const [defaultZone, auth] = await Promise.all([
         GetDefaultZone(profileName),
         GetAuthInfo(profileName),
@@ -268,7 +269,11 @@ function App() {
             </>
           )}
           </div>
-          {authInfo && (
+          {loading ? (
+            <div className="auth-info">
+              <span className="auth-loading">読み込み中...</span>
+            </div>
+          ) : authInfo && (
             <div className="auth-info">
               <span className="auth-account">{authInfo.accountName}</span>
               <span className="auth-member">{authInfo.memberCode}</span>
