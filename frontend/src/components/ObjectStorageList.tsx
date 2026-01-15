@@ -8,6 +8,7 @@ import {
   DeleteObjectStorageSecretKey,
   HasObjectStorageSecretKey,
   ListObjectStorageObjects,
+  DownloadObjectStorageObject,
 } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
@@ -332,6 +333,34 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
     return key.replace(currentPrefix, '');
   };
 
+  const [downloading, setDownloading] = useState<string | null>(null);
+
+  const handleDownload = async (obj: sakura.ObjectInfo) => {
+    if (!selectedSite || !selectedBucket) return;
+
+    const fileName = obj.key.split('/').pop() || obj.key;
+
+    setDownloading(obj.key);
+    try {
+      await DownloadObjectStorageObject(
+        selectedSite.endpoint,
+        selectedAccessKeyId,
+        secretKey,
+        selectedBucket.name,
+        obj.key,
+        fileName
+      );
+    } catch (err) {
+      console.error('[ObjectStorageList] download error:', err);
+      // User cancelled is not an error
+      if (err instanceof Error && !err.message.includes('cancelled')) {
+        setObjectsError(`ダウンロードに失敗しました: ${err.message}`);
+      }
+    } finally {
+      setDownloading(null);
+    }
+  };
+
   // Object list view
   if (viewMode === 'objects' && selectedSite && selectedBucket) {
     return (
@@ -414,6 +443,7 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
                   <th>名前</th>
                   <th>サイズ</th>
                   <th>更新日時</th>
+                  <th style={{ width: '80px' }}>操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -423,6 +453,7 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
                     style={{ cursor: 'pointer' }}
                   >
                     <td style={{ color: '#ffd93d' }}>📁 ..</td>
+                    <td>-</td>
                     <td>-</td>
                     <td>-</td>
                   </tr>
@@ -436,6 +467,7 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
                     <td style={{ color: '#ffd93d' }}>📁 {prefix.replace(currentPrefix, '').replace(/\/$/, '')}</td>
                     <td>-</td>
                     <td>-</td>
+                    <td>-</td>
                   </tr>
                 ))}
                 {objects.map((obj) => (
@@ -443,6 +475,17 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
                     <td style={{ color: '#e0e0e0' }}>📄 {getDisplayName(obj.key)}</td>
                     <td>{formatSize(obj.size)}</td>
                     <td>{obj.lastModified ? formatDate(obj.lastModified) : '-'}</td>
+                    <td>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => handleDownload(obj)}
+                        disabled={downloading === obj.key}
+                        style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+                        title="ダウンロード"
+                      >
+                        {downloading === obj.key ? '...' : '↓'}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

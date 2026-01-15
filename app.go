@@ -8,6 +8,7 @@ import (
 	"sakpilot/internal/sakura"
 
 	"github.com/sacloud/iaas-api-go"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type App struct {
@@ -429,4 +430,18 @@ func (a *App) HasObjectStorageSecretKey(siteID, accessKeyID string) bool {
 
 func (a *App) ListObjectStorageObjects(endpoint, accessKey, secretKey, bucketName, prefix, continuationToken string, maxKeys int32) (*sakura.ListObjectsResult, error) {
 	return sakura.ListObjects(a.ctx, endpoint, accessKey, secretKey, bucketName, prefix, continuationToken, maxKeys)
+}
+
+func (a *App) DownloadObjectStorageObject(endpoint, accessKey, secretKey, bucketName, key, defaultFileName string) error {
+	savePath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		DefaultFilename: defaultFileName,
+		Title:           "オブジェクトを保存",
+	})
+	if err != nil {
+		return err
+	}
+	if savePath == "" {
+		return fmt.Errorf("cancelled")
+	}
+	return sakura.DownloadObject(a.ctx, endpoint, accessKey, secretKey, bucketName, key, savePath)
 }

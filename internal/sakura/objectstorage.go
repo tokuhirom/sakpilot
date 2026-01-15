@@ -2,6 +2,8 @@ package sakura
 
 import (
 	"context"
+	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -206,4 +208,46 @@ func ListObjects(ctx context.Context, endpoint, accessKey, secretKey, bucketName
 		IsTruncated: aws.ToBool(output.IsTruncated),
 		NextToken:   nextToken,
 	}, nil
+}
+
+// DownloadObject downloads an object from S3 and saves it to the specified path
+func DownloadObject(ctx context.Context, endpoint, accessKey, secretKey, bucketName, key, savePath string) error {
+	// Ensure endpoint has https:// prefix
+	if !strings.HasPrefix(endpoint, "https://") && !strings.HasPrefix(endpoint, "http://") {
+		endpoint = "https://" + endpoint
+	}
+
+	cfg := aws.Config{
+		Region: "jp-north-1",
+		Credentials: credentials.NewStaticCredentialsProvider(
+			accessKey,
+			secretKey,
+			"",
+		),
+	}
+
+	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+		o.BaseEndpoint = aws.String(endpoint)
+		o.UsePathStyle = true
+	})
+
+	output, err := client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return err
+	}
+	defer output.Body.Close()
+
+	// Create the file
+	file, err := os.Create(savePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Copy the data
+	_, err = io.Copy(file, output.Body)
+	return err
 }
