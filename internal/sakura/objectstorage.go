@@ -4,6 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	objectstorage "github.com/sacloud/object-storage-api-go"
 	ossbucket "github.com/sacloud/object-storage-service-go/bucket"
 )
@@ -29,6 +32,20 @@ type AccessKeyInfo struct {
 	ID        string `json:"id"`
 	SiteID    string `json:"siteId"`
 	CreatedAt string `json:"createdAt"`
+}
+
+type ObjectInfo struct {
+	Key          string `json:"key"`
+	Size         int64  `json:"size"`
+	LastModified string `json:"lastModified"`
+	StorageClass string `json:"storageClass"`
+}
+
+type ListObjectsResult struct {
+	Objects      []ObjectInfo `json:"objects"`
+	Prefixes     []string     `json:"prefixes"`
+	IsTruncated  bool         `json:"isTruncated"`
+	NextToken    string       `json:"nextToken"`
 }
 
 func NewObjectStorageService(c *Client) *ObjectStorageService {
@@ -111,4 +128,76 @@ func (s *ObjectStorageService) ListBuckets(ctx context.Context, siteID, accessKe
 		})
 	}
 	return result, nil
+}
+
+// ListObjects lists objects in a bucket using S3 API
+func ListObjects(ctx context.Context, endpoint, accessKey, secretKey, bucketName, prefix, continuationToken string, maxKeys int32) (*ListObjectsResult, error) {
+	// Create S3 client with custom endpoint
+	cfg := aws.Config{
+		Region: "jp-north-1", // Sakura Cloud region (doesn't really matter for object storage)
+		Credentials: credentials.NewStaticCredentialsProvider(
+			accessKey,
+			secretKey,
+			"",
+		),
+	}
+
+	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+		o.BaseEndpoint = aws.String(endpoint)
+		o.UsePathStyle = true // Required for S3-compatible services
+	})
+
+	input := &s3.ListObjectsV2Input{
+		Bucket:    aws.String(bucketName),
+		Delimiter: aws.String("/"),
+	}
+	if prefix != "" {
+		input.Prefix = aws.String(prefix)
+	}
+	if continuationToken != "" {
+		input.ContinuationToken = aws.String(continuationToken)
+	}
+	if maxKeys > 0 {
+		input.MaxKeys = aws.Int32(maxKeys)
+	}
+
+	output, err := client.ListObjectsV2(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	objects := make([]ObjectInfo, 0, len(output.Contents))
+	for _, obj := range output.Contents {
+		lastModified := ""
+		if obj.LastModified != nil {
+			lastModified = obj.LastModified.Format(time.RFC3339)
+		}
+		storageClass := ""
+		if obj.StorageClass != "" {
+			storageClass = string(obj.StorageClass)
+		}
+		objects = append(objects, ObjectInfo{
+			Key:          aws.ToString(obj.Key),
+			Size:         aws.ToInt64(obj.Size),
+			LastModified: lastModified,
+			StorageClass: storageClass,
+		})
+	}
+
+	prefixes := make([]string, 0, len(output.CommonPrefixes))
+	for _, p := range output.CommonPrefixes {
+		prefixes = append(prefixes, aws.ToString(p.Prefix))
+	}
+
+	nextToken := ""
+	if output.NextContinuationToken != nil {
+		nextToken = *output.NextContinuationToken
+	}
+
+	return &ListObjectsResult{
+		Objects:     objects,
+		Prefixes:    prefixes,
+		IsTruncated: aws.ToBool(output.IsTruncated),
+		NextToken:   nextToken,
+	}, nil
 }

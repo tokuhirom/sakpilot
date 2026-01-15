@@ -426,3 +426,7 @@ func (a *App) DeleteObjectStorageSecretKey(siteID, accessKeyID string) error {
 func (a *App) HasObjectStorageSecretKey(siteID, accessKeyID string) bool {
 	return sakura.HasObjectStorageSecret(siteID, accessKeyID)
 }
+
+func (a *App) ListObjectStorageObjects(endpoint, accessKey, secretKey, bucketName, prefix, continuationToken string, maxKeys int32) (*sakura.ListObjectsResult, error) {
+	return sakura.ListObjects(a.ctx, endpoint, accessKey, secretKey, bucketName, prefix, continuationToken, maxKeys)
+}

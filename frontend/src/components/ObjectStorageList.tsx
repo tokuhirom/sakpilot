@@ -7,6 +7,7 @@ import {
   SaveObjectStorageSecretKey,
   DeleteObjectStorageSecretKey,
   HasObjectStorageSecretKey,
+  ListObjectStorageObjects,
 } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
@@ -20,7 +21,7 @@ interface AccessKeyWithSaved extends sakura.AccessKeyInfo {
   hasSavedSecret?: boolean;
 }
 
-type ViewMode = 'sites' | 'buckets';
+type ViewMode = 'sites' | 'buckets' | 'objects';
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
@@ -47,6 +48,15 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
   const [secretKey, setSecretKey] = useState('');
   const [secretSaved, setSecretSaved] = useState(false);
   const [bucketsError, setBucketsError] = useState<string | null>(null);
+
+  // Object list state
+  const [selectedBucket, setSelectedBucket] = useState<sakura.BucketInfo | null>(null);
+  const [objects, setObjects] = useState<sakura.ObjectInfo[]>([]);
+  const [prefixes, setPrefixes] = useState<string[]>([]);
+  const [currentPrefix, setCurrentPrefix] = useState('');
+  const [objectsError, setObjectsError] = useState<string | null>(null);
+  const [nextToken, setNextToken] = useState('');
+  const [hasMore, setHasMore] = useState(false);
 
   const {
     searchQuery,
@@ -110,6 +120,41 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
     }
   }, [profile, selectedSite, selectedAccessKeyId, secretKey]);
 
+  const loadObjects = useCallback(async (prefix: string = '', append: boolean = false) => {
+    if (!selectedSite || !selectedAccessKeyId || !secretKey || !selectedBucket) return;
+
+    setLoading(true);
+    setObjectsError(null);
+    try {
+      const result = await ListObjectStorageObjects(
+        selectedSite.endpoint,
+        selectedAccessKeyId,
+        secretKey,
+        selectedBucket.name,
+        prefix,
+        append ? nextToken : '',
+        100
+      );
+      if (append) {
+        setObjects(prev => [...prev, ...(result.objects || [])]);
+      } else {
+        setObjects(result.objects || []);
+      }
+      setPrefixes(result.prefixes || []);
+      setHasMore(result.isTruncated);
+      setNextToken(result.nextToken || '');
+    } catch (err) {
+      console.error('[ObjectStorageList] loadObjects error:', err);
+      setObjectsError(err instanceof Error ? err.message : String(err));
+      if (!append) {
+        setObjects([]);
+        setPrefixes([]);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedSite, selectedAccessKeyId, secretKey, selectedBucket, nextToken]);
+
   useEffect(() => {
     loadSites();
   }, [loadSites]);
@@ -120,6 +165,14 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
       loadBuckets();
     }
   }, [selectedAccessKeyId, secretKey, secretSaved, loadBuckets]);
+
+  // Auto-load objects when bucket is selected
+  useEffect(() => {
+    if (viewMode === 'objects' && selectedBucket && selectedAccessKeyId && secretKey) {
+      loadObjects('');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBucket]);
 
   const handleSiteSelect = async (site: sakura.SiteInfo) => {
     setSelectedSite(site);
@@ -202,6 +255,169 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
       console.error('[ObjectStorageList] delete secret error:', err);
     }
   };
+
+  const handleBucketSelect = (bucket: sakura.BucketInfo) => {
+    setSelectedBucket(bucket);
+    setViewMode('objects');
+    setObjects([]);
+    setPrefixes([]);
+    setCurrentPrefix('');
+    setObjectsError(null);
+    setNextToken('');
+    setHasMore(false);
+  };
+
+  const handleBackToBuckets = () => {
+    setViewMode('buckets');
+    setSelectedBucket(null);
+    setObjects([]);
+    setPrefixes([]);
+    setCurrentPrefix('');
+    setObjectsError(null);
+    setNextToken('');
+    setHasMore(false);
+  };
+
+  const handlePrefixClick = (prefix: string) => {
+    setCurrentPrefix(prefix);
+    setObjects([]);
+    setPrefixes([]);
+    setNextToken('');
+    setHasMore(false);
+    loadObjects(prefix);
+  };
+
+  const handleNavigateUp = () => {
+    // Remove last folder from prefix
+    const parts = currentPrefix.split('/').filter(p => p);
+    parts.pop();
+    const newPrefix = parts.length > 0 ? parts.join('/') + '/' : '';
+    setCurrentPrefix(newPrefix);
+    setObjects([]);
+    setPrefixes([]);
+    setNextToken('');
+    setHasMore(false);
+    loadObjects(newPrefix);
+  };
+
+  const formatSize = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
+  };
+
+  const getDisplayName = (key: string): string => {
+    // Remove prefix from key to get just the file name
+    return key.replace(currentPrefix, '');
+  };
+
+  // Object list view
+  if (viewMode === 'objects' && selectedSite && selectedBucket) {
+    return (
+      <>
+        <div className="header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              className="btn btn-secondary"
+              onClick={handleBackToBuckets}
+              style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+            >
+              ← 戻る
+            </button>
+            <h2>{selectedBucket.name}</h2>
+          </div>
+          <button
+            className="btn-reload"
+            onClick={() => loadObjects(currentPrefix)}
+            disabled={loading}
+            title="リロード"
+          >
+            ↻
+          </button>
+        </div>
+
+        {currentPrefix && (
+          <div style={{ marginBottom: '0.5rem', padding: '0.5rem', backgroundColor: '#1a1a2e', borderRadius: '4px' }}>
+            <span style={{ color: '#888', fontSize: '0.85rem' }}>パス: </span>
+            <span style={{ color: '#00adb5', fontSize: '0.85rem' }}>{currentPrefix}</span>
+          </div>
+        )}
+
+        {objectsError && (
+          <div style={{
+            marginBottom: '1rem',
+            padding: '0.75rem',
+            backgroundColor: '#3d1f1f',
+            borderRadius: '4px',
+            color: '#ff6b6b',
+            fontSize: '0.85rem'
+          }}>
+            エラー: {objectsError}
+          </div>
+        )}
+
+        {loading && objects.length === 0 ? (
+          <div className="loading">読み込み中...</div>
+        ) : (prefixes.length === 0 && objects.length === 0) ? (
+          <div className="empty-state">オブジェクトがありません</div>
+        ) : (
+          <>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>名前</th>
+                  <th>サイズ</th>
+                  <th>更新日時</th>
+                </tr>
+              </thead>
+              <tbody>
+                {currentPrefix && (
+                  <tr
+                    onClick={handleNavigateUp}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <td style={{ color: '#ffd93d' }}>📁 ..</td>
+                    <td>-</td>
+                    <td>-</td>
+                  </tr>
+                )}
+                {prefixes.map((prefix) => (
+                  <tr
+                    key={prefix}
+                    onClick={() => handlePrefixClick(prefix)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <td style={{ color: '#ffd93d' }}>📁 {prefix.replace(currentPrefix, '').replace(/\/$/, '')}</td>
+                    <td>-</td>
+                    <td>-</td>
+                  </tr>
+                ))}
+                {objects.map((obj) => (
+                  <tr key={obj.key}>
+                    <td style={{ color: '#e0e0e0' }}>📄 {getDisplayName(obj.key)}</td>
+                    <td>{formatSize(obj.size)}</td>
+                    <td>{obj.lastModified ? formatDate(obj.lastModified) : '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {hasMore && (
+              <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => loadObjects(currentPrefix, true)}
+                  disabled={loading}
+                >
+                  {loading ? '読み込み中...' : 'もっと読み込む'}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </>
+    );
+  }
 
   if (viewMode === 'buckets' && selectedSite) {
     return (
@@ -364,7 +580,11 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
             </thead>
             <tbody>
               {filteredBuckets.map((bucket) => (
-                <tr key={bucket.name}>
+                <tr
+                  key={bucket.name}
+                  onClick={() => handleBucketSelect(bucket)}
+                  style={{ cursor: 'pointer' }}
+                >
                   <td style={{ color: '#00adb5', fontWeight: 'bold' }}>{bucket.name}</td>
                   <td>{bucket.creationDate ? formatDate(bucket.creationDate) : '-'}</td>
                 </tr>
