@@ -381,3 +381,31 @@ func (a *App) GetBillDetails(profileName, memberCode, billID string) ([]sakura.B
 	service := sakura.NewBillService(client)
 	return service.GetDetails(a.ctx, memberCode, billID)
 }
+
+// Object Storage
+func (a *App) GetObjectStorageSites(profileName string) ([]sakura.SiteInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.ListSites(a.ctx)
+}
+
+func (a *App) GetObjectStorageBuckets(profileName, siteID, accessKey, secretKey string) ([]sakura.BucketInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.ListBuckets(a.ctx, siteID, accessKey, secretKey)
+}
+
+func (a *App) GetObjectStorageAccessKeys(profileName, siteID string) ([]sakura.AccessKeyInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.ListAccessKeys(a.ctx, siteID)
+}

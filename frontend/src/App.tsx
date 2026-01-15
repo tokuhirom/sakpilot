@@ -26,8 +26,9 @@ import { PacketFilterList } from './components/PacketFilterList';
 import { PacketFilterDetail } from './components/PacketFilterDetail';
 import { ArchiveList } from './components/ArchiveList';
 import { BillList } from './components/BillList';
+import { ObjectStorageList } from './components/ObjectStorageList';
 
-type Page = 'servers' | 'disks' | 'archives' | 'databases' | 'switches' | 'switch-detail' | 'packetfilters' | 'packetfilter-detail' | 'dns' | 'dns-detail' | 'gslb' | 'gslb-detail' | 'monitors' | 'monitoring' | 'container-registry' | 'container-registry-detail' | 'apprun' | 'bills';
+type Page = 'servers' | 'disks' | 'archives' | 'databases' | 'switches' | 'switch-detail' | 'packetfilters' | 'packetfilter-detail' | 'dns' | 'dns-detail' | 'gslb' | 'gslb-detail' | 'monitors' | 'monitoring' | 'container-registry' | 'container-registry-detail' | 'object-storage' | 'apprun' | 'bills';
 
 function App() {
   const [profiles, setProfiles] = useState<sakura.ProfileInfo[]>([]);
@@ -211,6 +212,12 @@ function App() {
           >
             コンテナレジストリ
           </div>
+          <div
+            className={`nav-item ${currentPage === 'object-storage' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('object-storage')}
+          >
+            オブジェクトストレージ
+          </div>
         </div>
 
         <div className="nav-section">
@@ -259,6 +266,7 @@ function App() {
              currentPage === 'monitors' ? 'シンプル監視' :
              currentPage === 'monitoring' ? 'モニタリングスイート' :
              currentPage === 'container-registry' || currentPage === 'container-registry-detail' ? 'コンテナレジストリ' :
+             currentPage === 'object-storage' ? 'オブジェクトストレージ' :
              currentPage === 'apprun' ? 'AppRun' :
              currentPage === 'bills' ? '請求' : ''}
           </span>
@@ -409,6 +417,10 @@ function App() {
             profile={currentProfile}
             registry={selectedContainerRegistry}
           />
+        )}
+
+        {currentPage === 'object-storage' && (
+          <ObjectStorageList profile={currentProfile} />
         )}
 
         {currentPage === 'apprun' && (
