@@ -56,6 +56,14 @@ SakPilot is a desktop app for managing Sakura Cloud infrastructure, built with W
 - `<td>` elements should be **left-aligned** by default. Avoid centering text in table cells as it reduces readability.
 - When creating detail pages or tables, always use `textAlign: 'left'` for td elements if needed.
 
+### Profile Switching
+
+- プロファイル切り替え時は、右側ペインの詳細情報を必ずクリアすること
+- `handleSwitchProfile` で以下の状態をリセット：
+  - 選択中の詳細情報（`selectedDNSId`, `selectedGSLBId`, `selectedContainerRegistry` 等）
+  - オブジェクトストレージのパンくず状態
+  - 詳細ページにいる場合はリストページに戻す
+
 ### Date Formatting
 
 - Date/time should be formatted as `YYYY/MM/DD HH:MM:SS`
