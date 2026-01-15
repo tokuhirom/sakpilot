@@ -409,3 +409,20 @@ func (a *App) GetObjectStorageAccessKeys(profileName, siteID string) ([]sakura.A
 	service := sakura.NewObjectStorageService(client)
 	return service.ListAccessKeys(a.ctx, siteID)
 }
+
+// Object Storage Secret Key management (Keychain)
+func (a *App) SaveObjectStorageSecretKey(siteID, accessKeyID, secretKey string) error {
+	return sakura.SaveObjectStorageSecret(siteID, accessKeyID, secretKey)
+}
+
+func (a *App) GetObjectStorageSecretKey(siteID, accessKeyID string) (string, error) {
+	return sakura.GetObjectStorageSecret(siteID, accessKeyID)
+}
+
+func (a *App) DeleteObjectStorageSecretKey(siteID, accessKeyID string) error {
+	return sakura.DeleteObjectStorageSecret(siteID, accessKeyID)
+}
+
+func (a *App) HasObjectStorageSecretKey(siteID, accessKeyID string) bool {
+	return sakura.HasObjectStorageSecret(siteID, accessKeyID)
+}

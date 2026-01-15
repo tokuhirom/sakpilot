@@ -1,5 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetObjectStorageSites, GetObjectStorageBuckets, GetObjectStorageAccessKeys } from '../../wailsjs/go/main/App';
+import {
+  GetObjectStorageSites,
+  GetObjectStorageBuckets,
+  GetObjectStorageAccessKeys,
+  GetObjectStorageSecretKey,
+  SaveObjectStorageSecretKey,
+  DeleteObjectStorageSecretKey,
+  HasObjectStorageSecretKey,
+} from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { SearchBar } from './SearchBar';
@@ -8,17 +16,22 @@ interface ObjectStorageListProps {
   profile: string;
 }
 
+interface AccessKeyWithSaved extends sakura.AccessKeyInfo {
+  hasSavedSecret?: boolean;
+}
+
 type ViewMode = 'sites' | 'buckets';
 
 export function ObjectStorageList({ profile }: ObjectStorageListProps) {
   const [sites, setSites] = useState<sakura.SiteInfo[]>([]);
   const [selectedSite, setSelectedSite] = useState<sakura.SiteInfo | null>(null);
   const [buckets, setBuckets] = useState<sakura.BucketInfo[]>([]);
-  const [accessKeys, setAccessKeys] = useState<sakura.AccessKeyInfo[]>([]);
+  const [accessKeys, setAccessKeys] = useState<AccessKeyWithSaved[]>([]);
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('sites');
-  const [accessKey, setAccessKey] = useState('');
+  const [selectedAccessKeyId, setSelectedAccessKeyId] = useState('');
   const [secretKey, setSecretKey] = useState('');
+  const [secretSaved, setSecretSaved] = useState(false);
   const [bucketsError, setBucketsError] = useState<string | null>(null);
 
   const {
@@ -52,7 +65,14 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
 
     try {
       const keys = await GetObjectStorageAccessKeys(profile, siteId);
-      setAccessKeys(keys || []);
+      // Check which keys have saved secrets
+      const keysWithSaved: AccessKeyWithSaved[] = await Promise.all(
+        (keys || []).map(async (key) => {
+          const hasSaved = await HasObjectStorageSecretKey(siteId, key.id);
+          return { ...key, hasSavedSecret: hasSaved };
+        })
+      );
+      setAccessKeys(keysWithSaved);
     } catch (err) {
       console.error('[ObjectStorageList] loadAccessKeys error:', err);
       setAccessKeys([]);
@@ -60,12 +80,12 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
   }, [profile]);
 
   const loadBuckets = useCallback(async () => {
-    if (!profile || !selectedSite || !accessKey || !secretKey) return;
+    if (!profile || !selectedSite || !selectedAccessKeyId || !secretKey) return;
 
     setLoading(true);
     setBucketsError(null);
     try {
-      const list = await GetObjectStorageBuckets(profile, selectedSite.id, accessKey, secretKey);
+      const list = await GetObjectStorageBuckets(profile, selectedSite.id, selectedAccessKeyId, secretKey);
       setBuckets(list || []);
     } catch (err) {
       console.error('[ObjectStorageList] loadBuckets error:', err);
@@ -74,19 +94,27 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
     } finally {
       setLoading(false);
     }
-  }, [profile, selectedSite, accessKey, secretKey]);
+  }, [profile, selectedSite, selectedAccessKeyId, secretKey]);
 
   useEffect(() => {
     loadSites();
   }, [loadSites]);
+
+  // Auto-load buckets when we have both accessKey and secretKey
+  useEffect(() => {
+    if (selectedAccessKeyId && secretKey && secretSaved) {
+      loadBuckets();
+    }
+  }, [selectedAccessKeyId, secretKey, secretSaved, loadBuckets]);
 
   const handleSiteSelect = async (site: sakura.SiteInfo) => {
     setSelectedSite(site);
     setViewMode('buckets');
     setBuckets([]);
     setBucketsError(null);
-    setAccessKey('');
+    setSelectedAccessKeyId('');
     setSecretKey('');
+    setSecretSaved(false);
     await loadAccessKeys(site.id);
   };
 
@@ -95,9 +123,70 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
     setSelectedSite(null);
     setBuckets([]);
     setAccessKeys([]);
-    setAccessKey('');
+    setSelectedAccessKeyId('');
     setSecretKey('');
+    setSecretSaved(false);
     setBucketsError(null);
+  };
+
+  const handleAccessKeySelect = async (accessKeyId: string) => {
+    setSelectedAccessKeyId(accessKeyId);
+    setSecretKey('');
+    setSecretSaved(false);
+    setBuckets([]);
+    setBucketsError(null);
+
+    if (!accessKeyId || !selectedSite) return;
+
+    // Try to load saved secret
+    try {
+      const savedSecret = await GetObjectStorageSecretKey(selectedSite.id, accessKeyId);
+      if (savedSecret) {
+        setSecretKey(savedSecret);
+        setSecretSaved(true);
+      }
+    } catch {
+      // No saved secret, that's fine
+    }
+  };
+
+  const handleSaveSecret = async () => {
+    if (!selectedSite || !selectedAccessKeyId || !secretKey) return;
+
+    try {
+      await SaveObjectStorageSecretKey(selectedSite.id, selectedAccessKeyId, secretKey);
+      setSecretSaved(true);
+      // Update the access key list to show saved status
+      setAccessKeys(prev =>
+        prev.map(k =>
+          k.id === selectedAccessKeyId ? { ...k, hasSavedSecret: true } : k
+        )
+      );
+      // Load buckets after saving
+      loadBuckets();
+    } catch (err) {
+      console.error('[ObjectStorageList] save secret error:', err);
+      setBucketsError('シークレットキーの保存に失敗しました');
+    }
+  };
+
+  const handleDeleteSecret = async () => {
+    if (!selectedSite || !selectedAccessKeyId) return;
+
+    try {
+      await DeleteObjectStorageSecretKey(selectedSite.id, selectedAccessKeyId);
+      setSecretKey('');
+      setSecretSaved(false);
+      setBuckets([]);
+      // Update the access key list
+      setAccessKeys(prev =>
+        prev.map(k =>
+          k.id === selectedAccessKeyId ? { ...k, hasSavedSecret: false } : k
+        )
+      );
+    } catch (err) {
+      console.error('[ObjectStorageList] delete secret error:', err);
+    }
   };
 
   if (viewMode === 'buckets' && selectedSite) {
@@ -117,7 +206,7 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
           <button
             className="btn-reload"
             onClick={loadBuckets}
-            disabled={loading || !accessKey || !secretKey}
+            disabled={loading || !selectedAccessKeyId || !secretKey}
             title="リロード"
           >
             ↻
@@ -125,31 +214,18 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
         </div>
 
         <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#1a1a2e', borderRadius: '8px' }}>
-          <div style={{ marginBottom: '0.5rem', fontSize: '0.85rem', color: '#888' }}>
+          <div style={{ marginBottom: '0.75rem', fontSize: '0.85rem', color: '#888' }}>
             エンドポイント: {selectedSite.endpoint}
-          </div>
-
-          <div style={{ marginBottom: '0.75rem' }}>
-            <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>
-              アクセスキー ({accessKeys.length}件)
-            </div>
-            {accessKeys.length > 0 && (
-              <div style={{ fontSize: '0.75rem', color: '#666' }}>
-                {accessKeys.map(k => k.id).join(', ')}
-              </div>
-            )}
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div style={{ flex: 1, minWidth: '200px' }}>
               <label style={{ fontSize: '0.75rem', color: '#888', display: 'block', marginBottom: '0.25rem' }}>
-                アクセスキーID
+                アクセスキー
               </label>
-              <input
-                type="text"
-                value={accessKey}
-                onChange={(e) => setAccessKey(e.target.value)}
-                placeholder="Access Key ID"
+              <select
+                value={selectedAccessKeyId}
+                onChange={(e) => handleAccessKeySelect(e.target.value)}
                 style={{
                   width: '100%',
                   padding: '0.5rem',
@@ -159,36 +235,72 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
                   color: '#fff',
                   fontSize: '0.85rem',
                 }}
-              />
+              >
+                <option value="">選択してください</option>
+                {accessKeys.map((key) => (
+                  <option key={key.id} value={key.id}>
+                    {key.id}{key.hasSavedSecret ? ' (保存済み)' : ''}
+                  </option>
+                ))}
+              </select>
             </div>
-            <div style={{ flex: 1, minWidth: '200px' }}>
-              <label style={{ fontSize: '0.75rem', color: '#888', display: 'block', marginBottom: '0.25rem' }}>
-                シークレットキー
-              </label>
-              <input
-                type="password"
-                value={secretKey}
-                onChange={(e) => setSecretKey(e.target.value)}
-                placeholder="Secret Access Key"
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  borderRadius: '4px',
-                  border: '1px solid #444',
-                  backgroundColor: '#0f0f1a',
-                  color: '#fff',
-                  fontSize: '0.85rem',
-                }}
-              />
-            </div>
-            <button
-              className="btn btn-primary"
-              onClick={loadBuckets}
-              disabled={loading || !accessKey || !secretKey}
-              style={{ padding: '0.5rem 1rem' }}
-            >
-              バケット取得
-            </button>
+
+            {selectedAccessKeyId && (
+              <>
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <label style={{ fontSize: '0.75rem', color: '#888', display: 'block', marginBottom: '0.25rem' }}>
+                    シークレットキー {secretSaved && <span style={{ color: '#4ade80' }}>(保存済み)</span>}
+                  </label>
+                  <input
+                    type="password"
+                    value={secretKey}
+                    onChange={(e) => {
+                      setSecretKey(e.target.value);
+                      setSecretSaved(false);
+                    }}
+                    placeholder="Secret Access Key"
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      borderRadius: '4px',
+                      border: '1px solid #444',
+                      backgroundColor: '#0f0f1a',
+                      color: '#fff',
+                      fontSize: '0.85rem',
+                    }}
+                  />
+                </div>
+                {!secretSaved && secretKey && (
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleSaveSecret}
+                    style={{ padding: '0.5rem 1rem' }}
+                  >
+                    保存
+                  </button>
+                )}
+                {secretSaved && (
+                  <>
+                    <button
+                      className="btn btn-primary"
+                      onClick={loadBuckets}
+                      disabled={loading}
+                      style={{ padding: '0.5rem 1rem' }}
+                    >
+                      取得
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={handleDeleteSecret}
+                      style={{ padding: '0.5rem 0.75rem' }}
+                      title="保存したシークレットを削除"
+                    >
+                      削除
+                    </button>
+                  </>
+                )}
+              </>
+            )}
           </div>
         </div>
 
@@ -220,8 +332,10 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
           <div className="loading">読み込み中...</div>
         ) : buckets.length === 0 ? (
           <div className="empty-state">
-            {!accessKey || !secretKey
-              ? 'アクセスキーとシークレットキーを入力してバケット一覧を取得してください'
+            {!selectedAccessKeyId
+              ? 'アクセスキーを選択してください'
+              : !secretKey
+              ? 'シークレットキーを入力してください'
               : searchQuery
               ? `「${searchQuery}」に一致するバケットがありません`
               : 'バケットがありません'}
