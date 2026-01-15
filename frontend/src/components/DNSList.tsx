@@ -4,9 +4,10 @@ import { sakura } from '../../wailsjs/go/models';
 
 interface DNSListProps {
   profile: string;
+  onSelectDNS: (id: string) => void;
 }
 
-export function DNSList({ profile }: DNSListProps) {
+export function DNSList({ profile, onSelectDNS }: DNSListProps) {
   const [dnsList, setDnsList] = useState<sakura.DNSInfo[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -57,8 +58,8 @@ export function DNSList({ profile }: DNSListProps) {
           </thead>
           <tbody>
             {dnsList.map((dns) => (
-              <tr key={dns.id}>
-                <td>{dns.name}</td>
+              <tr key={dns.id} onClick={() => onSelectDNS(dns.id)} style={{ cursor: 'pointer' }} className="row-hover">
+                <td style={{ color: '#00adb5', fontWeight: 'bold' }}>{dns.name}</td>
                 <td>{dns.zone}</td>
                 <td>{dns.description || '-'}</td>
               </tr>

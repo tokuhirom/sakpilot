@@ -84,6 +84,7 @@ body {
   background-color: #16213e;
   color: #fff;
   cursor: pointer;
+  font-size: 1rem;
 }
 
 .card {
@@ -295,6 +296,44 @@ body {
   color: #888;
 }
 
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.breadcrumb-item {
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.breadcrumb-item:hover {
+  color: #fff;
+}
+
+.breadcrumb-item.active {
+  color: #00adb5;
+  font-weight: 600;
+  cursor: default;
+}
+
+.breadcrumb-separator {
+  color: #444;
+}
+
+.row-hover:hover {
+  background-color: #1a4a7a !important;
+}
+
+.dns-detail h3 {
+  margin: 1.5rem 0 1rem 0;
+  font-size: 1.1rem;
+  color: #00adb5;
+}
+
 .profile-list {
   display: flex;
   flex-direction: column;
@@ -340,6 +379,7 @@ body {
   background-color: #0f3460;
   color: #fff;
   cursor: pointer;
+  font-size: 1rem;
 }
 
 .auth-info {

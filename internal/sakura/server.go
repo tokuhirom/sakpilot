@@ -65,7 +65,7 @@ func (s *ServerService) List(ctx context.Context, zone string) ([]ServerInfo, er
 			Status:      string(srv.InstanceStatus),
 			IPAddresses: ips,
 			Tags:        srv.Tags,
-			CreatedAt:   srv.CreatedAt.String(),
+			CreatedAt:   srv.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		})
 	}
 	return servers, nil

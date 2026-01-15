@@ -68,6 +68,19 @@ export function ServerList({ profile, zone, zones, onZoneChange }: ServerListPro
     setOpenDropdown(openDropdown === id ? null : id);
   };
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid Date';
+    
+    const Y = date.getFullYear();
+    const M = String(date.getMonth() + 1).padStart(2, '0');
+    const D = String(date.getDate()).padStart(2, '0');
+    const h = String(date.getHours()).padStart(2, '0');
+    const m = String(date.getMinutes()).padStart(2, '0');
+    
+    return `${Y}/${M}/${D} ${h}:${m}`;
+  };
+
   return (
     <>
       <div className="header">
@@ -100,18 +113,25 @@ export function ServerList({ profile, zone, zones, onZoneChange }: ServerListPro
                     {server.status}
                   </span>
                 </div>
-                <div className="card-subtitle" style={{ marginTop: '2px' }}>
-                  {server.cpu} vCPU / {server.memory} GB | {server.ipAddresses?.join(', ') || 'No IP'}
+                <div className="card-subtitle" style={{ marginTop: '2px', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <span>{server.cpu} vCPU / {server.memory} GB</span>
+                  <span style={{ color: '#555' }}>|</span>
+                  <span>{server.ipAddresses?.join(', ') || 'No IP'}</span>
+                  <span style={{ color: '#555' }}>|</span>
+                  <span title={`作成日: ${formatDate(server.createdAt)}`}>
+                    {formatDate(server.createdAt)}
+                  </span>
                 </div>
                 {server.tags && server.tags.length > 0 && (
-                  <div className="tags" style={{ marginTop: '0.25rem', display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                  <div className="tags" style={{ marginTop: '0.25rem', display: 'flex', gap: '0.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
                     {server.tags.map(tag => (
                       <span key={tag} className="tag" style={{
                         backgroundColor: '#e2e8f0',
-                        padding: '1px 6px',
+                        padding: '0px 6px',
                         borderRadius: '3px',
-                        fontSize: '0.7rem',
-                        color: '#4a5568'
+                        fontSize: '0.65rem',
+                        color: '#4a5568',
+                        border: '1px solid #cbd5e0'
                       }}>
                         {tag}
                       </span>

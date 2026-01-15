@@ -13,9 +13,11 @@ import (
 )
 
 type Client struct {
-	caller      iaas.APICaller
-	profileName string
-	defaultZone string
+	caller            iaas.APICaller
+	accessToken       string
+	accessTokenSecret string
+	profileName       string
+	defaultZone       string
 }
 
 type ProfileInfo struct {
@@ -58,9 +60,11 @@ func NewClientFromProfile(profileName string) (*Client, error) {
 		read.AuthMethod)
 
 	return &Client{
-		caller:      caller,
-		profileName: profileName,
-		defaultZone: cfg.Zone,
+		caller:            caller,
+		accessToken:       cfg.AccessToken,
+		accessTokenSecret: cfg.AccessTokenSecret,
+		profileName:       profileName,
+		defaultZone:       cfg.Zone,
 	}, nil
 }
 
@@ -92,6 +96,10 @@ func (c *Client) DefaultZone() string {
 		return "is1a"
 	}
 	return c.defaultZone
+}
+
+func (c *Client) Credentials() (string, string) {
+	return c.accessToken, c.accessTokenSecret
 }
 
 func ListProfiles() ([]ProfileInfo, error) {

@@ -118,6 +118,24 @@ func (a *App) ForceStopServer(profileName, zone, serverID string) error {
 	return service.ForceStop(a.ctx, zone, serverID)
 }
 
+func (a *App) GetDatabases(profileName, zone string) ([]sakura.DatabaseInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewDatabaseService(client)
+	return service.List(a.ctx, zone)
+}
+
+func (a *App) GetDisks(profileName, zone string) ([]sakura.DiskInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewDiskService(client)
+	return service.List(a.ctx, zone)
+}
+
 // Global resources (zone-independent)
 func (a *App) GetDNSList(profileName string) ([]sakura.DNSInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
@@ -126,6 +144,15 @@ func (a *App) GetDNSList(profileName string) ([]sakura.DNSInfo, error) {
 	}
 	service := sakura.NewGlobalService(client)
 	return service.ListDNS(a.ctx)
+}
+
+func (a *App) GetDNSDetail(profileName, id string) (*sakura.DNSInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.GetDNS(a.ctx, id)
 }
 
 func (a *App) GetCertificates(profileName string) ([]sakura.CertificateInfo, error) {
@@ -144,4 +171,31 @@ func (a *App) GetSimpleMonitors(profileName string) ([]sakura.SimpleMonitorInfo,
 	}
 	service := sakura.NewGlobalService(client)
 	return service.ListSimpleMonitors(a.ctx)
+}
+
+func (a *App) GetMSLogs(profileName string) ([]sakura.MSLogInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewMonitoringService(client)
+	return service.ListLogs(a.ctx)
+}
+
+func (a *App) GetMSMetrics(profileName string) ([]sakura.MSMetricInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewMonitoringService(client)
+	return service.ListMetrics(a.ctx)
+}
+
+func (a *App) GetMSTraces(profileName string) ([]sakura.MSTraceInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewMonitoringService(client)
+	return service.ListTraces(a.ctx)
 }

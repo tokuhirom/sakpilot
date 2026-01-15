@@ -4,13 +4,22 @@ import (
 	"context"
 
 	"github.com/sacloud/iaas-api-go"
+	"github.com/sacloud/iaas-api-go/types"
 )
 
+type DNSRecord struct {
+	Name  string `json:"name"`
+	Type  string `json:"type"`
+	RData string `json:"rdata"`
+	TTL   int    `json:"ttl"`
+}
+
 type DNSInfo struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Zone        string `json:"zone"`
+	ID          string      `json:"id"`
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	Zone        string      `json:"zone"`
+	Records     []DNSRecord `json:"records"`
 }
 
 type CertificateInfo struct {
@@ -45,14 +54,50 @@ func (s *GlobalService) ListDNS(ctx context.Context) ([]DNSInfo, error) {
 
 	list := make([]DNSInfo, 0, len(result.DNS))
 	for _, d := range result.DNS {
+		records := make([]DNSRecord, 0, len(d.Records))
+		for _, r := range d.Records {
+			records = append(records, DNSRecord{
+				Name:  r.Name,
+				Type:  string(r.Type),
+				RData: r.RData,
+				TTL:   r.TTL,
+			})
+		}
 		list = append(list, DNSInfo{
 			ID:          d.ID.String(),
 			Name:        d.Name,
 			Description: d.Description,
 			Zone:        d.DNSZone,
+			Records:     records,
 		})
 	}
 	return list, nil
+}
+
+func (s *GlobalService) GetDNS(ctx context.Context, id string) (*DNSInfo, error) {
+	dnsOp := iaas.NewDNSOp(s.client.Caller())
+	d, err := dnsOp.Read(ctx, types.StringID(id))
+	if err != nil {
+		return nil, err
+	}
+
+	records := make([]DNSRecord, 0, len(d.Records))
+	for _, r := range d.Records {
+		records = append(records, DNSRecord{
+			Name:  r.Name,
+			Type:  string(r.Type),
+			RData: r.RData,
+			TTL:   r.TTL,
+		})
+	}
+
+	return &DNSInfo{
+		ID:          d.ID.String(),
+		Name:        d.Name,
+		Description: d.Description,
+		Zone:        d.DNSZone,
+		Records:     records,
+	}, nil
 }
 
 func (s *GlobalService) ListCertificates(ctx context.Context) ([]CertificateInfo, error) {

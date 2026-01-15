@@ -9,10 +9,14 @@ import {
 } from '../wailsjs/go/main/App';
 import { sakura, main } from '../wailsjs/go/models';
 import { ServerList } from './components/ServerList';
+import { DiskList } from './components/DiskList';
 import { DNSList } from './components/DNSList';
+import { DNSDetail } from './components/DNSDetail';
 import { MonitorList } from './components/MonitorList';
+import { DatabaseList } from './components/DatabaseList';
+import { Monitoring } from './components/Monitoring';
 
-type Page = 'servers' | 'dns' | 'monitors';
+type Page = 'servers' | 'disks' | 'databases' | 'dns' | 'dns-detail' | 'monitors' | 'monitoring';
 
 function App() {
   const [profiles, setProfiles] = useState<sakura.ProfileInfo[]>([]);
@@ -21,6 +25,7 @@ function App() {
   const [zones, setZones] = useState<sakura.ZoneInfo[]>([]);
   const [selectedZone, setSelectedZone] = useState('');
   const [currentPage, setCurrentPage] = useState<Page>('servers');
+  const [selectedDNSId, setSelectedDNSId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -134,6 +139,18 @@ function App() {
           >
             サーバー
           </div>
+          <div
+            className={`nav-item ${currentPage === 'disks' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('disks')}
+          >
+            ディスク
+          </div>
+          <div
+            className={`nav-item ${currentPage === 'databases' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('databases')}
+          >
+            データベース
+          </div>
         </div>
 
         <div className="nav-section">
@@ -150,10 +167,40 @@ function App() {
           >
             シンプル監視
           </div>
+          <div
+            className={`nav-item ${currentPage === 'monitoring' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('monitoring')}
+          >
+            モニタリングスイート
+          </div>
         </div>
       </div>
 
       <div className="main-content">
+        <div className="breadcrumb">
+          <span 
+            className={`breadcrumb-item ${currentPage === 'dns' || currentPage === 'dns-detail' ? 'active' : ''}`}
+            onClick={() => {
+              if (currentPage === 'dns-detail') {
+                setCurrentPage('dns');
+              }
+            }}
+          >
+            {currentPage === 'dns' || currentPage === 'dns-detail' ? 'DNS' : 
+             currentPage === 'servers' ? 'サーバー' : 
+             currentPage === 'disks' ? 'ディスク' : 
+             currentPage === 'databases' ? 'データベース' : 
+             currentPage === 'monitors' ? 'シンプル監視' : 
+             currentPage === 'monitoring' ? 'モニタリングスイート' : ''}
+          </span>
+          {currentPage === 'dns-detail' && (
+            <>
+              <span className="breadcrumb-separator">/</span>
+              <span className="breadcrumb-item active">詳細</span>
+            </>
+          )}
+        </div>
+
         {currentPage === 'servers' && (
           <ServerList
             profile={currentProfile}
@@ -163,12 +210,43 @@ function App() {
           />
         )}
 
+        {currentPage === 'disks' && (
+          <DiskList
+            profile={currentProfile}
+            zone={selectedZone}
+            zones={zones}
+            onZoneChange={setSelectedZone}
+          />
+        )}
+
+        {currentPage === 'databases' && (
+          <DatabaseList
+            profile={currentProfile}
+            zone={selectedZone}
+            zones={zones}
+            onZoneChange={setSelectedZone}
+          />
+        )}
+
         {currentPage === 'dns' && (
-          <DNSList profile={currentProfile} />
+          <DNSList 
+            profile={currentProfile} 
+            onSelectDNS={(id) => {
+              setSelectedDNSId(id);
+              setCurrentPage('dns-detail');
+            }} 
+          />
+        )}
+
+        {currentPage === 'dns-detail' && selectedDNSId && (
+          <DNSDetail profile={currentProfile} dnsId={selectedDNSId} />
         )}
 
         {currentPage === 'monitors' && (
           <MonitorList profile={currentProfile} />
+        )}
+        {currentPage === 'monitoring' && (
+          <Monitoring profile={currentProfile} />
         )}
       </div>
     </div>
