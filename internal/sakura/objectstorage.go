@@ -2,6 +2,7 @@ package sakura
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -132,6 +133,11 @@ func (s *ObjectStorageService) ListBuckets(ctx context.Context, siteID, accessKe
 
 // ListObjects lists objects in a bucket using S3 API
 func ListObjects(ctx context.Context, endpoint, accessKey, secretKey, bucketName, prefix, continuationToken string, maxKeys int32) (*ListObjectsResult, error) {
+	// Ensure endpoint has https:// prefix
+	if !strings.HasPrefix(endpoint, "https://") && !strings.HasPrefix(endpoint, "http://") {
+		endpoint = "https://" + endpoint
+	}
+
 	// Create S3 client with custom endpoint
 	cfg := aws.Config{
 		Region: "jp-north-1", // Sakura Cloud region (doesn't really matter for object storage)
