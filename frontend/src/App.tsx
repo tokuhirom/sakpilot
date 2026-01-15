@@ -43,6 +43,9 @@ function App() {
   const [selectedSwitchId, setSelectedSwitchId] = useState<string | null>(null);
   const [selectedPacketFilterId, setSelectedPacketFilterId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // Object Storage breadcrumb state
+  const [objectStorageSiteName, setObjectStorageSiteName] = useState<string | null>(null);
+  const [objectStorageBucketName, setObjectStorageBucketName] = useState<string | null>(null);
 
   useEffect(() => {
     loadInitialData();
@@ -276,6 +279,18 @@ function App() {
               <span className="breadcrumb-item active">詳細</span>
             </>
           )}
+          {currentPage === 'object-storage' && objectStorageSiteName && (
+            <>
+              <span className="breadcrumb-separator">/</span>
+              <span className={`breadcrumb-item ${objectStorageBucketName ? '' : 'active'}`}>{objectStorageSiteName}</span>
+            </>
+          )}
+          {currentPage === 'object-storage' && objectStorageBucketName && (
+            <>
+              <span className="breadcrumb-separator">/</span>
+              <span className="breadcrumb-item active">{objectStorageBucketName}</span>
+            </>
+          )}
           </div>
           {loading ? (
             <div className="auth-info">
@@ -420,7 +435,13 @@ function App() {
         )}
 
         {currentPage === 'object-storage' && (
-          <ObjectStorageList profile={currentProfile} />
+          <ObjectStorageList
+            profile={currentProfile}
+            onBreadcrumbChange={(siteName, bucketName) => {
+              setObjectStorageSiteName(siteName);
+              setObjectStorageBucketName(bucketName);
+            }}
+          />
         )}
 
         {currentPage === 'apprun' && (

@@ -15,6 +15,7 @@ import { SearchBar } from './SearchBar';
 
 interface ObjectStorageListProps {
   profile: string;
+  onBreadcrumbChange?: (siteName: string | null, bucketName: string | null) => void;
 }
 
 interface AccessKeyWithSaved extends sakura.AccessKeyInfo {
@@ -37,7 +38,7 @@ const formatDate = (dateString: string) => {
   return `${Y}/${M}/${D} ${h}:${m}:${s}`;
 };
 
-export function ObjectStorageList({ profile }: ObjectStorageListProps) {
+export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorageListProps) {
   const [sites, setSites] = useState<sakura.SiteInfo[]>([]);
   const [selectedSite, setSelectedSite] = useState<sakura.SiteInfo | null>(null);
   const [buckets, setBuckets] = useState<sakura.BucketInfo[]>([]);
@@ -197,6 +198,7 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
     setSelectedAccessKeyId('');
     setSecretKey('');
     setSecretSaved(false);
+    onBreadcrumbChange?.(site.displayName, null);
     await loadAccessKeys(site.id);
   };
 
@@ -209,6 +211,7 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
     setSecretKey('');
     setSecretSaved(false);
     setBucketsError(null);
+    onBreadcrumbChange?.(null, null);
   };
 
   const handleAccessKeySelect = async (accessKeyId: string) => {
@@ -280,6 +283,7 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
     setObjectsError(null);
     setNextToken('');
     setHasMore(false);
+    onBreadcrumbChange?.(selectedSite?.displayName || null, bucket.name);
   };
 
   const handleBackToBuckets = () => {
@@ -289,6 +293,7 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
     setPrefixes([]);
     setCurrentPrefix('');
     setObjectsError(null);
+    onBreadcrumbChange?.(selectedSite?.displayName || null, null);
     setNextToken('');
     setHasMore(false);
   };
