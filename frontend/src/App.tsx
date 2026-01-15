@@ -27,8 +27,9 @@ import { PacketFilterDetail } from './components/PacketFilterDetail';
 import { ArchiveList } from './components/ArchiveList';
 import { BillList } from './components/BillList';
 import { ObjectStorageList } from './components/ObjectStorageList';
+import { EnhancedDBList } from './components/EnhancedDBList';
 
-type Page = 'servers' | 'disks' | 'archives' | 'databases' | 'switches' | 'switch-detail' | 'packetfilters' | 'packetfilter-detail' | 'dns' | 'dns-detail' | 'gslb' | 'gslb-detail' | 'monitors' | 'monitoring' | 'container-registry' | 'container-registry-detail' | 'object-storage' | 'apprun' | 'bills';
+type Page = 'servers' | 'disks' | 'archives' | 'databases' | 'switches' | 'switch-detail' | 'packetfilters' | 'packetfilter-detail' | 'dns' | 'dns-detail' | 'gslb' | 'gslb-detail' | 'monitors' | 'monitoring' | 'container-registry' | 'container-registry-detail' | 'object-storage' | 'enhanced-db' | 'apprun' | 'bills';
 
 function App() {
   const [profiles, setProfiles] = useState<sakura.ProfileInfo[]>([]);
@@ -236,6 +237,12 @@ function App() {
           >
             オブジェクトストレージ
           </div>
+          <div
+            className={`nav-item ${currentPage === 'enhanced-db' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('enhanced-db')}
+          >
+            エンハンスドDB
+          </div>
         </div>
 
         <div className="nav-section">
@@ -285,6 +292,7 @@ function App() {
              currentPage === 'monitoring' ? 'モニタリングスイート' :
              currentPage === 'container-registry' || currentPage === 'container-registry-detail' ? 'コンテナレジストリ' :
              currentPage === 'object-storage' ? 'オブジェクトストレージ' :
+             currentPage === 'enhanced-db' ? 'エンハンスドDB' :
              currentPage === 'apprun' ? 'AppRun' :
              currentPage === 'bills' ? '請求' : ''}
           </span>
@@ -457,6 +465,10 @@ function App() {
               setObjectStorageBucketName(bucketName);
             }}
           />
+        )}
+
+        {currentPage === 'enhanced-db' && (
+          <EnhancedDBList profile={currentProfile} />
         )}
 
         {currentPage === 'apprun' && (

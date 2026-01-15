@@ -471,3 +471,13 @@ func (a *App) ListContainerRegistryImages(fqdn, userName, password string) ([]sa
 func (a *App) GetContainerRegistryImageTags(fqdn, userName, password, imageName string) ([]sakura.RegistryTag, error) {
 	return sakura.GetImageTags(a.ctx, fqdn, userName, password, imageName)
 }
+
+// Enhanced Database
+func (a *App) GetEnhancedDBs(profileName string) ([]sakura.EnhancedDBInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewEnhancedDBService(client)
+	return service.List(a.ctx)
+}
