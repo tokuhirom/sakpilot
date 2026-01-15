@@ -84,6 +84,21 @@ function App() {
     setLoading(true);
     try {
       setAuthInfo(null);
+      // 詳細ページの状態をクリア
+      setSelectedDNSId(null);
+      setSelectedGSLBId(null);
+      setSelectedContainerRegistry(null);
+      setSelectedSwitchId(null);
+      setSelectedPacketFilterId(null);
+      setObjectStorageSiteName(null);
+      setObjectStorageBucketName(null);
+      // 詳細ページにいる場合はリストページに戻す
+      if (currentPage === 'dns-detail') setCurrentPage('dns');
+      else if (currentPage === 'gslb-detail') setCurrentPage('gslb');
+      else if (currentPage === 'container-registry-detail') setCurrentPage('container-registry');
+      else if (currentPage === 'switch-detail') setCurrentPage('switches');
+      else if (currentPage === 'packetfilter-detail') setCurrentPage('packetfilters');
+
       const [defaultZone, auth] = await Promise.all([
         GetDefaultZone(profileName),
         GetAuthInfo(profileName),
