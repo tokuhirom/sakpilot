@@ -124,7 +124,6 @@ function App() {
         <h1>SakPilot</h1>
 
         <div className="profile-selector">
-            {currentProfile}
           <select
             value={currentProfile}
             onChange={(e) => handleSwitchProfile(e.target.value)}
@@ -137,13 +136,6 @@ function App() {
             ))}
           </select>
         </div>
-
-        {authInfo && (
-          <div className="auth-info">
-            <div className="auth-account">{authInfo.accountName}</div>
-            <div className="auth-member">{authInfo.memberCode}</div>
-          </div>
-        )}
 
         <div className="nav-section">
           <h3>ゾーンリソース</h3>
@@ -231,7 +223,8 @@ function App() {
       </div>
 
       <div className="main-content">
-        <div className="breadcrumb">
+        <div className="top-bar">
+          <div className="breadcrumb">
           <span
             className={`breadcrumb-item ${['dns', 'dns-detail'].includes(currentPage) || ['gslb', 'gslb-detail'].includes(currentPage) || ['container-registry', 'container-registry-detail'].includes(currentPage) || ['switches', 'switch-detail'].includes(currentPage) || ['packetfilters', 'packetfilter-detail'].includes(currentPage) ? '' : 'active'}`}
             onClick={() => {
@@ -261,6 +254,13 @@ function App() {
               <span className="breadcrumb-separator">/</span>
               <span className="breadcrumb-item active">詳細</span>
             </>
+          )}
+          </div>
+          {authInfo && (
+            <div className="auth-info">
+              <span className="auth-account">{authInfo.accountName}</span>
+              <span className="auth-member">{authInfo.memberCode}</span>
+            </div>
           )}
         </div>
 
