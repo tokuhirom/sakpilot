@@ -50,6 +50,8 @@ func (s *ServerService) List(ctx context.Context, zone string) ([]ServerInfo, er
 		for _, iface := range srv.Interfaces {
 			if iface.IPAddress != "" {
 				ips = append(ips, iface.IPAddress)
+			} else if iface.UserIPAddress != "" {
+				ips = append(ips, iface.UserIPAddress)
 			}
 		}
 

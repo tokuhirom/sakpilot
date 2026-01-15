@@ -12,6 +12,7 @@ interface ServerListProps {
 export function ServerList({ profile, zone, zones, onZoneChange }: ServerListProps) {
   const [servers, setServers] = useState<sakura.ServerInfo[]>([]);
   const [loading, setLoading] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
   const loadServers = useCallback(async () => {
     if (!profile || !zone) {
@@ -33,22 +34,38 @@ export function ServerList({ profile, zone, zones, onZoneChange }: ServerListPro
     }
   }, [profile, zone]);
 
+  // ドロップダウンを閉じるためのクリックリスナー
+  useEffect(() => {
+    const handleClickOutside = () => setOpenDropdown(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
+
   // profile または zone が変更されたらサーバー一覧を再取得
   useEffect(() => {
     console.log('[ServerList] useEffect triggered:', { profile, zone });
     loadServers();
   }, [loadServers]);
 
-  const handlePowerOn = async (serverZone: string, id: string) => {
+  const handlePowerOn = async (e: React.MouseEvent, serverZone: string, id: string) => {
+    e.stopPropagation();
     console.log('[ServerList] PowerOn:', { profile, serverZone, id });
+    setOpenDropdown(null);
     await PowerOnServer(profile, serverZone, id);
     loadServers();
   };
 
-  const handlePowerOff = async (serverZone: string, id: string) => {
+  const handlePowerOff = async (e: React.MouseEvent, serverZone: string, id: string) => {
+    e.stopPropagation();
     console.log('[ServerList] PowerOff:', { profile, serverZone, id });
+    setOpenDropdown(null);
     await PowerOffServer(profile, serverZone, id);
     loadServers();
+  };
+
+  const toggleDropdown = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setOpenDropdown(openDropdown === id ? null : id);
   };
 
   return (
@@ -76,19 +93,24 @@ export function ServerList({ profile, zone, zones, onZoneChange }: ServerListPro
         servers.map((server) => (
           <div key={server.id} className="card">
             <div className="card-header">
-              <div>
-                <div className="card-title">{server.name}</div>
-                <div className="card-subtitle">
-                  {server.cpu} vCPU / {server.memory} GB | ID: {server.id}
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div className="card-title">{server.name}</div>
+                  <span className={`status ${server.status === 'up' ? 'up' : 'down'}`} style={{ padding: '2px 6px', fontSize: '0.65rem' }}>
+                    {server.status}
+                  </span>
+                </div>
+                <div className="card-subtitle" style={{ marginTop: '2px' }}>
+                  {server.cpu} vCPU / {server.memory} GB | {server.ipAddresses?.join(', ') || 'No IP'}
                 </div>
                 {server.tags && server.tags.length > 0 && (
-                  <div className="tags" style={{ marginTop: '0.5rem', display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                  <div className="tags" style={{ marginTop: '0.25rem', display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
                     {server.tags.map(tag => (
                       <span key={tag} className="tag" style={{
                         backgroundColor: '#e2e8f0',
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        fontSize: '0.75rem',
+                        padding: '1px 6px',
+                        borderRadius: '3px',
+                        fontSize: '0.7rem',
                         color: '#4a5568'
                       }}>
                         {tag}
@@ -97,28 +119,35 @@ export function ServerList({ profile, zone, zones, onZoneChange }: ServerListPro
                   </div>
                 )}
               </div>
-              <span className={`status ${server.status === 'up' ? 'up' : 'down'}`}>
-                {server.status}
-              </span>
-            </div>
-            <div className="card-subtitle">
-              {server.ipAddresses?.join(', ') || 'No IP'}
-            </div>
-            <div className="btn-group" style={{ marginTop: '0.75rem' }}>
-              <button
-                className="btn btn-primary"
-                onClick={() => handlePowerOn(server.zone, server.id)}
-                disabled={server.status === 'up'}
-              >
-                起動
-              </button>
-              <button
-                className="btn btn-danger"
-                onClick={() => handlePowerOff(server.zone, server.id)}
-                disabled={server.status === 'down'}
-              >
-                停止
-              </button>
+              
+              <div className="dropdown">
+                <button 
+                  className="btn-icon" 
+                  onClick={(e) => toggleDropdown(e, server.id)}
+                >
+                  ⋮
+                </button>
+                <div className={`dropdown-menu ${openDropdown === server.id ? 'show' : ''}`}>
+                  <button 
+                    className="dropdown-item" 
+                    onClick={(e) => handlePowerOn(e, server.zone, server.id)}
+                    disabled={server.status === 'up'}
+                  >
+                    起動
+                  </button>
+                  <button 
+                    className="dropdown-item" 
+                    onClick={(e) => handlePowerOff(e, server.zone, server.id)}
+                    disabled={server.status === 'down'}
+                  >
+                    停止
+                  </button>
+                  <div style={{ borderTop: '1px solid #333', margin: '4px 0' }}></div>
+                  <div className="dropdown-item" style={{ fontSize: '0.7rem', color: '#666', cursor: 'default' }}>
+                    ID: {server.id}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         ))
