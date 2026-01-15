@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GetSimpleMonitors } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
+import { useSearch } from '../hooks/useSearch';
+import { SearchBar } from './SearchBar';
 
 interface MonitorListProps {
   profile: string;
@@ -9,6 +11,19 @@ interface MonitorListProps {
 export function MonitorList({ profile }: MonitorListProps) {
   const [monitors, setMonitors] = useState<sakura.SimpleMonitorInfo[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const {
+    searchQuery,
+    setSearchQuery,
+    isSearching,
+    searchInputRef,
+    filteredItems: filteredMonitors,
+    closeSearch,
+  } = useSearch(monitors, (m, query) =>
+    m.name.toLowerCase().includes(query) ||
+    m.target.toLowerCase().includes(query) ||
+    m.id.includes(query)
+  );
 
   const loadMonitors = useCallback(async () => {
     if (!profile) {
@@ -50,10 +65,21 @@ export function MonitorList({ profile }: MonitorListProps) {
         </button>
       </div>
 
+      <SearchBar
+        isSearching={isSearching}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        closeSearch={closeSearch}
+        searchInputRef={searchInputRef}
+        placeholder="名前、ターゲットで検索... (Escで閉じる)"
+      />
+
       {loading ? (
         <div className="loading">読み込み中...</div>
-      ) : monitors.length === 0 ? (
-        <div className="empty-state">シンプル監視がありません</div>
+      ) : filteredMonitors.length === 0 ? (
+        <div className="empty-state">
+          {searchQuery ? `「${searchQuery}」に一致するシンプル監視がありません` : 'シンプル監視がありません'}
+        </div>
       ) : (
         <table className="table">
           <thead>
@@ -64,7 +90,7 @@ export function MonitorList({ profile }: MonitorListProps) {
             </tr>
           </thead>
           <tbody>
-            {monitors.map((m) => (
+            {filteredMonitors.map((m) => (
               <tr key={m.id}>
                 <td>{m.name}</td>
                 <td>{m.target}</td>

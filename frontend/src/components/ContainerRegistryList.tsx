@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GetContainerRegistries } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
+import { useSearch } from '../hooks/useSearch';
+import { SearchBar } from './SearchBar';
 
 interface ContainerRegistryListProps {
   profile: string;
@@ -10,6 +12,20 @@ interface ContainerRegistryListProps {
 export function ContainerRegistryList({ profile, onSelectRegistry }: ContainerRegistryListProps) {
   const [registries, setRegistries] = useState<sakura.ContainerRegistryInfo[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const {
+    searchQuery,
+    setSearchQuery,
+    isSearching,
+    searchInputRef,
+    filteredItems: filteredRegistries,
+    closeSearch,
+  } = useSearch(registries, (r, query) =>
+    r.name.toLowerCase().includes(query) ||
+    r.fqdn.toLowerCase().includes(query) ||
+    r.virtualDomain?.toLowerCase().includes(query) ||
+    r.id.includes(query)
+  );
 
   const loadRegistries = useCallback(async () => {
     if (!profile) return;
@@ -44,10 +60,21 @@ export function ContainerRegistryList({ profile, onSelectRegistry }: ContainerRe
         </button>
       </div>
 
+      <SearchBar
+        isSearching={isSearching}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        closeSearch={closeSearch}
+        searchInputRef={searchInputRef}
+        placeholder="名前、FQDNで検索... (Escで閉じる)"
+      />
+
       {loading ? (
         <div className="loading">読み込み中...</div>
-      ) : registries.length === 0 ? (
-        <div className="empty-state">コンテナレジストリがありません</div>
+      ) : filteredRegistries.length === 0 ? (
+        <div className="empty-state">
+          {searchQuery ? `「${searchQuery}」に一致するコンテナレジストリがありません` : 'コンテナレジストリがありません'}
+        </div>
       ) : (
         <table className="table">
           <thead>
@@ -59,7 +86,7 @@ export function ContainerRegistryList({ profile, onSelectRegistry }: ContainerRe
             </tr>
           </thead>
           <tbody>
-            {registries.map((r) => (
+            {filteredRegistries.map((r) => (
               <tr
                 key={r.id}
                 onClick={() => onSelectRegistry(r)}

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GetPacketFilters } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
+import { useSearch } from '../hooks/useSearch';
+import { SearchBar } from './SearchBar';
 
 interface PacketFilterListProps {
   profile: string;
@@ -13,6 +15,19 @@ interface PacketFilterListProps {
 export function PacketFilterList({ profile, zone, zones, onZoneChange, onSelectPacketFilter }: PacketFilterListProps) {
   const [packetFilters, setPacketFilters] = useState<sakura.PacketFilterInfo[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const {
+    searchQuery,
+    setSearchQuery,
+    isSearching,
+    searchInputRef,
+    filteredItems: filteredPacketFilters,
+    closeSearch,
+  } = useSearch(packetFilters, (pf, query) =>
+    pf.name.toLowerCase().includes(query) ||
+    pf.description?.toLowerCase().includes(query) ||
+    pf.id.includes(query)
+  );
 
   const loadPacketFilters = useCallback(async () => {
     if (!profile || !zone) return;
@@ -61,10 +76,21 @@ export function PacketFilterList({ profile, zone, zones, onZoneChange, onSelectP
         </div>
       </div>
 
+      <SearchBar
+        isSearching={isSearching}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        closeSearch={closeSearch}
+        searchInputRef={searchInputRef}
+        placeholder="名前、説明で検索... (Escで閉じる)"
+      />
+
       {loading ? (
         <div className="loading">読み込み中...</div>
-      ) : packetFilters.length === 0 ? (
-        <div className="empty-state">パケットフィルターがありません</div>
+      ) : filteredPacketFilters.length === 0 ? (
+        <div className="empty-state">
+          {searchQuery ? `「${searchQuery}」に一致するパケットフィルターがありません` : 'パケットフィルターがありません'}
+        </div>
       ) : (
         <table className="table">
           <thead>
@@ -74,7 +100,7 @@ export function PacketFilterList({ profile, zone, zones, onZoneChange, onSelectP
             </tr>
           </thead>
           <tbody>
-            {packetFilters.map((pf) => (
+            {filteredPacketFilters.map((pf) => (
               <tr
                 key={pf.id}
                 onClick={() => onSelectPacketFilter(pf.id)}

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GetGSLBList } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
+import { useSearch } from '../hooks/useSearch';
+import { SearchBar } from './SearchBar';
 
 interface GSLBListProps {
   profile: string;
@@ -10,6 +12,19 @@ interface GSLBListProps {
 export function GSLBList({ profile, onSelectGSLB }: GSLBListProps) {
   const [gslbList, setGslbList] = useState<sakura.GSLBInfo[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const {
+    searchQuery,
+    setSearchQuery,
+    isSearching,
+    searchInputRef,
+    filteredItems: filteredGslbList,
+    closeSearch,
+  } = useSearch(gslbList, (g, query) =>
+    g.name.toLowerCase().includes(query) ||
+    g.fqdn.toLowerCase().includes(query) ||
+    g.id.includes(query)
+  );
 
   const loadGSLBList = useCallback(async () => {
     if (!profile) {
@@ -46,10 +61,21 @@ export function GSLBList({ profile, onSelectGSLB }: GSLBListProps) {
         </button>
       </div>
 
+      <SearchBar
+        isSearching={isSearching}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        closeSearch={closeSearch}
+        searchInputRef={searchInputRef}
+        placeholder="名前、FQDNで検索... (Escで閉じる)"
+      />
+
       {loading ? (
         <div className="loading">読み込み中...</div>
-      ) : gslbList.length === 0 ? (
-        <div className="empty-state">GSLBがありません</div>
+      ) : filteredGslbList.length === 0 ? (
+        <div className="empty-state">
+          {searchQuery ? `「${searchQuery}」に一致するGSLBがありません` : 'GSLBがありません'}
+        </div>
       ) : (
         <table className="table">
           <thead>
@@ -61,7 +87,7 @@ export function GSLBList({ profile, onSelectGSLB }: GSLBListProps) {
             </tr>
           </thead>
           <tbody>
-            {gslbList.map((g) => (
+            {filteredGslbList.map((g) => (
               <tr
                 key={g.id}
                 onClick={() => onSelectGSLB(g.id)}

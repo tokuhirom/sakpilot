@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GetDNSList } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
+import { useSearch } from '../hooks/useSearch';
+import { SearchBar } from './SearchBar';
 
 interface DNSListProps {
   profile: string;
@@ -10,6 +12,20 @@ interface DNSListProps {
 export function DNSList({ profile, onSelectDNS }: DNSListProps) {
   const [dnsList, setDnsList] = useState<sakura.DNSInfo[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const {
+    searchQuery,
+    setSearchQuery,
+    isSearching,
+    searchInputRef,
+    filteredItems: filteredDnsList,
+    closeSearch,
+  } = useSearch(dnsList, (dns, query) =>
+    dns.name.toLowerCase().includes(query) ||
+    dns.zone.toLowerCase().includes(query) ||
+    dns.description?.toLowerCase().includes(query) ||
+    dns.id.includes(query)
+  );
 
   const loadDNS = useCallback(async () => {
     if (!profile) {
@@ -51,10 +67,21 @@ export function DNSList({ profile, onSelectDNS }: DNSListProps) {
         </button>
       </div>
 
+      <SearchBar
+        isSearching={isSearching}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        closeSearch={closeSearch}
+        searchInputRef={searchInputRef}
+        placeholder="名前、ゾーンで検索... (Escで閉じる)"
+      />
+
       {loading ? (
         <div className="loading">読み込み中...</div>
-      ) : dnsList.length === 0 ? (
-        <div className="empty-state">DNSゾーンがありません</div>
+      ) : filteredDnsList.length === 0 ? (
+        <div className="empty-state">
+          {searchQuery ? `「${searchQuery}」に一致するDNSゾーンがありません` : 'DNSゾーンがありません'}
+        </div>
       ) : (
         <table className="table">
           <thead>
@@ -65,7 +92,7 @@ export function DNSList({ profile, onSelectDNS }: DNSListProps) {
             </tr>
           </thead>
           <tbody>
-            {dnsList.map((dns) => (
+            {filteredDnsList.map((dns) => (
               <tr key={dns.id} onClick={() => onSelectDNS(dns.id)} style={{ cursor: 'pointer' }} className="row-hover">
                 <td style={{ color: '#00adb5', fontWeight: 'bold' }}>{dns.name}</td>
                 <td>{dns.zone}</td>

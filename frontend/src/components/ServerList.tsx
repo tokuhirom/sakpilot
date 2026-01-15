@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GetServers, PowerOnServer, PowerOffServer } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
+import { useSearch } from '../hooks/useSearch';
+import { SearchBar } from './SearchBar';
 
 interface ServerListProps {
   profile: string;
@@ -40,6 +42,21 @@ export function ServerList({ profile, zone, zones, onZoneChange }: ServerListPro
     window.addEventListener('click', handleClickOutside);
     return () => window.removeEventListener('click', handleClickOutside);
   }, []);
+
+  // 検索機能
+  const {
+    searchQuery,
+    setSearchQuery,
+    isSearching,
+    searchInputRef,
+    filteredItems: filteredServers,
+    closeSearch,
+  } = useSearch(servers, (server, query) =>
+    server.name.toLowerCase().includes(query) ||
+    server.ipAddresses?.some(ip => ip.includes(query)) ||
+    server.tags?.some(tag => tag.toLowerCase().includes(query)) ||
+    server.id.includes(query)
+  );
 
   // profile または zone が変更されたらサーバー一覧を再取得
   useEffect(() => {
@@ -108,12 +125,23 @@ export function ServerList({ profile, zone, zones, onZoneChange }: ServerListPro
         </div>
       </div>
 
+      <SearchBar
+        isSearching={isSearching}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        closeSearch={closeSearch}
+        searchInputRef={searchInputRef}
+        placeholder="サーバー名、IP、タグで検索... (Escで閉じる)"
+      />
+
       {loading ? (
         <div className="loading">読み込み中...</div>
-      ) : servers.length === 0 ? (
-        <div className="empty-state">サーバーがありません</div>
+      ) : filteredServers.length === 0 ? (
+        <div className="empty-state">
+          {searchQuery ? `「${searchQuery}」に一致するサーバーがありません` : 'サーバーがありません'}
+        </div>
       ) : (
-        servers.map((server) => (
+        filteredServers.map((server) => (
           <div key={server.id} className="card">
             <div className="card-header">
               <div style={{ flex: 1 }}>

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GetArchives } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
+import { useSearch } from '../hooks/useSearch';
+import { SearchBar } from './SearchBar';
 
 interface ArchiveListProps {
   profile: string;
@@ -12,6 +14,20 @@ interface ArchiveListProps {
 export function ArchiveList({ profile, zone, zones, onZoneChange }: ArchiveListProps) {
   const [archives, setArchives] = useState<sakura.ArchiveInfo[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const {
+    searchQuery,
+    setSearchQuery,
+    isSearching,
+    searchInputRef,
+    filteredItems: filteredArchives,
+    closeSearch,
+  } = useSearch(archives, (archive, query) =>
+    archive.name.toLowerCase().includes(query) ||
+    archive.description?.toLowerCase().includes(query) ||
+    archive.tags?.some(tag => tag.toLowerCase().includes(query)) ||
+    archive.id.includes(query)
+  );
 
   const loadArchives = useCallback(async () => {
     if (!profile || !zone) {
@@ -84,10 +100,21 @@ export function ArchiveList({ profile, zone, zones, onZoneChange }: ArchiveListP
         </div>
       </div>
 
+      <SearchBar
+        isSearching={isSearching}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        closeSearch={closeSearch}
+        searchInputRef={searchInputRef}
+        placeholder="名前、説明、タグで検索... (Escで閉じる)"
+      />
+
       {loading ? (
         <div className="loading">読み込み中...</div>
-      ) : archives.length === 0 ? (
-        <div className="empty-state">アーカイブがありません</div>
+      ) : filteredArchives.length === 0 ? (
+        <div className="empty-state">
+          {searchQuery ? `「${searchQuery}」に一致するアーカイブがありません` : 'アーカイブがありません'}
+        </div>
       ) : (
         <table className="table">
           <thead>
@@ -99,7 +126,7 @@ export function ArchiveList({ profile, zone, zones, onZoneChange }: ArchiveListP
             </tr>
           </thead>
           <tbody>
-            {archives.map((archive) => {
+            {filteredArchives.map((archive) => {
               const availability = formatAvailability(archive.availability);
               return (
                 <tr key={archive.id}>

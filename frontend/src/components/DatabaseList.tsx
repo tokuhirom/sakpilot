@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GetDatabases } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
+import { useSearch } from '../hooks/useSearch';
+import { SearchBar } from './SearchBar';
 
 interface DatabaseListProps {
   profile: string;
@@ -12,6 +14,20 @@ interface DatabaseListProps {
 export function DatabaseList({ profile, zone, zones, onZoneChange }: DatabaseListProps) {
   const [databases, setDatabases] = useState<sakura.DatabaseInfo[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const {
+    searchQuery,
+    setSearchQuery,
+    isSearching,
+    searchInputRef,
+    filteredItems: filteredDatabases,
+    closeSearch,
+  } = useSearch(databases, (db, query) =>
+    db.name.toLowerCase().includes(query) ||
+    db.ipAddresses?.some(ip => ip.includes(query)) ||
+    db.tags?.some(tag => tag.toLowerCase().includes(query)) ||
+    db.id.includes(query)
+  );
 
   const loadDatabases = useCallback(async () => {
     if (!profile || !zone) {
@@ -85,12 +101,23 @@ export function DatabaseList({ profile, zone, zones, onZoneChange }: DatabaseLis
         </div>
       </div>
 
+      <SearchBar
+        isSearching={isSearching}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        closeSearch={closeSearch}
+        searchInputRef={searchInputRef}
+        placeholder="名前、IPアドレス、タグで検索... (Escで閉じる)"
+      />
+
       {loading ? (
         <div className="loading">読み込み中...</div>
-      ) : databases.length === 0 ? (
-        <div className="empty-state">データベースがありません</div>
+      ) : filteredDatabases.length === 0 ? (
+        <div className="empty-state">
+          {searchQuery ? `「${searchQuery}」に一致するデータベースがありません` : 'データベースがありません'}
+        </div>
       ) : (
-        databases.map((db) => (
+        filteredDatabases.map((db) => (
           <div key={db.id} className="card">
             <div className="card-header">
               <div style={{ flex: 1 }}>

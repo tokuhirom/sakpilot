@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GetSwitches } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
+import { useSearch } from '../hooks/useSearch';
+import { SearchBar } from './SearchBar';
 
 interface SwitchListProps {
   profile: string;
@@ -13,6 +15,19 @@ interface SwitchListProps {
 export function SwitchList({ profile, zone, zones, onZoneChange, onSelectSwitch }: SwitchListProps) {
   const [switches, setSwitches] = useState<sakura.SwitchInfo[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const {
+    searchQuery,
+    setSearchQuery,
+    isSearching,
+    searchInputRef,
+    filteredItems: filteredSwitches,
+    closeSearch,
+  } = useSearch(switches, (sw, query) =>
+    sw.name.toLowerCase().includes(query) ||
+    sw.description?.toLowerCase().includes(query) ||
+    sw.id.includes(query)
+  );
 
   const loadSwitches = useCallback(async () => {
     if (!profile || !zone) return;
@@ -61,10 +76,21 @@ export function SwitchList({ profile, zone, zones, onZoneChange, onSelectSwitch 
         </div>
       </div>
 
+      <SearchBar
+        isSearching={isSearching}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        closeSearch={closeSearch}
+        searchInputRef={searchInputRef}
+        placeholder="名前で検索... (Escで閉じる)"
+      />
+
       {loading ? (
         <div className="loading">読み込み中...</div>
-      ) : switches.length === 0 ? (
-        <div className="empty-state">スイッチがありません</div>
+      ) : filteredSwitches.length === 0 ? (
+        <div className="empty-state">
+          {searchQuery ? `「${searchQuery}」に一致するスイッチがありません` : 'スイッチがありません'}
+        </div>
       ) : (
         <table className="table">
           <thead>
@@ -76,7 +102,7 @@ export function SwitchList({ profile, zone, zones, onZoneChange, onSelectSwitch 
             </tr>
           </thead>
           <tbody>
-            {switches.map((sw) => (
+            {filteredSwitches.map((sw) => (
               <tr
                 key={sw.id}
                 onClick={() => onSelectSwitch(sw.id)}

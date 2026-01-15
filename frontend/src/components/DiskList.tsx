@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GetDisks } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
+import { useSearch } from '../hooks/useSearch';
+import { SearchBar } from './SearchBar';
 
 interface DiskListProps {
   profile: string;
@@ -12,6 +14,20 @@ interface DiskListProps {
 export function DiskList({ profile, zone, zones, onZoneChange }: DiskListProps) {
   const [disks, setDisks] = useState<sakura.DiskInfo[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const {
+    searchQuery,
+    setSearchQuery,
+    isSearching,
+    searchInputRef,
+    filteredItems: filteredDisks,
+    closeSearch,
+  } = useSearch(disks, (disk, query) =>
+    disk.name.toLowerCase().includes(query) ||
+    disk.serverName?.toLowerCase().includes(query) ||
+    disk.tags?.some(tag => tag.toLowerCase().includes(query)) ||
+    disk.id.includes(query)
+  );
 
   const loadDisks = useCallback(async () => {
     if (!profile || !zone) {
@@ -74,12 +90,23 @@ export function DiskList({ profile, zone, zones, onZoneChange }: DiskListProps) 
         </div>
       </div>
 
+      <SearchBar
+        isSearching={isSearching}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        closeSearch={closeSearch}
+        searchInputRef={searchInputRef}
+        placeholder="名前、接続先、タグで検索... (Escで閉じる)"
+      />
+
       {loading ? (
         <div className="loading">読み込み中...</div>
-      ) : disks.length === 0 ? (
-        <div className="empty-state">ディスクがありません</div>
+      ) : filteredDisks.length === 0 ? (
+        <div className="empty-state">
+          {searchQuery ? `「${searchQuery}」に一致するディスクがありません` : 'ディスクがありません'}
+        </div>
       ) : (
-        disks.map((disk) => (
+        filteredDisks.map((disk) => (
           <div key={disk.id} className="card">
             <div className="card-header">
               <div style={{ flex: 1 }}>
