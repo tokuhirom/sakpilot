@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"sakpilot/internal/apprun"
 	"sakpilot/internal/sakura"
 
 	"github.com/sacloud/iaas-api-go"
@@ -118,24 +119,6 @@ func (a *App) ForceStopServer(profileName, zone, serverID string) error {
 	return service.ForceStop(a.ctx, zone, serverID)
 }
 
-func (a *App) GetDatabases(profileName, zone string) ([]sakura.DatabaseInfo, error) {
-	client, err := sakura.NewClientFromProfile(profileName)
-	if err != nil {
-		return nil, err
-	}
-	service := sakura.NewDatabaseService(client)
-	return service.List(a.ctx, zone)
-}
-
-func (a *App) GetDisks(profileName, zone string) ([]sakura.DiskInfo, error) {
-	client, err := sakura.NewClientFromProfile(profileName)
-	if err != nil {
-		return nil, err
-	}
-	service := sakura.NewDiskService(client)
-	return service.List(a.ctx, zone)
-}
-
 // Global resources (zone-independent)
 func (a *App) GetDNSList(profileName string) ([]sakura.DNSInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
@@ -144,15 +127,6 @@ func (a *App) GetDNSList(profileName string) ([]sakura.DNSInfo, error) {
 	}
 	service := sakura.NewGlobalService(client)
 	return service.ListDNS(a.ctx)
-}
-
-func (a *App) GetDNSDetail(profileName, id string) (*sakura.DNSInfo, error) {
-	client, err := sakura.NewClientFromProfile(profileName)
-	if err != nil {
-		return nil, err
-	}
-	service := sakura.NewGlobalService(client)
-	return service.GetDNS(a.ctx, id)
 }
 
 func (a *App) GetCertificates(profileName string) ([]sakura.CertificateInfo, error) {
@@ -173,6 +147,122 @@ func (a *App) GetSimpleMonitors(profileName string) ([]sakura.SimpleMonitorInfo,
 	return service.ListSimpleMonitors(a.ctx)
 }
 
+func (a *App) GetGSLBList(profileName string) ([]sakura.GSLBInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.ListGSLB(a.ctx)
+}
+
+func (a *App) GetContainerRegistries(profileName string) ([]sakura.ContainerRegistryInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.ListContainerRegistries(a.ctx)
+}
+
+func (a *App) GetContainerRegistryUsers(profileName, registryId string) ([]sakura.ContainerRegistryUserInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.ListContainerRegistryUsers(a.ctx, registryId)
+}
+
+// GSLB Detail
+func (a *App) GetGSLBDetail(profileName, gslbId string) (*sakura.GSLBInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.GetGSLB(a.ctx, gslbId)
+}
+
+// Switches
+func (a *App) GetSwitches(profileName, zone string) ([]sakura.SwitchInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewSwitchService(client)
+	return service.List(a.ctx, zone)
+}
+
+func (a *App) GetSwitchDetail(profileName, zone, switchId string) (*sakura.SwitchInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewSwitchService(client)
+	return service.Get(a.ctx, zone, switchId)
+}
+
+// PacketFilters
+func (a *App) GetPacketFilters(profileName, zone string) ([]sakura.PacketFilterInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewPacketFilterService(client)
+	return service.List(a.ctx, zone)
+}
+
+func (a *App) GetPacketFilterDetail(profileName, zone, pfId string) (*sakura.PacketFilterInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewPacketFilterService(client)
+	return service.Get(a.ctx, zone, pfId)
+}
+
+// Disks
+func (a *App) GetDisks(profileName, zone string) ([]sakura.DiskInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewDiskService(client)
+	return service.List(a.ctx, zone)
+}
+
+// Archives
+func (a *App) GetArchives(profileName, zone string) ([]sakura.ArchiveInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewArchiveService(client)
+	return service.List(a.ctx, zone)
+}
+
+// Databases
+func (a *App) GetDatabases(profileName, zone string) ([]sakura.DatabaseInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewDatabaseService(client)
+	return service.List(a.ctx, zone)
+}
+
+// DNS Detail
+func (a *App) GetDNSDetail(profileName, dnsId string) (*sakura.DNSInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.GetDNS(a.ctx, dnsId)
+}
+
+// Monitoring Suite
 func (a *App) GetMSLogs(profileName string) ([]sakura.MSLogInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
 	if err != nil {
@@ -198,4 +288,77 @@ func (a *App) GetMSTraces(profileName string) ([]sakura.MSTraceInfo, error) {
 	}
 	service := sakura.NewMonitoringService(client)
 	return service.ListTraces(a.ctx)
+}
+
+// AppRun Dedicated API
+func (a *App) GetAppRunClusters(profileName string) ([]apprun.ClusterInfo, error) {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListClusters(a.ctx)
+}
+
+func (a *App) GetAppRunApplications(profileName, clusterID string) ([]apprun.AppInfo, error) {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListApplications(a.ctx, clusterID)
+}
+
+func (a *App) GetAppRunApplicationVersions(profileName, applicationID string) ([]apprun.AppVersionInfo, error) {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListApplicationVersions(a.ctx, applicationID)
+}
+
+func (a *App) GetAppRunASGs(profileName, clusterID string) ([]apprun.ASGInfo, error) {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListAutoScalingGroups(a.ctx, clusterID)
+}
+
+func (a *App) GetAppRunLoadBalancers(profileName, clusterID, asgID string) ([]apprun.LBInfo, error) {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListLoadBalancers(a.ctx, clusterID, asgID)
+}
+
+func (a *App) GetAppRunWorkerNodes(profileName, clusterID, asgID string) ([]apprun.WorkerNodeInfo, error) {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListWorkerNodes(a.ctx, clusterID, asgID)
+}
+
+func (a *App) GetAppRunLBNodes(profileName, clusterID, asgID, lbID string) ([]apprun.LBNodeInfo, error) {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListLoadBalancerNodes(a.ctx, clusterID, asgID, lbID)
+}
+
+func (a *App) SetAppRunActiveVersion(profileName, applicationID string, version int) error {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.SetActiveVersion(a.ctx, applicationID, version)
+}
+
+func (a *App) GetAppRunApplicationVersion(profileName, applicationID string, version int) (*apprun.AppVersionDetailInfo, error) {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetApplicationVersion(a.ctx, applicationID, version)
 }

@@ -41,6 +41,14 @@ export function DNSList({ profile, onSelectDNS }: DNSListProps) {
     <>
       <div className="header">
         <h2>DNS</h2>
+        <button
+          className="btn-reload"
+          onClick={() => loadDNS()}
+          disabled={loading}
+          title="リロード"
+        >
+          ↻
+        </button>
       </div>
 
       {loading ? (

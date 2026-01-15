@@ -15,8 +15,18 @@ import { DNSDetail } from './components/DNSDetail';
 import { MonitorList } from './components/MonitorList';
 import { DatabaseList } from './components/DatabaseList';
 import { Monitoring } from './components/Monitoring';
+import { AppRunList } from './components/AppRunList';
+import { GSLBList } from './components/GSLBList';
+import { GSLBDetail } from './components/GSLBDetail';
+import { ContainerRegistryList } from './components/ContainerRegistryList';
+import { ContainerRegistryDetail } from './components/ContainerRegistryDetail';
+import { SwitchList } from './components/SwitchList';
+import { SwitchDetail } from './components/SwitchDetail';
+import { PacketFilterList } from './components/PacketFilterList';
+import { PacketFilterDetail } from './components/PacketFilterDetail';
+import { ArchiveList } from './components/ArchiveList';
 
-type Page = 'servers' | 'disks' | 'databases' | 'dns' | 'dns-detail' | 'monitors' | 'monitoring';
+type Page = 'servers' | 'disks' | 'archives' | 'databases' | 'switches' | 'switch-detail' | 'packetfilters' | 'packetfilter-detail' | 'dns' | 'dns-detail' | 'gslb' | 'gslb-detail' | 'monitors' | 'monitoring' | 'container-registry' | 'container-registry-detail' | 'apprun';
 
 function App() {
   const [profiles, setProfiles] = useState<sakura.ProfileInfo[]>([]);
@@ -26,6 +36,10 @@ function App() {
   const [selectedZone, setSelectedZone] = useState('');
   const [currentPage, setCurrentPage] = useState<Page>('servers');
   const [selectedDNSId, setSelectedDNSId] = useState<string | null>(null);
+  const [selectedGSLBId, setSelectedGSLBId] = useState<string | null>(null);
+  const [selectedContainerRegistry, setSelectedContainerRegistry] = useState<sakura.ContainerRegistryInfo | null>(null);
+  const [selectedSwitchId, setSelectedSwitchId] = useState<string | null>(null);
+  const [selectedPacketFilterId, setSelectedPacketFilterId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -146,10 +160,28 @@ function App() {
             ディスク
           </div>
           <div
+            className={`nav-item ${currentPage === 'archives' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('archives')}
+          >
+            アーカイブ
+          </div>
+          <div
+            className={`nav-item ${currentPage === 'switches' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('switches')}
+          >
+            スイッチ
+          </div>
+          <div
             className={`nav-item ${currentPage === 'databases' ? 'active' : ''}`}
             onClick={() => setCurrentPage('databases')}
           >
             データベース
+          </div>
+          <div
+            className={`nav-item ${currentPage === 'packetfilters' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('packetfilters')}
+          >
+            パケットフィルター
           </div>
         </div>
 
@@ -160,6 +192,12 @@ function App() {
             onClick={() => setCurrentPage('dns')}
           >
             DNS
+          </div>
+          <div
+            className={`nav-item ${currentPage === 'gslb' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('gslb')}
+          >
+            GSLB
           </div>
           <div
             className={`nav-item ${currentPage === 'monitors' ? 'active' : ''}`}
@@ -173,27 +211,52 @@ function App() {
           >
             モニタリングスイート
           </div>
+          <div
+            className={`nav-item ${currentPage === 'container-registry' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('container-registry')}
+          >
+            コンテナレジストリ
+          </div>
+        </div>
+
+        <div className="nav-section">
+          <h3>AppRun専有型</h3>
+          <div
+            className={`nav-item ${currentPage === 'apprun' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('apprun')}
+          >
+            クラスタ
+          </div>
         </div>
       </div>
 
       <div className="main-content">
         <div className="breadcrumb">
-          <span 
-            className={`breadcrumb-item ${currentPage === 'dns' || currentPage === 'dns-detail' ? 'active' : ''}`}
+          <span
+            className={`breadcrumb-item ${['dns', 'dns-detail'].includes(currentPage) || ['gslb', 'gslb-detail'].includes(currentPage) || ['container-registry', 'container-registry-detail'].includes(currentPage) || ['switches', 'switch-detail'].includes(currentPage) || ['packetfilters', 'packetfilter-detail'].includes(currentPage) ? '' : 'active'}`}
             onClick={() => {
-              if (currentPage === 'dns-detail') {
-                setCurrentPage('dns');
-              }
+              if (currentPage === 'dns-detail') setCurrentPage('dns');
+              else if (currentPage === 'gslb-detail') setCurrentPage('gslb');
+              else if (currentPage === 'container-registry-detail') setCurrentPage('container-registry');
+              else if (currentPage === 'switch-detail') setCurrentPage('switches');
+              else if (currentPage === 'packetfilter-detail') setCurrentPage('packetfilters');
             }}
+            style={{ cursor: ['dns-detail', 'gslb-detail', 'container-registry-detail', 'switch-detail', 'packetfilter-detail'].includes(currentPage) ? 'pointer' : 'default' }}
           >
-            {currentPage === 'dns' || currentPage === 'dns-detail' ? 'DNS' : 
-             currentPage === 'servers' ? 'サーバー' : 
-             currentPage === 'disks' ? 'ディスク' : 
-             currentPage === 'databases' ? 'データベース' : 
-             currentPage === 'monitors' ? 'シンプル監視' : 
-             currentPage === 'monitoring' ? 'モニタリングスイート' : ''}
+            {currentPage === 'dns' || currentPage === 'dns-detail' ? 'DNS' :
+             currentPage === 'servers' ? 'サーバー' :
+             currentPage === 'disks' ? 'ディスク' :
+             currentPage === 'archives' ? 'アーカイブ' :
+             currentPage === 'switches' || currentPage === 'switch-detail' ? 'スイッチ' :
+             currentPage === 'packetfilters' || currentPage === 'packetfilter-detail' ? 'パケットフィルター' :
+             currentPage === 'databases' ? 'データベース' :
+             currentPage === 'gslb' || currentPage === 'gslb-detail' ? 'GSLB' :
+             currentPage === 'monitors' ? 'シンプル監視' :
+             currentPage === 'monitoring' ? 'モニタリングスイート' :
+             currentPage === 'container-registry' || currentPage === 'container-registry-detail' ? 'コンテナレジストリ' :
+             currentPage === 'apprun' ? 'AppRun' : ''}
           </span>
-          {currentPage === 'dns-detail' && (
+          {(currentPage === 'dns-detail' || currentPage === 'gslb-detail' || currentPage === 'container-registry-detail' || currentPage === 'switch-detail' || currentPage === 'packetfilter-detail') && (
             <>
               <span className="breadcrumb-separator">/</span>
               <span className="breadcrumb-item active">詳細</span>
@@ -219,12 +282,63 @@ function App() {
           />
         )}
 
+        {currentPage === 'archives' && (
+          <ArchiveList
+            profile={currentProfile}
+            zone={selectedZone}
+            zones={zones}
+            onZoneChange={setSelectedZone}
+          />
+        )}
+
         {currentPage === 'databases' && (
           <DatabaseList
             profile={currentProfile}
             zone={selectedZone}
             zones={zones}
             onZoneChange={setSelectedZone}
+          />
+        )}
+
+        {currentPage === 'switches' && (
+          <SwitchList
+            profile={currentProfile}
+            zone={selectedZone}
+            zones={zones}
+            onZoneChange={setSelectedZone}
+            onSelectSwitch={(id) => {
+              setSelectedSwitchId(id);
+              setCurrentPage('switch-detail');
+            }}
+          />
+        )}
+
+        {currentPage === 'switch-detail' && selectedSwitchId && (
+          <SwitchDetail
+            profile={currentProfile}
+            zone={selectedZone}
+            switchId={selectedSwitchId}
+          />
+        )}
+
+        {currentPage === 'packetfilters' && (
+          <PacketFilterList
+            profile={currentProfile}
+            zone={selectedZone}
+            zones={zones}
+            onZoneChange={setSelectedZone}
+            onSelectPacketFilter={(id) => {
+              setSelectedPacketFilterId(id);
+              setCurrentPage('packetfilter-detail');
+            }}
+          />
+        )}
+
+        {currentPage === 'packetfilter-detail' && selectedPacketFilterId && (
+          <PacketFilterDetail
+            profile={currentProfile}
+            zone={selectedZone}
+            packetFilterId={selectedPacketFilterId}
           />
         )}
 
@@ -242,11 +356,46 @@ function App() {
           <DNSDetail profile={currentProfile} dnsId={selectedDNSId} />
         )}
 
+        {currentPage === 'gslb' && (
+          <GSLBList
+            profile={currentProfile}
+            onSelectGSLB={(id) => {
+              setSelectedGSLBId(id);
+              setCurrentPage('gslb-detail');
+            }}
+          />
+        )}
+
+        {currentPage === 'gslb-detail' && selectedGSLBId && (
+          <GSLBDetail profile={currentProfile} gslbId={selectedGSLBId} />
+        )}
+
         {currentPage === 'monitors' && (
           <MonitorList profile={currentProfile} />
         )}
         {currentPage === 'monitoring' && (
           <Monitoring profile={currentProfile} />
+        )}
+
+        {currentPage === 'container-registry' && (
+          <ContainerRegistryList
+            profile={currentProfile}
+            onSelectRegistry={(registry) => {
+              setSelectedContainerRegistry(registry);
+              setCurrentPage('container-registry-detail');
+            }}
+          />
+        )}
+
+        {currentPage === 'container-registry-detail' && selectedContainerRegistry && (
+          <ContainerRegistryDetail
+            profile={currentProfile}
+            registry={selectedContainerRegistry}
+          />
+        )}
+
+        {currentPage === 'apprun' && (
+          <AppRunList profile={currentProfile} />
         )}
       </div>
     </div>

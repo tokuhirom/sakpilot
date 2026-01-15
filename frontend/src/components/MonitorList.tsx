@@ -40,6 +40,14 @@ export function MonitorList({ profile }: MonitorListProps) {
     <>
       <div className="header">
         <h2>シンプル監視</h2>
+        <button
+          className="btn-reload"
+          onClick={() => loadMonitors()}
+          disabled={loading}
+          title="リロード"
+        >
+          ↻
+        </button>
       </div>
 
       {loading ? (

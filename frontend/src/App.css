@@ -170,6 +170,28 @@ body {
   color: #fff;
 }
 
+.btn-reload {
+  background: none;
+  border: 1px solid #444;
+  color: #888;
+  cursor: pointer;
+  padding: 4px 10px;
+  font-size: 1rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.btn-reload:hover {
+  background-color: #0f3460;
+  color: #fff;
+  border-color: #0f3460;
+}
+
+.btn-reload:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .status {
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
@@ -185,6 +207,27 @@ body {
 .status.down {
   background-color: #3d0000;
   color: #f87171;
+}
+
+.status.draining {
+  background-color: #4a3000;
+  color: #fbbf24;
+}
+
+.spinner-small {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #444;
+  border-top-color: #fbbf24;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .btn {

@@ -48,3 +48,10 @@ SakPilot is a desktop app for managing Sakura Cloud infrastructure, built with W
 
 - Go: `github.com/sacloud/iaas-api-go` - Sakura Cloud IaaS API
 - Frontend: React 18, TypeScript, Vite
+
+## Style Guidelines
+
+### Table Styling
+
+- `<td>` elements should be **left-aligned** by default. Avoid centering text in table cells as it reduces readability.
+- When creating detail pages or tables, always use `textAlign: 'left'` for td elements if needed.

@@ -116,6 +116,14 @@ export function Monitoring({ profile }: MonitoringProps) {
     <>
       <div className="header">
         <h2>モニタリングスイート</h2>
+        <button
+          className="btn-reload"
+          onClick={() => loadData()}
+          disabled={loading}
+          title="リロード"
+        >
+          ↻
+        </button>
       </div>
 
       <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem' }}>
