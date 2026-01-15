@@ -1,0 +1,304 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #1a1a2e;
+  color: #eee;
+}
+
+#app {
+  display: flex;
+  height: 100vh;
+}
+
+.sidebar {
+  width: 220px;
+  background-color: #16213e;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar h1 {
+  font-size: 1.2rem;
+  margin: 0 0 1.5rem 0;
+  color: #00adb5;
+}
+
+.nav-section {
+  margin-bottom: 1.5rem;
+}
+
+.nav-section h3 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #666;
+  margin: 0 0 0.5rem 0;
+}
+
+.nav-item {
+  display: block;
+  padding: 0.5rem 0.75rem;
+  margin: 0.25rem 0;
+  border-radius: 4px;
+  color: #aaa;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nav-item:hover {
+  background-color: #0f3460;
+  color: #fff;
+}
+
+.nav-item.active {
+  background-color: #00adb5;
+  color: #fff;
+}
+
+.main-content {
+  flex: 1;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.zone-select {
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  border: 1px solid #333;
+  background-color: #16213e;
+  color: #fff;
+  cursor: pointer;
+}
+
+.card {
+  background-color: #16213e;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.card-title {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.card-subtitle {
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.status {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status.up {
+  background-color: #1b4332;
+  color: #95d5b2;
+}
+
+.status.down {
+  background-color: #3d0000;
+  color: #f87171;
+}
+
+.btn {
+  padding: 0.4rem 0.8rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background-color: #00adb5;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background-color: #00959c;
+}
+
+.btn-danger {
+  background-color: #c62828;
+  color: #fff;
+}
+
+.btn-danger:hover {
+  background-color: #a31c1c;
+}
+
+.btn-secondary {
+  background-color: #333;
+  color: #fff;
+}
+
+.btn-secondary:hover {
+  background-color: #444;
+}
+
+.btn-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.login-form {
+  max-width: 400px;
+  margin: 100px auto;
+  padding: 2rem;
+  background-color: #16213e;
+  border-radius: 8px;
+}
+
+.login-form h2 {
+  margin: 0 0 1.5rem 0;
+  text-align: center;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+  color: #aaa;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #333;
+  border-radius: 4px;
+  background-color: #0f3460;
+  color: #fff;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #00adb5;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #333;
+}
+
+.table th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #888;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: #666;
+}
+
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: #888;
+}
+
+.profile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.profile-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  background-color: #0f3460;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.profile-item:hover {
+  background-color: #1a4a7a;
+}
+
+.profile-item.current {
+  border: 1px solid #00adb5;
+}
+
+.badge {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  background-color: #00adb5;
+  color: #fff;
+}
+
+.profile-selector {
+  margin-bottom: 1.5rem;
+}
+
+.profile-selector select {
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #333;
+  background-color: #0f3460;
+  color: #fff;
+  cursor: pointer;
+}
+
+.auth-info {
+  padding: 0.75rem;
+  margin-bottom: 1.5rem;
+  background-color: #0f3460;
+  border-radius: 4px;
+  border-left: 3px solid #00adb5;
+}
+
+.auth-account {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #fff;
+}
+
+.auth-member {
+  font-size: 0.75rem;
+  color: #888;
+  margin-top: 0.25rem;
+}

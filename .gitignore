@@ -1,0 +1,51 @@
+# Wails build output
+/build/bin/
+/build/windows/*
+!/build/windows/icon.ico
+!/build/windows/info.json
+!/build/windows/installer/
+!/build/windows/wails.exe.manifest
+/build/darwin/*
+!/build/darwin/Info.plist
+!/build/darwin/Info.dev.plist
+/build/linux/
+# Keep icons and project templates in build/
+!/build/appicon.png
+!/build/icon.svg
+!/build/README.md
+
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/dist/
+frontend/wailsjs/
+
+# Go
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# IDEs
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Debug binary
+cmd/debug/debug
+
+# Go vendor (if used)
+vendor/
+
+# Coverage
+coverage.out
+coverage.html
