@@ -99,6 +99,17 @@ export function ObjectStorageList({ profile }: ObjectStorageListProps) {
         })
       );
       setAccessKeys(keysWithSaved);
+
+      // Auto-select first key with saved secret
+      const savedKey = keysWithSaved.find(k => k.hasSavedSecret);
+      if (savedKey) {
+        setSelectedAccessKeyId(savedKey.id);
+        const savedSecret = await GetObjectStorageSecretKey(siteId, savedKey.id);
+        if (savedSecret) {
+          setSecretKey(savedSecret);
+          setSecretSaved(true);
+        }
+      }
     } catch (err) {
       console.error('[ObjectStorageList] loadAccessKeys error:', err);
       setAccessKeys([]);
