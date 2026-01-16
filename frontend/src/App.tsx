@@ -31,6 +31,7 @@ import { BillList } from './components/BillList';
 import { ObjectStorageList } from './components/ObjectStorageList';
 import { EnhancedDBList } from './components/EnhancedDBList';
 import { KMSList } from './components/KMSList';
+import { ProxyLBList } from './components/ProxyLBList';
 
 // ナビゲーション項目の定義
 const zoneResources = [
@@ -45,6 +46,7 @@ const zoneResources = [
 const globalResources = [
   { path: 'dns', label: 'DNS' },
   { path: 'gslb', label: 'GSLB' },
+  { path: 'elb', label: 'ELB' },
   { path: 'monitors', label: 'シンプル監視' },
   { path: 'monitoring', label: 'モニタリングスイート' },
   { path: 'container-registry', label: 'コンテナレジストリ' },
@@ -157,6 +159,7 @@ function AppContent({ profiles, zones, authInfo, loading, onProfileChange }: App
               <Route path="dns/:id" element={<DNSBreadcrumb profile={profile} />} />
               <Route path="gslb" element={<span className="breadcrumb-item active">GSLB</span>} />
               <Route path="gslb/:id" element={<GSLBBreadcrumb profile={profile} />} />
+              <Route path="elb" element={<span className="breadcrumb-item active">ELB</span>} />
               <Route path="monitors" element={<span className="breadcrumb-item active">シンプル監視</span>} />
               <Route path="monitoring" element={<span className="breadcrumb-item active">モニタリングスイート</span>} />
               <Route path="container-registry" element={<span className="breadcrumb-item active">コンテナレジストリ</span>} />
@@ -220,6 +223,7 @@ function AppContent({ profiles, zones, authInfo, loading, onProfileChange }: App
           } />
           <Route path="monitors" element={<MonitorList profile={profile} />} />
           <Route path="monitoring" element={<Monitoring profile={profile} />} />
+          <Route path="elb" element={<ProxyLBList profile={profile} />} />
           <Route path="container-registry" element={
             <ContainerRegistryListWrapper profile={profile} />
           } />
