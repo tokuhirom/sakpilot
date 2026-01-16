@@ -495,6 +495,7 @@ export function AppRunList({ profile }: AppRunListProps) {
                           </button>
                           {openMenuVersion === v.version && (
                             <div
+                              onClick={(e) => e.stopPropagation()}
                               style={{
                                 position: 'absolute',
                                 right: 0,
