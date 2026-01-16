@@ -121,6 +121,15 @@ func (a *App) ForceStopServer(profileName, zone, serverID string) error {
 	return service.ForceStop(a.ctx, zone, serverID)
 }
 
+func (a *App) GetServerStatus(profileName, zone, serverID string) (string, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return "", err
+	}
+	service := sakura.NewServerService(client)
+	return service.GetStatus(a.ctx, zone, serverID)
+}
+
 // Global resources (zone-independent)
 func (a *App) GetDNSList(profileName string) ([]sakura.DNSInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
