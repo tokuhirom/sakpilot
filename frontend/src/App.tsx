@@ -129,22 +129,18 @@ function AppContent({ profiles, zones, authInfo, loading, onProfileChange }: App
         </div>
 
         <div className="nav-section">
-          <h3>AppRun専有型</h3>
-          <NavLink
-            to={`/${profile}/apprun`}
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            クラスタ
-          </NavLink>
-        </div>
-
-        <div className="nav-section">
-          <h3>AppRun共用型</h3>
+          <h3>AppRun</h3>
           <NavLink
             to={`/${profile}/apprun-shared`}
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
           >
-            アプリケーション
+            共用型
+          </NavLink>
+          <NavLink
+            to={`/${profile}/apprun`}
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+          >
+            専有型
           </NavLink>
         </div>
 
@@ -182,8 +178,8 @@ function AppContent({ profiles, zones, authInfo, loading, onProfileChange }: App
               <Route path="object-storage/*" element={<span className="breadcrumb-item active">オブジェクトストレージ</span>} />
               <Route path="enhanced-db" element={<span className="breadcrumb-item active">エンハンスドDB</span>} />
               <Route path="kms" element={<span className="breadcrumb-item active">KMS</span>} />
-              <Route path="apprun" element={<span className="breadcrumb-item active">AppRun専有型</span>} />
-              <Route path="apprun-shared" element={<span className="breadcrumb-item active">AppRun共用型</span>} />
+              <Route path="apprun" element={<span className="breadcrumb-item active">AppRun 専有型</span>} />
+              <Route path="apprun-shared" element={<span className="breadcrumb-item active">AppRun 共用型</span>} />
               <Route path="bills" element={<span className="breadcrumb-item active">請求</span>} />
             </Routes>
           </div>
