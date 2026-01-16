@@ -169,32 +169,32 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
           <table style={{ borderCollapse: 'collapse', width: '100%' }}>
             <tbody>
               <tr>
-                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', width: '150px' }}>ID</td>
-                <td style={{ padding: '0.5rem 0', fontFamily: 'monospace' }}>{selectedProxyLB.id}</td>
+                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', width: '150px', textAlign: 'left' }}>ID</td>
+                <td style={{ padding: '0.5rem 0', fontFamily: 'monospace', textAlign: 'left' }}>{selectedProxyLB.id}</td>
               </tr>
               <tr>
-                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888' }}>FQDN</td>
-                <td style={{ padding: '0.5rem 0', fontFamily: 'monospace', color: '#00adb5' }}>{selectedProxyLB.fqdn}</td>
+                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>FQDN</td>
+                <td style={{ padding: '0.5rem 0', fontFamily: 'monospace', color: '#00adb5', textAlign: 'left' }}>{selectedProxyLB.fqdn}</td>
               </tr>
               <tr>
-                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888' }}>VIP</td>
-                <td style={{ padding: '0.5rem 0', fontFamily: 'monospace' }}>{selectedProxyLB.virtualIPAddress}</td>
+                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>VIP</td>
+                <td style={{ padding: '0.5rem 0', fontFamily: 'monospace', textAlign: 'left' }}>{selectedProxyLB.virtualIPAddress}</td>
               </tr>
               <tr>
-                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888' }}>プラン</td>
-                <td style={{ padding: '0.5rem 0' }}>{getPlanName(selectedProxyLB.plan)}</td>
+                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>プラン</td>
+                <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{getPlanName(selectedProxyLB.plan)}</td>
               </tr>
               <tr>
-                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888' }}>リージョン</td>
-                <td style={{ padding: '0.5rem 0' }}>{getRegionName(selectedProxyLB.region)}</td>
+                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>リージョン</td>
+                <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{getRegionName(selectedProxyLB.region)}</td>
               </tr>
               <tr>
-                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888' }}>VIPフェイルオーバー</td>
-                <td style={{ padding: '0.5rem 0' }}>{selectedProxyLB.useVIPFailover ? '有効' : '無効'}</td>
+                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>VIPフェイルオーバー</td>
+                <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{selectedProxyLB.useVIPFailover ? '有効' : '無効'}</td>
               </tr>
               <tr>
-                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888' }}>作成日</td>
-                <td style={{ padding: '0.5rem 0' }}>{formatDate(selectedProxyLB.createdAt)}</td>
+                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>作成日</td>
+                <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{formatDate(selectedProxyLB.createdAt)}</td>
               </tr>
             </tbody>
           </table>
