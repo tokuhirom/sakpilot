@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.0.4](https://github.com/tokuhirom/sakpilot/compare/v0.0.3...v0.0.4) - 2026-01-16
+- feat(frontend): react-router を導入してプロファイル切り替えをURL管理に変更 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/13
+
 ## [v0.0.3](https://github.com/tokuhirom/sakpilot/compare/v0.0.2...v0.0.3) - 2026-01-16
 - docs: READMEのファイル名を SakPilot に更新 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/10
 
