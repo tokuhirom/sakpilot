@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
+  GetContainerRegistries,
   GetContainerRegistryUsers,
   SaveContainerRegistrySecret,
   GetContainerRegistrySecret,
@@ -12,7 +13,7 @@ import { sakura } from '../../wailsjs/go/models';
 
 interface ContainerRegistryDetailProps {
   profile: string;
-  registry: sakura.ContainerRegistryInfo;
+  registryId: string;
 }
 
 interface UserWithSecret extends sakura.ContainerRegistryUserInfo {
@@ -28,7 +29,8 @@ const formatSize = (bytes: number): string => {
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
 };
 
-export function ContainerRegistryDetail({ profile, registry }: ContainerRegistryDetailProps) {
+export function ContainerRegistryDetail({ profile, registryId }: ContainerRegistryDetailProps) {
+  const [registry, setRegistry] = useState<sakura.ContainerRegistryInfo | null>(null);
   const [users, setUsers] = useState<UserWithSecret[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
@@ -51,16 +53,34 @@ export function ContainerRegistryDetail({ profile, registry }: ContainerRegistry
   const [activeUserName, setActiveUserName] = useState<string | null>(null);
   const [activePassword, setActivePassword] = useState<string | null>(null);
 
+  // Load registry details
+  useEffect(() => {
+    if (!profile || !registryId) return;
+
+    const loadRegistry = async () => {
+      try {
+        const registries = await GetContainerRegistries(profile);
+        const found = registries?.find(r => r.id === registryId);
+        if (found) {
+          setRegistry(found);
+        }
+      } catch (err) {
+        console.error('[ContainerRegistryDetail] loadRegistry error:', err);
+      }
+    };
+    loadRegistry();
+  }, [profile, registryId]);
+
   const loadUsers = useCallback(async () => {
-    if (!profile || !registry.id) return;
+    if (!profile || !registryId) return;
 
     setLoading(true);
     try {
-      const userList = await GetContainerRegistryUsers(profile, registry.id);
+      const userList = await GetContainerRegistryUsers(profile, registryId);
       // Check which users have saved secrets
       const usersWithSecret: UserWithSecret[] = await Promise.all(
         (userList || []).map(async (user) => {
-          const hasSaved = await HasContainerRegistrySecret(registry.id, user.userName);
+          const hasSaved = await HasContainerRegistrySecret(registryId, user.userName);
           return { ...user, hasSavedSecret: hasSaved };
         })
       );
@@ -71,7 +91,7 @@ export function ContainerRegistryDetail({ profile, registry }: ContainerRegistry
         u => u.permission === 'all' && u.hasSavedSecret
       );
       if (savedAllUser) {
-        const savedPassword = await GetContainerRegistrySecret(registry.id, savedAllUser.userName);
+        const savedPassword = await GetContainerRegistrySecret(registryId, savedAllUser.userName);
         if (savedPassword) {
           setActiveUserName(savedAllUser.userName);
           setActivePassword(savedPassword);
@@ -82,10 +102,10 @@ export function ContainerRegistryDetail({ profile, registry }: ContainerRegistry
     } finally {
       setLoading(false);
     }
-  }, [profile, registry.id]);
+  }, [profile, registryId]);
 
   const loadImages = useCallback(async () => {
-    if (!activeUserName || !activePassword) return;
+    if (!activeUserName || !activePassword || !registry) return;
 
     setLoadingImages(true);
     setImagesError(null);
@@ -103,10 +123,10 @@ export function ContainerRegistryDetail({ profile, registry }: ContainerRegistry
     } finally {
       setLoadingImages(false);
     }
-  }, [registry.fqdn, activeUserName, activePassword]);
+  }, [registry, activeUserName, activePassword]);
 
   const loadTags = useCallback(async (imageName: string) => {
-    if (!activeUserName || !activePassword) return;
+    if (!activeUserName || !activePassword || !registry) return;
 
     setLoadingTags(true);
     setTagsError(null);
@@ -125,7 +145,7 @@ export function ContainerRegistryDetail({ profile, registry }: ContainerRegistry
     } finally {
       setLoadingTags(false);
     }
-  }, [registry.fqdn, activeUserName, activePassword]);
+  }, [registry, activeUserName, activePassword]);
 
   useEffect(() => {
     loadUsers();
@@ -142,7 +162,7 @@ export function ContainerRegistryDetail({ profile, registry }: ContainerRegistry
 
     setSavingPassword(true);
     try {
-      await SaveContainerRegistrySecret(registry.id, userName, password);
+      await SaveContainerRegistrySecret(registryId, userName, password);
       // Update users list
       setUsers(prev =>
         prev.map(u =>
@@ -163,7 +183,7 @@ export function ContainerRegistryDetail({ profile, registry }: ContainerRegistry
 
   const handleDeletePassword = async (userName: string) => {
     try {
-      await DeleteContainerRegistrySecret(registry.id, userName);
+      await DeleteContainerRegistrySecret(registryId, userName);
       setUsers(prev =>
         prev.map(u =>
           u.userName === userName ? { ...u, hasSavedSecret: false } : u
@@ -256,6 +276,15 @@ export function ContainerRegistryDetail({ profile, registry }: ContainerRegistry
             </tbody>
           </table>
         )}
+      </div>
+    );
+  }
+
+  // Loading state
+  if (!registry) {
+    return (
+      <div className="container-registry-detail">
+        <div className="loading">読み込み中...</div>
       </div>
     );
   }
