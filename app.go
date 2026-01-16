@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"sakpilot/internal/apprun"
+	"sakpilot/internal/apprunshared"
 	"sakpilot/internal/kms"
 	"sakpilot/internal/sakura"
 
@@ -372,6 +373,55 @@ func (a *App) GetAppRunApplicationVersion(profileName, applicationID string, ver
 		return nil, err
 	}
 	return service.GetApplicationVersion(a.ctx, applicationID, version)
+}
+
+// AppRun Shared API
+func (a *App) GetAppRunSharedApplications(profileName string) ([]apprunshared.AppInfo, error) {
+	service, err := apprunshared.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListApplications(a.ctx)
+}
+
+func (a *App) GetAppRunSharedApplication(profileName, appID string) (*apprunshared.AppDetailInfo, error) {
+	service, err := apprunshared.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetApplication(a.ctx, appID)
+}
+
+func (a *App) GetAppRunSharedApplicationStatus(profileName, appID string) (string, error) {
+	service, err := apprunshared.NewService(profileName)
+	if err != nil {
+		return "", err
+	}
+	return service.GetApplicationStatus(a.ctx, appID)
+}
+
+func (a *App) GetAppRunSharedVersions(profileName, appID string) ([]apprunshared.VersionInfo, error) {
+	service, err := apprunshared.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListVersions(a.ctx, appID)
+}
+
+func (a *App) GetAppRunSharedTraffics(profileName, appID string) ([]apprunshared.TrafficInfo, error) {
+	service, err := apprunshared.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListTraffics(a.ctx, appID)
+}
+
+func (a *App) HasAppRunSharedUser(profileName string) (bool, error) {
+	service, err := apprunshared.NewService(profileName)
+	if err != nil {
+		return false, err
+	}
+	return service.HasUser(a.ctx)
 }
 
 // Bills

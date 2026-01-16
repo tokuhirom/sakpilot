@@ -17,6 +17,7 @@ import { MonitorList } from './components/MonitorList';
 import { DatabaseList } from './components/DatabaseList';
 import { Monitoring } from './components/Monitoring';
 import { AppRunList } from './components/AppRunList';
+import { AppRunSharedList } from './components/AppRunSharedList';
 import { GSLBList } from './components/GSLBList';
 import { GSLBDetail } from './components/GSLBDetail';
 import { ContainerRegistryList } from './components/ContainerRegistryList';
@@ -50,6 +51,8 @@ const globalResources = [
   { path: 'object-storage', label: 'オブジェクトストレージ' },
   { path: 'enhanced-db', label: 'エンハンスドDB' },
   { path: 'kms', label: 'KMS' },
+  { path: 'apprun-shared', label: 'AppRun共用型' },
+  { path: 'apprun', label: 'AppRun専有型' },
 ];
 
 interface AppContentProps {
@@ -128,16 +131,6 @@ function AppContent({ profiles, zones, authInfo, loading, onProfileChange }: App
         </div>
 
         <div className="nav-section">
-          <h3>AppRun専有型</h3>
-          <NavLink
-            to={`/${profile}/apprun`}
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            クラスタ
-          </NavLink>
-        </div>
-
-        <div className="nav-section">
           <h3>アカウント</h3>
           <NavLink
             to={`/${profile}/bills`}
@@ -171,7 +164,8 @@ function AppContent({ profiles, zones, authInfo, loading, onProfileChange }: App
               <Route path="object-storage/*" element={<span className="breadcrumb-item active">オブジェクトストレージ</span>} />
               <Route path="enhanced-db" element={<span className="breadcrumb-item active">エンハンスドDB</span>} />
               <Route path="kms" element={<span className="breadcrumb-item active">KMS</span>} />
-              <Route path="apprun" element={<span className="breadcrumb-item active">AppRun</span>} />
+              <Route path="apprun" element={<span className="breadcrumb-item active">AppRun 専有型</span>} />
+              <Route path="apprun-shared" element={<span className="breadcrumb-item active">AppRun 共用型</span>} />
               <Route path="bills" element={<span className="breadcrumb-item active">請求</span>} />
             </Routes>
           </div>
@@ -236,6 +230,7 @@ function AppContent({ profiles, zones, authInfo, loading, onProfileChange }: App
           <Route path="enhanced-db" element={<EnhancedDBList profile={profile} />} />
           <Route path="kms" element={<KMSList profile={profile} />} />
           <Route path="apprun" element={<AppRunList profile={profile} />} />
+          <Route path="apprun-shared" element={<AppRunSharedList profile={profile} />} />
           <Route path="bills" element={
             authInfo ? (
               <BillList profile={profile} accountId={authInfo.accountId} memberCode={authInfo.memberCode} />
