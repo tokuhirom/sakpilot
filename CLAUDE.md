@@ -49,6 +49,18 @@ SakPilot is a desktop app for managing Sakura Cloud infrastructure, built with W
 - Go: `github.com/sacloud/iaas-api-go` - Sakura Cloud IaaS API
 - Frontend: React 18, TypeScript, Vite
 
+### Sakura Cloud SDK
+
+さくらのクラウドのSDKは `iaas-api-go` に含まれていない場合、[sacloud org](https://github.com/sacloud) の別リポジトリに存在することが多い：
+
+- `github.com/sacloud/iaas-api-go` - IaaS API（サーバー、ディスク、DNS等）
+- `github.com/sacloud/apprun-api-go` - AppRun API
+- `github.com/sacloud/object-storage-api-go` - オブジェクトストレージ API
+- `github.com/sacloud/kms-api-go` - KMS API
+- `github.com/sacloud/webaccel-api-go` - ウェブアクセラレータ API
+
+新しいサービスに対応する際は、まず sacloud org で専用のAPIライブラリを探すこと。
+
 ## Style Guidelines
 
 ### Table Styling
