@@ -10,14 +10,52 @@
 - DNS ゾーン一覧表示
 - シンプル監視一覧表示
 
-## 必要条件
+## インストール
+
+### ダウンロード
+
+[GitHub Releases](https://github.com/tokuhirom/sakpilot/releases) から最新版をダウンロードしてください。
+
+| OS | ファイル |
+|----|----------|
+| macOS (Intel/Apple Silicon) | `sakpilot-darwin-universal.zip` |
+| Windows | `sakpilot-windows-amd64.zip` |
+| Linux | `sakpilot-linux-amd64.tar.gz` |
+
+### 必要条件
+
+- [usacloud](https://github.com/sacloud/usacloud) の設定済みプロファイル (`~/.usacloud/`)
+
+### macOS での起動方法
+
+このアプリは署名されていないため、初回起動時にセキュリティ警告が表示されます。
+
+**方法1: システム設定から許可する**
+
+1. アプリをダブルクリックして開こうとする
+2. 「開発元が未確認」という警告が表示されたら、一度キャンセル
+3. 「システム設定」→「プライバシーとセキュリティ」を開く
+4. 「セキュリティ」セクションで「このまま開く」をクリック
+
+**方法2: ターミナルから quarantine 属性を削除する**
+
+```bash
+xattr -cr /Applications/sakpilot.app
+```
+
+その後、通常通りアプリを起動できます。
+
+---
+
+## 開発
+
+### 必要条件
 
 - Go 1.21+
 - Node.js 18+
 - [Wails CLI](https://wails.io/docs/gettingstarted/installation)
-- usacloud の設定済みプロファイル (`~/.usacloud/`)
 
-## セットアップ
+### セットアップ
 
 ```bash
 # 依存関係のインストール
@@ -25,14 +63,14 @@ go mod download
 cd frontend && npm install && cd ..
 ```
 
-## 開発
+### 開発モードで起動
 
 ```bash
-# 開発モードで起動（ホットリロード有効）
+# ホットリロード有効
 wails dev
 ```
 
-## ビルド
+### ビルド
 
 ```bash
 # プロダクションビルド
@@ -41,7 +79,7 @@ wails build
 
 ビルド成果物は `build/bin/` に出力されます。
 
-## デバッグ
+### デバッグ
 
 プロファイルの認証情報を確認するためのデバッグコマンド:
 
