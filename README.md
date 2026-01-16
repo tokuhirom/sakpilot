@@ -18,9 +18,9 @@
 
 | OS | ファイル |
 |----|----------|
-| macOS (Intel/Apple Silicon) | `sakpilot-darwin-universal.zip` |
-| Windows | `sakpilot-windows-amd64.zip` |
-| Linux | `sakpilot-linux-amd64.tar.gz` |
+| macOS (Intel/Apple Silicon) | `SakPilot-darwin-universal.zip` |
+| Windows | `SakPilot-windows-amd64.zip` |
+| Linux | `SakPilot-linux-amd64.tar.gz` |
 
 ### 必要条件
 
@@ -40,7 +40,7 @@
 **方法2: ターミナルから quarantine 属性を削除する**
 
 ```bash
-xattr -cr /Applications/sakpilot.app
+xattr -cr /Applications/SakPilot.app
 ```
 
 その後、通常通りアプリを起動できます。
