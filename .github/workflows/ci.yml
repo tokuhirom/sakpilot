@@ -5,24 +5,11 @@ on:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
-        with:
-          go-version-file: go.mod
-
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@55c2c1448f86e01eaae002a5a3a9624417608d84 # v6.5.2
-        with:
-          version: latest
-
-  build:
-    runs-on: ubuntu-latest
+  build-and-lint:
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
@@ -50,21 +37,12 @@ jobs:
       - name: Build
         run: wails build
 
-  frontend-lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
         with:
-          node-version: "20"
-
-      - name: Install dependencies
-        run: |
-          cd frontend
-          npm ci
+          version: latest
 
       - name: TypeScript check
         run: |
           cd frontend
-          npm run build
+          npx tsc --noEmit
