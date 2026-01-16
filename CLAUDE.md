@@ -73,6 +73,14 @@ golangci-lint run
 cd frontend && npx tsc --noEmit
 ```
 
+## Git Workflow
+
+- mainブランチに直接コミットしない。必ずブランチを作成してPRを出すこと
+- ブランチ作成前に `git fetch origin main` で最新を取得
+- ブランチは `origin/main` から作成: `git checkout -b feature/xxx origin/main`
+- 作業完了後は `git push -u origin feature/xxx` でプッシュ
+- `gh pr create` でPR作成
+
 ## Style Guidelines
 
 ### Table Styling
