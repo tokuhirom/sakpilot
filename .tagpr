@@ -1,0 +1,4 @@
+# See https://github.com/Songmu/tagpr for more information
+[tagpr]
+vPrefix = true
+releaseBranch = main
