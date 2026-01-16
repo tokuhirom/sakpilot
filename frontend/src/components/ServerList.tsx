@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { GetServers, PowerOnServer, PowerOffServer } from '../../wailsjs/go/main/App';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { GetServers, PowerOnServer, PowerOffServer, GetServerStatus } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { SearchBar } from './SearchBar';
@@ -11,10 +11,21 @@ interface ServerListProps {
   onZoneChange: (zone: string) => void;
 }
 
+interface ConfirmDialog {
+  show: boolean;
+  serverName: string;
+  serverId: string;
+  serverZone: string;
+  action: 'powerOn' | 'powerOff';
+}
+
 export function ServerList({ profile, zone, zones, onZoneChange }: ServerListProps) {
   const [servers, setServers] = useState<sakura.ServerInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog | null>(null);
+  const [pendingServers, setPendingServers] = useState<Set<string>>(new Set());
+  const pollingIntervalRef = useRef<Record<string, number>>({});
 
   const loadServers = useCallback(async () => {
     if (!profile || !zone) {
@@ -43,6 +54,83 @@ export function ServerList({ profile, zone, zones, onZoneChange }: ServerListPro
     return () => window.removeEventListener('click', handleClickOutside);
   }, []);
 
+  // コンポーネントのアンマウント時にポーリングをクリア
+  useEffect(() => {
+    return () => {
+      Object.values(pollingIntervalRef.current).forEach(clearInterval);
+    };
+  }, []);
+
+  // サーバーのステータスをポーリングする
+  const startPolling = useCallback((serverZone: string, serverId: string, expectedStatus: string) => {
+    // 既存のポーリングをクリア
+    if (pollingIntervalRef.current[serverId]) {
+      clearInterval(pollingIntervalRef.current[serverId]);
+    }
+
+    const pollInterval = window.setInterval(async () => {
+      try {
+        const status = await GetServerStatus(profile, serverZone, serverId);
+        if (status === expectedStatus) {
+          clearInterval(pollingIntervalRef.current[serverId]);
+          delete pollingIntervalRef.current[serverId];
+          setPendingServers(prev => {
+            const next = new Set(prev);
+            next.delete(serverId);
+            return next;
+          });
+          // サーバー一覧を更新
+          loadServers();
+        }
+      } catch (err) {
+        console.error('[ServerList] Polling error:', err);
+      }
+    }, 2000); // 2秒ごとにポーリング
+
+    pollingIntervalRef.current[serverId] = pollInterval;
+  }, [profile, loadServers]);
+
+  // 確認ダイアログを表示
+  const showConfirmDialog = (e: React.MouseEvent, serverZone: string, serverId: string, serverName: string, action: 'powerOn' | 'powerOff') => {
+    e.stopPropagation();
+    setOpenDropdown(null);
+    setConfirmDialog({
+      show: true,
+      serverName,
+      serverId,
+      serverZone,
+      action,
+    });
+  };
+
+  // 確認ダイアログでの操作実行
+  const executeAction = async () => {
+    if (!confirmDialog) return;
+
+    const { serverZone, serverId, action } = confirmDialog;
+    setConfirmDialog(null);
+
+    // 即座にスピナーを表示
+    setPendingServers(prev => new Set(prev).add(serverId));
+
+    try {
+      if (action === 'powerOn') {
+        await PowerOnServer(profile, serverZone, serverId);
+        startPolling(serverZone, serverId, 'up');
+      } else {
+        await PowerOffServer(profile, serverZone, serverId);
+        startPolling(serverZone, serverId, 'down');
+      }
+    } catch (err) {
+      console.error('[ServerList] Action error:', err);
+      setPendingServers(prev => {
+        const next = new Set(prev);
+        next.delete(serverId);
+        return next;
+      });
+    }
+  };
+
   // 検索機能
   const {
     searchQuery,
@@ -63,22 +151,6 @@ export function ServerList({ profile, zone, zones, onZoneChange }: ServerListPro
     console.log('[ServerList] useEffect triggered:', { profile, zone });
     loadServers();
   }, [loadServers]);
-
-  const handlePowerOn = async (e: React.MouseEvent, serverZone: string, id: string) => {
-    e.stopPropagation();
-    console.log('[ServerList] PowerOn:', { profile, serverZone, id });
-    setOpenDropdown(null);
-    await PowerOnServer(profile, serverZone, id);
-    loadServers();
-  };
-
-  const handlePowerOff = async (e: React.MouseEvent, serverZone: string, id: string) => {
-    e.stopPropagation();
-    console.log('[ServerList] PowerOff:', { profile, serverZone, id });
-    setOpenDropdown(null);
-    await PowerOffServer(profile, serverZone, id);
-    loadServers();
-  };
 
   const toggleDropdown = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -147,9 +219,23 @@ export function ServerList({ profile, zone, zones, onZoneChange }: ServerListPro
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <div className="card-title">{server.name}</div>
-                  <span className={`status ${server.status === 'up' ? 'up' : 'down'}`} style={{ padding: '2px 6px', fontSize: '0.65rem' }}>
-                    {server.status}
-                  </span>
+                  {pendingServers.has(server.id) ? (
+                    <span className="status pending" style={{ padding: '2px 6px', fontSize: '0.65rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span className="spinner" style={{
+                        width: '10px',
+                        height: '10px',
+                        border: '2px solid #ccc',
+                        borderTop: '2px solid #666',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite',
+                      }}></span>
+                      {server.status === 'up' ? '停止中...' : '起動中...'}
+                    </span>
+                  ) : (
+                    <span className={`status ${server.status === 'up' ? 'up' : 'down'}`} style={{ padding: '2px 6px', fontSize: '0.65rem' }}>
+                      {server.status}
+                    </span>
+                  )}
                 </div>
                 <div className="card-subtitle" style={{ marginTop: '2px', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <span>{server.cpu} vCPU / {server.memory} GB</span>
@@ -186,17 +272,17 @@ export function ServerList({ profile, zone, zones, onZoneChange }: ServerListPro
                   ⋮
                 </button>
                 <div className={`dropdown-menu ${openDropdown === server.id ? 'show' : ''}`}>
-                  <button 
-                    className="dropdown-item" 
-                    onClick={(e) => handlePowerOn(e, server.zone, server.id)}
-                    disabled={server.status === 'up'}
+                  <button
+                    className="dropdown-item"
+                    onClick={(e) => showConfirmDialog(e, server.zone, server.id, server.name, 'powerOn')}
+                    disabled={server.status === 'up' || pendingServers.has(server.id)}
                   >
                     起動
                   </button>
-                  <button 
-                    className="dropdown-item" 
-                    onClick={(e) => handlePowerOff(e, server.zone, server.id)}
-                    disabled={server.status === 'down'}
+                  <button
+                    className="dropdown-item"
+                    onClick={(e) => showConfirmDialog(e, server.zone, server.id, server.name, 'powerOff')}
+                    disabled={server.status === 'down' || pendingServers.has(server.id)}
                   >
                     停止
                   </button>
@@ -210,6 +296,79 @@ export function ServerList({ profile, zone, zones, onZoneChange }: ServerListPro
           </div>
         ))
       )}
+
+      {/* 確認ダイアログ */}
+      {confirmDialog && (
+        <div className="modal-overlay" onClick={() => setConfirmDialog(null)} style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+            backgroundColor: '#1a1a1a',
+            border: '1px solid #333',
+            borderRadius: '8px',
+            padding: '20px',
+            minWidth: '300px',
+            maxWidth: '400px',
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>
+              {confirmDialog.action === 'powerOn' ? 'サーバー起動' : 'サーバー停止'}
+            </h3>
+            <p style={{ margin: '0 0 20px 0', color: '#aaa' }}>
+              <strong style={{ color: '#fff' }}>{confirmDialog.serverName}</strong> を
+              {confirmDialog.action === 'powerOn' ? '起動' : '停止'}しますか？
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setConfirmDialog(null)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#333',
+                  border: '1px solid #444',
+                  borderRadius: '4px',
+                  color: '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={executeAction}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: confirmDialog.action === 'powerOn' ? '#22c55e' : '#ef4444',
+                  border: 'none',
+                  borderRadius: '4px',
+                  color: '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                {confirmDialog.action === 'powerOn' ? '起動する' : '停止する'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* スピナーアニメーション用CSS */}
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        .status.pending {
+          background-color: #f59e0b;
+          color: #000;
+        }
+      `}</style>
     </>
   );
 }

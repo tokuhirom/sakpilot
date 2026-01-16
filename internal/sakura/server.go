@@ -88,3 +88,13 @@ func (s *ServerService) ForceStop(ctx context.Context, zone string, serverID str
 	id := types.StringID(serverID)
 	return serverOp.Shutdown(ctx, zone, id, &iaas.ShutdownOption{Force: true})
 }
+
+func (s *ServerService) GetStatus(ctx context.Context, zone string, serverID string) (string, error) {
+	serverOp := iaas.NewServerOp(s.client.Caller())
+	id := types.StringID(serverID)
+	srv, err := serverOp.Read(ctx, zone, id)
+	if err != nil {
+		return "", err
+	}
+	return string(srv.InstanceStatus), nil
+}
