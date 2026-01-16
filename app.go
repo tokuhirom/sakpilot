@@ -550,3 +550,31 @@ func (a *App) GetKMSKeys(profileName string) ([]kms.KeyInfo, error) {
 	}
 	return service.ListKeys(a.ctx)
 }
+
+// ProxyLB (Enhanced Load Balancer)
+func (a *App) GetProxyLBs(profileName string) ([]sakura.ProxyLBInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewProxyLBService(client)
+	return service.List(a.ctx)
+}
+
+func (a *App) GetProxyLBDetail(profileName, proxyLBId string) (*sakura.ProxyLBInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewProxyLBService(client)
+	return service.Get(a.ctx, proxyLBId)
+}
+
+func (a *App) GetProxyLBHealth(profileName, proxyLBId string) (*sakura.ProxyLBHealthInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewProxyLBService(client)
+	return service.GetHealth(a.ctx, proxyLBId)
+}
