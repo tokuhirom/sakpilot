@@ -8,6 +8,7 @@ import {
   GetAppRunLoadBalancers,
   GetAppRunWorkerNodes,
   GetAppRunLBNodes,
+  SetAppRunActiveVersion,
 } from '../../wailsjs/go/main/App';
 import { apprun } from '../../wailsjs/go/models';
 
@@ -35,6 +36,8 @@ export function AppRunList({ profile }: AppRunListProps) {
   const [lbNodesMap, setLbNodesMap] = useState<Record<string, apprun.LBNodeInfo[]>>({});
   const [versionDetail, setVersionDetail] = useState<apprun.AppVersionDetailInfo | null>(null);
   const [loading, setLoading] = useState(false);
+  const [openMenuVersion, setOpenMenuVersion] = useState<number | null>(null);
+  const [settingActive, setSettingActive] = useState(false);
 
   const loadClusters = useCallback(async () => {
     if (!profile) return;
@@ -142,6 +145,33 @@ export function AppRunList({ profile }: AppRunListProps) {
     }
   }, [profile]);
 
+  const handleSetActiveVersion = async (appId: string, version: number) => {
+    if (!profile) return;
+
+    // Confirmation dialog
+    const confirmed = window.confirm(`バージョン ${version} をアクティブにしますか？\n\n現在アクティブなバージョンは非アクティブ化されます。`);
+    if (!confirmed) {
+      setOpenMenuVersion(null);
+      return;
+    }
+
+    setSettingActive(true);
+    setOpenMenuVersion(null);
+    try {
+      await SetAppRunActiveVersion(profile, appId, version);
+      // Update the view with new active version and reload versions
+      if (view.type === 'app') {
+        setView({ ...view, activeVersion: version });
+      }
+      await loadAppVersions(appId);
+    } catch (err) {
+      console.error('[AppRunList] handleSetActiveVersion error:', err);
+      alert('アクティブバージョンの設定に失敗しました');
+    } finally {
+      setSettingActive(false);
+    }
+  };
+
   useEffect(() => {
     if (view.type === 'clusters') {
       loadClusters();
@@ -157,6 +187,15 @@ export function AppRunList({ profile }: AppRunListProps) {
       loadVersionDetail(view.appId, view.version);
     }
   }, [view, loadClusters, loadClusterDetails, loadAppVersions, loadASGDetails, loadLBNodes, loadVersionDetail]);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setOpenMenuVersion(null);
+    if (openMenuVersion !== null) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [openMenuVersion]);
 
   const renderBreadcrumb = () => {
     const items: { label: string; onClick?: () => void }[] = [];
@@ -390,6 +429,7 @@ export function AppRunList({ profile }: AppRunListProps) {
                 <th>イメージ</th>
                 <th>アクティブノード数</th>
                 <th>作成日時</th>
+                <th style={{ width: '50px' }}></th>
               </tr>
             </thead>
             <tbody>
@@ -432,6 +472,68 @@ export function AppRunList({ profile }: AppRunListProps) {
                       )}
                     </td>
                     <td>{v.createdAt || '-'}</td>
+                    <td style={{ position: 'relative' }}>
+                      {!isActive && (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuVersion(openMenuVersion === v.version ? null : v.version);
+                            }}
+                            disabled={settingActive}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#888',
+                              cursor: 'pointer',
+                              padding: '0.25rem 0.5rem',
+                              fontSize: '1.2rem',
+                              lineHeight: 1,
+                            }}
+                          >
+                            ⋮
+                          </button>
+                          {openMenuVersion === v.version && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                right: 0,
+                                top: '100%',
+                                background: '#2a2a2a',
+                                border: '1px solid #444',
+                                borderRadius: '4px',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                                zIndex: 100,
+                                minWidth: '150px',
+                              }}
+                            >
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSetActiveVersion(view.appId, v.version);
+                                }}
+                                disabled={settingActive}
+                                style={{
+                                  display: 'block',
+                                  width: '100%',
+                                  padding: '0.5rem 1rem',
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#fff',
+                                  textAlign: 'left',
+                                  cursor: 'pointer',
+                                  fontSize: '0.9rem',
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = '#3a3a3a'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                              >
+                                {settingActive ? '設定中...' : 'アクティブにする'}
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
