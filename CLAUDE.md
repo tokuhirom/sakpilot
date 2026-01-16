@@ -61,6 +61,14 @@ SakPilot is a desktop app for managing Sakura Cloud infrastructure, built with W
 
 新しいサービスに対応する際は、まず sacloud org で専用のAPIライブラリを探すこと。
 
+## Git Workflow
+
+- mainブランチに直接コミットしない。必ずブランチを作成してPRを出すこと
+- ブランチ作成前に `git fetch origin main` で最新を取得
+- ブランチは `origin/main` から作成: `git checkout -b feature/xxx origin/main`
+- 作業完了後は `git push -u origin feature/xxx` でプッシュ
+- `gh pr create` でPR作成
+
 ## Style Guidelines
 
 ### Table Styling
