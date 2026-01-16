@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"sakpilot/internal/apprun"
+	"sakpilot/internal/kms"
 	"sakpilot/internal/sakura"
 
 	"github.com/sacloud/iaas-api-go"
@@ -480,4 +481,13 @@ func (a *App) GetEnhancedDBs(profileName string) ([]sakura.EnhancedDBInfo, error
 	}
 	service := sakura.NewEnhancedDBService(client)
 	return service.List(a.ctx)
+}
+
+// KMS
+func (a *App) GetKMSKeys(profileName string) ([]kms.KeyInfo, error) {
+	service, err := kms.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListKeys(a.ctx)
 }

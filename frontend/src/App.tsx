@@ -28,8 +28,9 @@ import { ArchiveList } from './components/ArchiveList';
 import { BillList } from './components/BillList';
 import { ObjectStorageList } from './components/ObjectStorageList';
 import { EnhancedDBList } from './components/EnhancedDBList';
+import { KMSList } from './components/KMSList';
 
-type Page = 'servers' | 'disks' | 'archives' | 'databases' | 'switches' | 'switch-detail' | 'packetfilters' | 'packetfilter-detail' | 'dns' | 'dns-detail' | 'gslb' | 'gslb-detail' | 'monitors' | 'monitoring' | 'container-registry' | 'container-registry-detail' | 'object-storage' | 'enhanced-db' | 'apprun' | 'bills';
+type Page = 'servers' | 'disks' | 'archives' | 'databases' | 'switches' | 'switch-detail' | 'packetfilters' | 'packetfilter-detail' | 'dns' | 'dns-detail' | 'gslb' | 'gslb-detail' | 'monitors' | 'monitoring' | 'container-registry' | 'container-registry-detail' | 'object-storage' | 'enhanced-db' | 'kms' | 'apprun' | 'bills';
 
 function App() {
   const [profiles, setProfiles] = useState<sakura.ProfileInfo[]>([]);
@@ -243,6 +244,12 @@ function App() {
           >
             エンハンスドDB
           </div>
+          <div
+            className={`nav-item ${currentPage === 'kms' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('kms')}
+          >
+            KMS
+          </div>
         </div>
 
         <div className="nav-section">
@@ -293,6 +300,7 @@ function App() {
              currentPage === 'container-registry' || currentPage === 'container-registry-detail' ? 'コンテナレジストリ' :
              currentPage === 'object-storage' ? 'オブジェクトストレージ' :
              currentPage === 'enhanced-db' ? 'エンハンスドDB' :
+             currentPage === 'kms' ? 'KMS' :
              currentPage === 'apprun' ? 'AppRun' :
              currentPage === 'bills' ? '請求' : ''}
           </span>
@@ -469,6 +477,10 @@ function App() {
 
         {currentPage === 'enhanced-db' && (
           <EnhancedDBList profile={currentProfile} />
+        )}
+
+        {currentPage === 'kms' && (
+          <KMSList profile={currentProfile} />
         )}
 
         {currentPage === 'apprun' && (
