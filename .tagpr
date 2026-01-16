@@ -2,3 +2,4 @@
 [tagpr]
 vPrefix = true
 releaseBranch = main
+	versionFile = frontend/package.json
