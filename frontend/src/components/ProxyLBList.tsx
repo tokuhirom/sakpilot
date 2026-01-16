@@ -300,8 +300,8 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
                         <td style={{ fontFamily: 'monospace' }}>{srv.ipAddress}</td>
                         <td style={{ fontFamily: 'monospace' }}>{srv.port}</td>
                         <td>
-                          <span className={`status ${srv.status === 'up' ? 'up' : 'down'}`}>
-                            {srv.status === 'up' ? 'UP' : srv.status === 'down' ? 'DOWN' : srv.status}
+                          <span className={`status ${srv.status.toLowerCase() === 'up' ? 'up' : 'down'}`}>
+                            {srv.status.toLowerCase() === 'up' ? 'UP' : srv.status.toLowerCase() === 'down' ? 'DOWN' : srv.status}
                           </span>
                         </td>
                         <td style={{ fontFamily: 'monospace' }}>{srv.activeConn}</td>

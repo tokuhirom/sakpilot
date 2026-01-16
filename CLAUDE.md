@@ -96,6 +96,20 @@ cd frontend && npx tsc --noEmit
   - オブジェクトストレージのパンくず状態
   - 詳細ページにいる場合はリストページに戻す
 
+### Status Indicators
+
+- **Healthy/UP状態は緑系の色で表示**すること（`.status.up` クラスを使用）
+- **Unhealthy/DOWN状態は赤系の色で表示**すること（`.status.down` クラスを使用）
+- ステータスの比較時は、APIからの値が大文字小文字混在の可能性があるため、`toLowerCase()` で正規化してから比較すること
+
+```typescript
+// Good - 大文字小文字を正規化して比較
+<span className={`status ${srv.status.toLowerCase() === 'up' ? 'up' : 'down'}`}>
+
+// Bad - 大文字小文字の違いで色が正しく表示されない可能性
+<span className={`status ${srv.status === 'up' ? 'up' : 'down'}`}>
+```
+
 ### Date Formatting
 
 - Date/time should be formatted as `YYYY/MM/DD HH:MM:SS`
