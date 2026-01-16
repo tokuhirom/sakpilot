@@ -31,7 +31,7 @@ func (l *loggingClient) Do(req *http.Request) (*http.Response, error) {
 
 	// レスポンスボディを読み取ってログに出力
 	body, err := io.ReadAll(resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if err != nil {
 		fmt.Printf("[AppRun HTTP] failed to read body: %v\n", err)
 		return nil, err

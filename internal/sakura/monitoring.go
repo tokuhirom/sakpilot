@@ -79,7 +79,7 @@ func (s *MonitoringService) ListLogs(ctx context.Context) ([]MSLogInfo, error) {
 	routingMap := make(map[int64][]MSRoutingInfo)
 	for _, r := range routingsRes.Results {
 		info := MSRoutingInfo{
-			ID:   fmt.Sprintf("%d", r.ID),
+			ID:   fmt.Sprintf("%d", r.ID), //nolint:staticcheck // ID is deprecated but still functional
 			UID:  r.UID.String(),
 			Name: fmt.Sprintf("%s (%s)", r.PublisherCode.Value, r.Variant),
 		}
@@ -119,7 +119,7 @@ func (s *MonitoringService) ListMetrics(ctx context.Context) ([]MSMetricInfo, er
 	routingMap := make(map[int64][]MSRoutingInfo)
 	for _, r := range routingsRes.Results {
 		info := MSRoutingInfo{
-			ID:   fmt.Sprintf("%d", r.ID),
+			ID:   fmt.Sprintf("%d", r.ID), //nolint:staticcheck // ID is deprecated but still functional
 			UID:  r.UID.String(),
 			Name: fmt.Sprintf("%s (%s)", r.PublisherCode.Value, r.Variant),
 		}

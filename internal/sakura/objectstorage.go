@@ -238,14 +238,14 @@ func DownloadObject(ctx context.Context, endpoint, accessKey, secretKey, bucketN
 	if err != nil {
 		return err
 	}
-	defer output.Body.Close()
+	defer func() { _ = output.Body.Close() }()
 
 	// Create the file
 	file, err := os.Create(savePath)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Copy the data
 	_, err = io.Copy(file, output.Body)

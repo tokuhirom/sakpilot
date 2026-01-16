@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	client "github.com/sacloud/api-client-go"
 	"github.com/sacloud/iaas-api-go"
 )
 
@@ -40,13 +39,9 @@ func NewClientFromProfile(profileName string) (*Client, error) {
 
 	println("NewClientFromProfile:", profileName, "token prefix:", cfg.AccessToken[:8])
 
-	// 直接クライアントを作成（認証情報を明示的に渡す）
-	caller := iaas.NewClientWithOptions(
-		&client.Options{
-			AccessToken:       cfg.AccessToken,
-			AccessTokenSecret: cfg.AccessTokenSecret,
-		},
-	)
+	// クライアントを作成
+	//nolint:staticcheck // deprecated but works, migration to saclient is complex
+	caller := iaas.NewClient(cfg.AccessToken, cfg.AccessTokenSecret)
 	op := iaas.NewAuthStatusOp(caller)
 	read, err := op.Read(context.Background())
 	if err != nil {

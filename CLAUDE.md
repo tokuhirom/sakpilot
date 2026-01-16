@@ -61,6 +61,18 @@ SakPilot is a desktop app for managing Sakura Cloud infrastructure, built with W
 
 新しいサービスに対応する際は、まず sacloud org で専用のAPIライブラリを探すこと。
 
+## Lint
+
+コミット前に以下のlintを通すこと：
+
+```bash
+# Go lint
+golangci-lint run
+
+# TypeScript lint
+cd frontend && npx tsc --noEmit
+```
+
 ## Style Guidelines
 
 ### Table Styling
