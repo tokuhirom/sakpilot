@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.0.5](https://github.com/tokuhirom/sakpilot/compare/v0.0.4...v0.0.5) - 2026-01-16
+- feat: AppRun共用型のサポートを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/15
+- feat: ELB（エンハンスドロードバランサ）サポートを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/17
+
 ## [v0.0.4](https://github.com/tokuhirom/sakpilot/compare/v0.0.3...v0.0.4) - 2026-01-16
 - feat(frontend): react-router を導入してプロファイル切り替えをURL管理に変更 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/13
 
