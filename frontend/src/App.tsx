@@ -337,6 +337,7 @@ function App() {
 
         {currentPage === 'servers' && (
           <ServerList
+            key={currentProfile}
             profile={currentProfile}
             zone={selectedZone}
             zones={zones}
@@ -346,6 +347,7 @@ function App() {
 
         {currentPage === 'disks' && (
           <DiskList
+            key={currentProfile}
             profile={currentProfile}
             zone={selectedZone}
             zones={zones}
@@ -355,6 +357,7 @@ function App() {
 
         {currentPage === 'archives' && (
           <ArchiveList
+            key={currentProfile}
             profile={currentProfile}
             zone={selectedZone}
             zones={zones}
@@ -364,6 +367,7 @@ function App() {
 
         {currentPage === 'databases' && (
           <DatabaseList
+            key={currentProfile}
             profile={currentProfile}
             zone={selectedZone}
             zones={zones}
@@ -373,6 +377,7 @@ function App() {
 
         {currentPage === 'switches' && (
           <SwitchList
+            key={currentProfile}
             profile={currentProfile}
             zone={selectedZone}
             zones={zones}
@@ -386,6 +391,7 @@ function App() {
 
         {currentPage === 'switch-detail' && selectedSwitchId && (
           <SwitchDetail
+            key={currentProfile}
             profile={currentProfile}
             zone={selectedZone}
             switchId={selectedSwitchId}
@@ -394,6 +400,7 @@ function App() {
 
         {currentPage === 'packetfilters' && (
           <PacketFilterList
+            key={currentProfile}
             profile={currentProfile}
             zone={selectedZone}
             zones={zones}
@@ -407,6 +414,7 @@ function App() {
 
         {currentPage === 'packetfilter-detail' && selectedPacketFilterId && (
           <PacketFilterDetail
+            key={currentProfile}
             profile={currentProfile}
             zone={selectedZone}
             packetFilterId={selectedPacketFilterId}
@@ -414,21 +422,23 @@ function App() {
         )}
 
         {currentPage === 'dns' && (
-          <DNSList 
-            profile={currentProfile} 
+          <DNSList
+            key={currentProfile}
+            profile={currentProfile}
             onSelectDNS={(id) => {
               setSelectedDNSId(id);
               setCurrentPage('dns-detail');
-            }} 
+            }}
           />
         )}
 
         {currentPage === 'dns-detail' && selectedDNSId && (
-          <DNSDetail profile={currentProfile} dnsId={selectedDNSId} />
+          <DNSDetail key={currentProfile} profile={currentProfile} dnsId={selectedDNSId} />
         )}
 
         {currentPage === 'gslb' && (
           <GSLBList
+            key={currentProfile}
             profile={currentProfile}
             onSelectGSLB={(id) => {
               setSelectedGSLBId(id);
@@ -438,18 +448,19 @@ function App() {
         )}
 
         {currentPage === 'gslb-detail' && selectedGSLBId && (
-          <GSLBDetail profile={currentProfile} gslbId={selectedGSLBId} />
+          <GSLBDetail key={currentProfile} profile={currentProfile} gslbId={selectedGSLBId} />
         )}
 
         {currentPage === 'monitors' && (
-          <MonitorList profile={currentProfile} />
+          <MonitorList key={currentProfile} profile={currentProfile} />
         )}
         {currentPage === 'monitoring' && (
-          <Monitoring profile={currentProfile} />
+          <Monitoring key={currentProfile} profile={currentProfile} />
         )}
 
         {currentPage === 'container-registry' && (
           <ContainerRegistryList
+            key={currentProfile}
             profile={currentProfile}
             onSelectRegistry={(registry) => {
               setSelectedContainerRegistry(registry);
@@ -460,6 +471,7 @@ function App() {
 
         {currentPage === 'container-registry-detail' && selectedContainerRegistry && (
           <ContainerRegistryDetail
+            key={currentProfile}
             profile={currentProfile}
             registry={selectedContainerRegistry}
           />
@@ -467,6 +479,7 @@ function App() {
 
         {currentPage === 'object-storage' && (
           <ObjectStorageList
+            key={currentProfile}
             profile={currentProfile}
             onBreadcrumbChange={(siteName, bucketName) => {
               setObjectStorageSiteName(siteName);
@@ -476,19 +489,20 @@ function App() {
         )}
 
         {currentPage === 'enhanced-db' && (
-          <EnhancedDBList profile={currentProfile} />
+          <EnhancedDBList key={currentProfile} profile={currentProfile} />
         )}
 
         {currentPage === 'kms' && (
-          <KMSList profile={currentProfile} />
+          <KMSList key={currentProfile} profile={currentProfile} />
         )}
 
         {currentPage === 'apprun' && (
-          <AppRunList profile={currentProfile} />
+          <AppRunList key={currentProfile} profile={currentProfile} />
         )}
 
         {currentPage === 'bills' && authInfo && (
           <BillList
+            key={currentProfile}
             profile={currentProfile}
             accountId={authInfo.accountId}
             memberCode={authInfo.memberCode}

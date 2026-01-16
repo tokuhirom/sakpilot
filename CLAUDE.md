@@ -90,11 +90,23 @@ cd frontend && npx tsc --noEmit
 
 ### Profile Switching
 
-- プロファイル切り替え時は、右側ペインの詳細情報を必ずクリアすること
-- `handleSwitchProfile` で以下の状態をリセット：
+- **重要**: 全てのページコンポーネントには `key={currentProfile}` を付けること
+  - これにより、プロファイル切り替え時にコンポーネントが再マウントされ、内部stateが自動的にリセットされる
+  - 新しいコンポーネントを追加する際は必ず `key={currentProfile}` を付けること
+- `handleSwitchProfile` で App.tsx のstateをリセット：
   - 選択中の詳細情報（`selectedDNSId`, `selectedGSLBId`, `selectedContainerRegistry` 等）
   - オブジェクトストレージのパンくず状態
   - 詳細ページにいる場合はリストページに戻す
+
+```tsx
+// 例: 新しいコンポーネントを追加する場合
+{currentPage === 'new-feature' && (
+  <NewFeatureList
+    key={currentProfile}  // ← 必須
+    profile={currentProfile}
+  />
+)}
+```
 
 ### Date Formatting
 
