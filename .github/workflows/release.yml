@@ -15,16 +15,16 @@ jobs:
         include:
           - os: macos-latest
             platform: darwin/universal
-            output: sakpilot.app
-            artifact: sakpilot-darwin-universal.zip
+            output: SakPilot.app
+            artifact: SakPilot-darwin-universal.zip
           - os: windows-latest
             platform: windows/amd64
-            output: sakpilot.exe
-            artifact: sakpilot-windows-amd64.zip
+            output: SakPilot.exe
+            artifact: SakPilot-windows-amd64.zip
           - os: ubuntu-22.04
             platform: linux/amd64
-            output: sakpilot
-            artifact: sakpilot-linux-amd64.tar.gz
+            output: SakPilot
+            artifact: SakPilot-linux-amd64.tar.gz
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -70,19 +70,19 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: |
           cd build/bin
-          zip -r ../../${{ matrix.artifact }} sakpilot.app
+          zip -r ../../${{ matrix.artifact }} ${{ matrix.output }}
 
       - name: Package (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          Compress-Archive -Path build/bin/sakpilot.exe -DestinationPath ${{ matrix.artifact }}
+          Compress-Archive -Path build/bin/${{ matrix.output }} -DestinationPath ${{ matrix.artifact }}
 
       - name: Package (Linux)
         if: matrix.os == 'ubuntu-22.04'
         run: |
           cd build/bin
-          tar -czvf ../../${{ matrix.artifact }} sakpilot
+          tar -czvf ../../${{ matrix.artifact }} ${{ matrix.output }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
