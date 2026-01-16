@@ -51,6 +51,8 @@ const globalResources = [
   { path: 'object-storage', label: 'オブジェクトストレージ' },
   { path: 'enhanced-db', label: 'エンハンスドDB' },
   { path: 'kms', label: 'KMS' },
+  { path: 'apprun-shared', label: 'AppRun共用型' },
+  { path: 'apprun', label: 'AppRun専有型' },
 ];
 
 interface AppContentProps {
@@ -126,22 +128,6 @@ function AppContent({ profiles, zones, authInfo, loading, onProfileChange }: App
               {item.label}
             </NavLink>
           ))}
-        </div>
-
-        <div className="nav-section">
-          <h3>AppRun</h3>
-          <NavLink
-            to={`/${profile}/apprun-shared`}
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            共用型
-          </NavLink>
-          <NavLink
-            to={`/${profile}/apprun`}
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            専有型
-          </NavLink>
         </div>
 
         <div className="nav-section">
