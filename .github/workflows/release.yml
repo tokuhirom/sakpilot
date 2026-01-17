@@ -129,32 +129,28 @@ jobs:
             exit 1
           fi
 
-          git clone https://x-access-token:${TAP_GITHUB_TOKEN}@github.com/tokuhirom/homebrew-tap.git
+          git clone "https://x-access-token:${TAP_GITHUB_TOKEN}@github.com/tokuhirom/homebrew-tap.git"
           cd homebrew-tap
 
           mkdir -p Casks
-          cat > Casks/sakpilot.rb << 'CASKEOF'
-cask "sakpilot" do
-  version "VERSION_PLACEHOLDER"
-  sha256 "SHA256_PLACEHOLDER"
-
-  url "https://github.com/tokuhirom/sakpilot/releases/download/v#{version}/SakPilot-darwin-universal.zip"
-  name "SakPilot"
-  desc "Desktop client for Sakura Cloud"
-  homepage "https://github.com/tokuhirom/sakpilot"
-
-  app "SakPilot.app"
-
-  postflight do
-    system_command "/usr/bin/xattr",
-                   args: ["-cr", "#{appdir}/SakPilot.app"],
-                   sudo: true
-  end
-end
-CASKEOF
-
-          sed -i "s/VERSION_PLACEHOLDER/${VERSION}/g" Casks/sakpilot.rb
-          sed -i "s/SHA256_PLACEHOLDER/${SHA256}/g" Casks/sakpilot.rb
+          printf '%s\n' \
+            'cask "sakpilot" do' \
+            "  version \"${VERSION}\"" \
+            "  sha256 \"${SHA256}\"" \
+            '' \
+            '  url "https://github.com/tokuhirom/sakpilot/releases/download/v#{version}/SakPilot-darwin-universal.zip"' \
+            '  name "SakPilot"' \
+            '  desc "Desktop client for Sakura Cloud"' \
+            '  homepage "https://github.com/tokuhirom/sakpilot"' \
+            '' \
+            '  app "SakPilot.app"' \
+            '' \
+            '  postflight do' \
+            '    system_command "/usr/bin/xattr",' \
+            '                   args: ["-cr", "#{appdir}/SakPilot.app"],' \
+            '                   sudo: true' \
+            '  end' \
+            'end' > Casks/sakpilot.rb
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

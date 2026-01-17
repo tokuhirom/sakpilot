@@ -8,6 +8,14 @@ on:
   workflow_dispatch:
 
 jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: actionlint
+        uses: reviewdog/action-actionlint@83e4ed25b168066ad8f62f5afbb29ebd8641d982 # v1
+
   build-and-lint:
     runs-on: ubuntu-22.04
     steps:
