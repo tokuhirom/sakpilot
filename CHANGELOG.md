@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.0.7](https://github.com/tokuhirom/sakpilot/compare/v0.0.6...v0.0.7) - 2026-01-17
+- fix: actionlint エラーを修正し CI に actionlint を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/20
+
 ## [v0.0.6](https://github.com/tokuhirom/sakpilot/compare/v0.0.5...v0.0.6) - 2026-01-17
 - feat: Homebrew Cask でのインストールをサポート by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/18
 
