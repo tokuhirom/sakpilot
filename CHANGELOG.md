@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.0.6](https://github.com/tokuhirom/sakpilot/compare/v0.0.5...v0.0.6) - 2026-01-17
+- feat: Homebrew Cask でのインストールをサポート by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/18
+
 ## [v0.0.5](https://github.com/tokuhirom/sakpilot/compare/v0.0.4...v0.0.5) - 2026-01-16
 - feat: AppRun共用型のサポートを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/15
 
