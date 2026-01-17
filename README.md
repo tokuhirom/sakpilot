@@ -12,6 +12,12 @@
 
 ## インストール
 
+### Homebrew (macOS)
+
+```bash
+brew install tokuhirom/tap/sakpilot
+```
+
 ### ダウンロード
 
 [GitHub Releases](https://github.com/tokuhirom/sakpilot/releases) から最新版をダウンロードしてください。

@@ -105,3 +105,59 @@ jobs:
         with:
           files: artifacts/*
           generate_release_notes: true
+
+  update-homebrew:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download macOS artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: SakPilot-darwin-universal.zip
+          path: .
+
+      - name: Calculate checksum and update Homebrew Cask
+        env:
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+        run: |
+          SHA256=$(sha256sum SakPilot-darwin-universal.zip | awk '{print $1}')
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+
+          if [ -z "$TAP_GITHUB_TOKEN" ]; then
+            echo "ERROR: TAP_GITHUB_TOKEN is not set"
+            exit 1
+          fi
+
+          git clone https://x-access-token:${TAP_GITHUB_TOKEN}@github.com/tokuhirom/homebrew-tap.git
+          cd homebrew-tap
+
+          mkdir -p Casks
+          cat > Casks/sakpilot.rb << 'CASKEOF'
+cask "sakpilot" do
+  version "VERSION_PLACEHOLDER"
+  sha256 "SHA256_PLACEHOLDER"
+
+  url "https://github.com/tokuhirom/sakpilot/releases/download/v#{version}/SakPilot-darwin-universal.zip"
+  name "SakPilot"
+  desc "Desktop client for Sakura Cloud"
+  homepage "https://github.com/tokuhirom/sakpilot"
+
+  app "SakPilot.app"
+
+  postflight do
+    system_command "/usr/bin/xattr",
+                   args: ["-cr", "#{appdir}/SakPilot.app"],
+                   sudo: true
+  end
+end
+CASKEOF
+
+          sed -i "s/VERSION_PLACEHOLDER/${VERSION}/g" Casks/sakpilot.rb
+          sed -i "s/SHA256_PLACEHOLDER/${SHA256}/g" Casks/sakpilot.rb
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/sakpilot.rb
+          git commit -m "Update sakpilot to ${VERSION}" || echo "No changes to commit"
+          git push
