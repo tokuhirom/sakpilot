@@ -616,9 +616,14 @@ function ProfileManagementModal({ profiles, zones, currentProfile, onClose, onPr
                 {profiles.map((p) => (
                   <div key={p.name} className={`profile-item ${p.name === currentProfile ? 'current' : ''}`}>
                     <div className="profile-info">
-                      <span className="profile-name">{p.name}</span>
-                      {p.isCurrent && <span className="badge">current</span>}
-                      {p.defaultZone && <span className="profile-zone">{p.defaultZone}</span>}
+                      <div className="profile-info-row">
+                        <span className="profile-name">{p.name}</span>
+                        {p.isCurrent && <span className="badge">current</span>}
+                        {p.defaultZone && <span className="profile-zone">{p.defaultZone}</span>}
+                      </div>
+                      {p.accessTokenPrefix && (
+                        <span className="profile-token-prefix">Key: {p.accessTokenPrefix}...</span>
+                      )}
                     </div>
                     <button
                       className="btn btn-danger btn-small"

@@ -604,6 +604,12 @@ body {
 
 .profile-info {
   display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.profile-info-row {
+  display: flex;
   align-items: center;
   gap: 0.5rem;
 }
@@ -615,6 +621,12 @@ body {
 .profile-zone {
   font-size: 0.75rem;
   color: #666;
+}
+
+.profile-token-prefix {
+  font-size: 0.7rem;
+  color: #888;
+  font-family: monospace;
 }
 
 .btn-small {
