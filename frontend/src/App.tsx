@@ -22,7 +22,7 @@ import { DNSDetail } from './components/DNSDetail';
 import { MonitorList } from './components/MonitorList';
 import { DatabaseList } from './components/DatabaseList';
 import { Monitoring } from './components/Monitoring';
-import { AppRunList } from './components/AppRunList';
+import { AppRunDedicatedList } from './components/AppRunDedicatedList';
 import { AppRunSharedList } from './components/AppRunSharedList';
 import { GSLBList } from './components/GSLBList';
 import { GSLBDetail } from './components/GSLBDetail';
@@ -254,7 +254,7 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
           <Route path="object-storage" element={<ObjectStorageList profile={profile} />} />
           <Route path="enhanced-db" element={<EnhancedDBList profile={profile} />} />
           <Route path="kms" element={<KMSList profile={profile} />} />
-          <Route path="apprun" element={<AppRunList profile={profile} />} />
+          <Route path="apprun" element={<AppRunDedicatedList profile={profile} />} />
           <Route path="apprun-shared" element={<AppRunSharedList profile={profile} />} />
           <Route path="bills" element={
             authInfo ? (
