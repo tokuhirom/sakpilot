@@ -398,6 +398,14 @@ func (a *App) SetAppRunActiveVersion(profileName, applicationID string, version 
 	return service.SetActiveVersion(a.ctx, applicationID, version)
 }
 
+func (a *App) ClearAppRunActiveVersion(profileName, applicationID string) error {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.ClearActiveVersion(a.ctx, applicationID)
+}
+
 func (a *App) GetAppRunApplicationVersion(profileName, applicationID string, version int) (*apprun.AppVersionDetailInfo, error) {
 	service, err := apprun.NewService(profileName)
 	if err != nil {

@@ -385,6 +385,21 @@ func (s *Service) SetActiveVersion(ctx context.Context, applicationID string, ve
 	})
 }
 
+// ClearActiveVersion アプリケーションのアクティブバージョンをクリア（nullに設定）
+func (s *Service) ClearActiveVersion(ctx context.Context, applicationID string) error {
+	appID, err := uuid.Parse(applicationID)
+	if err != nil {
+		return err
+	}
+
+	req := &UpdateApplication{}
+	req.ActiveVersion.SetToNull()
+
+	return s.client.UpdateApplication(ctx, req, UpdateApplicationParams{
+		ApplicationID: ApplicationID(appID),
+	})
+}
+
 // ListAutoScalingGroups ASG 一覧を取得
 func (s *Service) ListAutoScalingGroups(ctx context.Context, clusterID string) ([]ASGInfo, error) {
 	cID, err := uuid.Parse(clusterID)
