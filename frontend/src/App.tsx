@@ -7,6 +7,10 @@ import {
   GetDefaultZone,
   GetZones,
   GetAuthInfo,
+  CreateProfile,
+  DeleteProfile,
+  SetCurrentProfile,
+  ValidateCredentials,
 } from '../wailsjs/go/main/App';
 import { sakura, main } from '../wailsjs/go/models';
 import { ServerList } from './components/ServerList';
@@ -63,9 +67,10 @@ interface AppContentProps {
   authInfo: main.AuthInfo | null;
   loading: boolean;
   onProfileChange: (profile: string) => Promise<void>;
+  onShowProfileModal: () => void;
 }
 
-function AppContent({ profiles, zones, authInfo, loading, onProfileChange }: AppContentProps) {
+function AppContent({ profiles, zones, authInfo, loading, onProfileChange, onShowProfileModal }: AppContentProps) {
   const { profile } = useParams<{ profile: string }>();
   const navigate = useNavigate();
   const [selectedZone, setSelectedZone] = useState('');
@@ -93,17 +98,26 @@ function AppContent({ profiles, zones, authInfo, loading, onProfileChange }: App
         <h1>SakPilot</h1>
 
         <div className="profile-selector">
-          <select
-            value={profile}
-            onChange={(e) => handleProfileChange(e.target.value)}
-            disabled={loading}
-          >
-            {profiles.map((p) => (
-              <option key={p.name} value={p.name}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <div className="profile-selector-row">
+            <select
+              value={profile}
+              onChange={(e) => handleProfileChange(e.target.value)}
+              disabled={loading}
+            >
+              {profiles.map((p) => (
+                <option key={p.name} value={p.name}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <button
+              className="btn-icon profile-manage-btn"
+              onClick={onShowProfileModal}
+              title="プロファイル管理"
+            >
+              &#9881;
+            </button>
+          </div>
         </div>
 
         <div className="nav-section">
@@ -403,12 +417,235 @@ function ContainerRegistryBreadcrumb({ profile }: { profile: string }) {
   );
 }
 
+// プロファイル作成フォームのProps
+interface ProfileFormProps {
+  zones: sakura.ZoneInfo[];
+  onSuccess: () => void;
+  onCancel?: () => void;
+  isInitialSetup?: boolean;
+}
+
+// プロファイル作成フォーム
+function ProfileForm({ zones, onSuccess, onCancel, isInitialSetup = false }: ProfileFormProps) {
+  const [name, setName] = useState('');
+  const [accessToken, setAccessToken] = useState('');
+  const [accessTokenSecret, setAccessTokenSecret] = useState('');
+  const [zone, setZone] = useState('is1a');
+  const [validating, setValidating] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState('');
+  const [validated, setValidated] = useState(false);
+
+  const validateProfileName = (value: string) => {
+    return /^[a-zA-Z0-9_-]+$/.test(value);
+  };
+
+  const handleValidate = async () => {
+    if (!accessToken || !accessTokenSecret) {
+      setError('APIトークンとAPIシークレットを入力してください');
+      return;
+    }
+    setValidating(true);
+    setError('');
+    try {
+      await ValidateCredentials(accessToken, accessTokenSecret);
+      setValidated(true);
+      setError('');
+    } catch (e) {
+      setError('認証に失敗しました。トークンとシークレットを確認してください。');
+      setValidated(false);
+    } finally {
+      setValidating(false);
+    }
+  };
+
+  const handleCreate = async () => {
+    if (!name || !accessToken || !accessTokenSecret) {
+      setError('全ての項目を入力してください');
+      return;
+    }
+    if (!validateProfileName(name)) {
+      setError('プロファイル名は英数字、ハイフン、アンダースコアのみ使用できます');
+      return;
+    }
+    setCreating(true);
+    setError('');
+    try {
+      await CreateProfile(name, accessToken, accessTokenSecret, zone);
+      await SetCurrentProfile(name);
+      onSuccess();
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      if (errorMessage.includes('O_EXCL')) {
+        setError(`プロファイル "${name}" は既に存在します`);
+      } else {
+        setError(`プロファイルの作成に失敗しました: ${errorMessage}`);
+      }
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div className="profile-form">
+      {isInitialSetup && <p className="form-description">さくらのクラウドのAPI認証情報を入力してください。</p>}
+      {error && <div className="error-message">{error}</div>}
+      <div className="form-group">
+        <label>プロファイル名</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="default"
+          disabled={creating}
+        />
+        <small>英数字、ハイフン、アンダースコアのみ</small>
+      </div>
+      <div className="form-group">
+        <label>APIトークン</label>
+        <input
+          type="text"
+          value={accessToken}
+          onChange={(e) => { setAccessToken(e.target.value); setValidated(false); }}
+          placeholder="アクセストークン"
+          disabled={creating}
+        />
+      </div>
+      <div className="form-group">
+        <label>APIシークレット</label>
+        <input
+          type="password"
+          value={accessTokenSecret}
+          onChange={(e) => { setAccessTokenSecret(e.target.value); setValidated(false); }}
+          placeholder="アクセストークンシークレット"
+          disabled={creating}
+        />
+      </div>
+      <div className="form-group">
+        <label>デフォルトゾーン</label>
+        <select value={zone} onChange={(e) => setZone(e.target.value)} disabled={creating}>
+          {zones.map((z) => (
+            <option key={z.id} value={z.id}>{z.name} ({z.id})</option>
+          ))}
+        </select>
+      </div>
+      <div className="form-actions">
+        <button
+          className="btn btn-secondary"
+          onClick={handleValidate}
+          disabled={validating || creating || !accessToken || !accessTokenSecret}
+        >
+          {validating ? '検証中...' : validated ? '認証OK' : '認証テスト'}
+        </button>
+        <button
+          className="btn btn-primary"
+          onClick={handleCreate}
+          disabled={creating || !name || !accessToken || !accessTokenSecret}
+        >
+          {creating ? '作成中...' : '作成'}
+        </button>
+        {onCancel && (
+          <button className="btn btn-secondary" onClick={onCancel} disabled={creating}>
+            キャンセル
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// プロファイル管理モーダルのProps
+interface ProfileManagementModalProps {
+  profiles: sakura.ProfileInfo[];
+  zones: sakura.ZoneInfo[];
+  currentProfile: string;
+  onClose: () => void;
+  onProfileCreated: () => void;
+  onProfileDeleted: () => void;
+}
+
+// プロファイル管理モーダル
+function ProfileManagementModal({ profiles, zones, currentProfile, onClose, onProfileCreated, onProfileDeleted }: ProfileManagementModalProps) {
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const handleDelete = async (profileName: string) => {
+    if (!confirm(`プロファイル "${profileName}" を削除しますか？この操作は取り消せません。`)) {
+      return;
+    }
+    setDeleting(profileName);
+    try {
+      await DeleteProfile(profileName);
+      onProfileDeleted();
+    } catch (e) {
+      alert(`削除に失敗しました: ${e}`);
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>プロファイル管理</h3>
+          <button className="modal-close" onClick={onClose}>&times;</button>
+        </div>
+        <div className="modal-body">
+          {showCreateForm ? (
+            <>
+              <h4>新規プロファイル作成</h4>
+              <ProfileForm
+                zones={zones}
+                onSuccess={() => {
+                  setShowCreateForm(false);
+                  onProfileCreated();
+                }}
+                onCancel={() => setShowCreateForm(false)}
+              />
+            </>
+          ) : (
+            <>
+              <div className="profile-list-header">
+                <span>登録済みプロファイル</span>
+                <button className="btn btn-primary btn-small" onClick={() => setShowCreateForm(true)}>
+                  + 新規作成
+                </button>
+              </div>
+              <div className="profile-list">
+                {profiles.map((p) => (
+                  <div key={p.name} className={`profile-item ${p.name === currentProfile ? 'current' : ''}`}>
+                    <div className="profile-info">
+                      <span className="profile-name">{p.name}</span>
+                      {p.isCurrent && <span className="badge">current</span>}
+                      {p.defaultZone && <span className="profile-zone">{p.defaultZone}</span>}
+                    </div>
+                    <button
+                      className="btn btn-danger btn-small"
+                      onClick={() => handleDelete(p.name)}
+                      disabled={p.name === currentProfile || deleting === p.name}
+                      title={p.name === currentProfile ? '使用中のプロファイルは削除できません' : '削除'}
+                    >
+                      {deleting === p.name ? '削除中...' : '削除'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [profiles, setProfiles] = useState<sakura.ProfileInfo[]>([]);
   const [authInfo, setAuthInfo] = useState<main.AuthInfo | null>(null);
   const [zones, setZones] = useState<sakura.ZoneInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [defaultProfile, setDefaultProfile] = useState('');
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   useEffect(() => {
     loadInitialData();
@@ -427,10 +664,12 @@ function App() {
       setZones(zoneList);
       setDefaultProfile(defProfile);
 
-      // デフォルトプロファイルのアカウント情報を取得
-      const auth = await GetAuthInfo(defProfile);
-      console.log('[App] auth:', auth);
-      setAuthInfo(auth);
+      // プロファイルがある場合のみアカウント情報を取得
+      if (profileList && profileList.length > 0) {
+        const auth = await GetAuthInfo(defProfile);
+        console.log('[App] auth:', auth);
+        setAuthInfo(auth);
+      }
     } finally {
       setLoading(false);
     }
@@ -452,6 +691,16 @@ function App() {
     }
   };
 
+  const handleProfileCreated = async () => {
+    setShowProfileModal(false);
+    setLoading(true);
+    await loadInitialData();
+  };
+
+  const handleProfileDeleted = async () => {
+    await loadInitialData();
+  };
+
   // 初期ロード中
   if (loading && profiles.length === 0) {
     return (
@@ -462,34 +711,49 @@ function App() {
     );
   }
 
-  // プロファイルがない場合
+  // プロファイルがない場合：初期セットアップ画面
   if (profiles.length === 0) {
     return (
       <div className="login-form">
         <h2>SakPilot</h2>
-        <div className="empty-state">
-          プロファイルが見つかりません。<br />
-          usacloud を設定してください。
-        </div>
+        <h3>初期セットアップ</h3>
+        <ProfileForm
+          zones={zones}
+          onSuccess={loadInitialData}
+          isInitialSetup={true}
+        />
       </div>
     );
   }
 
   return (
-    <HashRouter>
-      <Routes>
-        <Route path="/:profile/*" element={
-          <AppContent
-            profiles={profiles}
-            zones={zones}
-            authInfo={authInfo}
-            loading={loading}
-            onProfileChange={handleProfileChange}
-          />
-        } />
-        <Route path="*" element={<Navigate to={`/${defaultProfile}/servers`} replace />} />
-      </Routes>
-    </HashRouter>
+    <>
+      <HashRouter>
+        <Routes>
+          <Route path="/:profile/*" element={
+            <AppContent
+              profiles={profiles}
+              zones={zones}
+              authInfo={authInfo}
+              loading={loading}
+              onProfileChange={handleProfileChange}
+              onShowProfileModal={() => setShowProfileModal(true)}
+            />
+          } />
+          <Route path="*" element={<Navigate to={`/${defaultProfile}/servers`} replace />} />
+        </Routes>
+      </HashRouter>
+      {showProfileModal && (
+        <ProfileManagementModal
+          profiles={profiles}
+          zones={zones}
+          currentProfile={defaultProfile}
+          onClose={() => setShowProfileModal(false)}
+          onProfileCreated={handleProfileCreated}
+          onProfileDeleted={handleProfileDeleted}
+        />
+      )}
+    </>
   );
 }
 

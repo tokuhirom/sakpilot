@@ -18,6 +18,7 @@ require (
 	github.com/sacloud/monitoring-suite-api-go v0.1.1
 	github.com/sacloud/object-storage-api-go v0.0.12
 	github.com/sacloud/object-storage-service-go v0.0.4
+	github.com/sacloud/saclient-go v0.2.7
 	github.com/wailsapp/wails/v2 v2.11.0
 	github.com/zalando/go-keyring v0.2.6
 	go.opentelemetry.io/otel v1.38.0
@@ -94,7 +95,6 @@ require (
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/sacloud/go-http v0.1.9 // indirect
 	github.com/sacloud/packages-go v0.0.12 // indirect
-	github.com/sacloud/saclient-go v0.2.7 // indirect
 	github.com/samber/lo v1.52.0 // indirect
 	github.com/segmentio/asm v1.2.1 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
