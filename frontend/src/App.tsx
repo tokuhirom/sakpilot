@@ -67,12 +67,13 @@ interface AppContentProps {
   profiles: sakura.ProfileInfo[];
   zones: sakura.ZoneInfo[];
   authInfo: main.AuthInfo | null;
+  authError: string | null;
   loading: boolean;
   onProfileChange: (profile: string) => Promise<void>;
   onShowProfileModal: () => void;
 }
 
-function AppContent({ profiles, zones, authInfo, loading, onProfileChange, onShowProfileModal }: AppContentProps) {
+function AppContent({ profiles, zones, authInfo, authError, loading, onProfileChange, onShowProfileModal }: AppContentProps) {
   const { profile } = useParams<{ profile: string }>();
   const navigate = useNavigate();
   const [selectedZone, setSelectedZone] = useState('');
@@ -191,6 +192,10 @@ function AppContent({ profiles, zones, authInfo, loading, onProfileChange, onSho
           {loading ? (
             <div className="auth-info">
               <span className="auth-loading">読み込み中...</span>
+            </div>
+          ) : authError ? (
+            <div className="auth-info auth-error">
+              <span className="auth-error-message">{authError}</span>
             </div>
           ) : authInfo && (
             <div className="auth-info">
@@ -840,6 +845,7 @@ function ProfileManagementModal({ profiles, zones, currentProfile, onClose, onPr
 function App() {
   const [profiles, setProfiles] = useState<sakura.ProfileInfo[]>([]);
   const [authInfo, setAuthInfo] = useState<main.AuthInfo | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [zones, setZones] = useState<sakura.ZoneInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [defaultProfile, setDefaultProfile] = useState('');
@@ -864,9 +870,16 @@ function App() {
 
       // プロファイルがある場合のみアカウント情報を取得
       if (profileList && profileList.length > 0) {
-        const auth = await GetAuthInfo(defProfile);
-        console.log('[App] auth:', auth);
-        setAuthInfo(auth);
+        try {
+          const auth = await GetAuthInfo(defProfile);
+          console.log('[App] auth:', auth);
+          setAuthInfo(auth);
+          setAuthError(null);
+        } catch (e) {
+          console.error('[App] GetAuthInfo error:', e);
+          setAuthInfo(null);
+          setAuthError('認証エラー');
+        }
       }
     } finally {
       setLoading(false);
@@ -876,14 +889,17 @@ function App() {
   const handleProfileChange = async (profileName: string) => {
     console.log('[App] handleProfileChange:', profileName);
     setLoading(true);
+    setAuthError(null);
     try {
       setAuthInfo(null);
       const auth = await GetAuthInfo(profileName);
       console.log('[App] profile switched:', { profileName, auth });
       setAuthInfo(auth);
+      setAuthError(null);
     } catch (e) {
       console.error('[App] handleProfileChange error:', e);
-      alert(`プロファイル "${profileName}" への切り替えに失敗しました`);
+      setAuthInfo(null);
+      setAuthError('認証エラー');
     } finally {
       setLoading(false);
     }
@@ -937,6 +953,7 @@ function App() {
               profiles={profiles}
               zones={zones}
               authInfo={authInfo}
+              authError={authError}
               loading={loading}
               onProfileChange={handleProfileChange}
               onShowProfileModal={() => setShowProfileModal(true)}

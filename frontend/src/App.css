@@ -460,6 +460,16 @@ body {
   color: #666;
 }
 
+.auth-info.auth-error {
+  border-color: #c62828;
+}
+
+.auth-error-message {
+  font-size: 0.8rem;
+  color: #f87171;
+  font-weight: 600;
+}
+
 /* Profile Selector Row */
 .profile-selector-row {
   display: flex;
