@@ -505,7 +505,10 @@ function ProfileForm({ zones, onSuccess, onCancel, isInitialSetup = false, editP
         await UpdateProfile(editProfile.name, name, accessToken, accessTokenSecret, zone);
       } else {
         await CreateProfile(name, accessToken, accessTokenSecret, zone);
-        await SetCurrentProfile(name);
+        // 初期セットアップ時のみ current に設定
+        if (isInitialSetup) {
+          await SetCurrentProfile(name);
+        }
       }
       onSuccess();
     } catch (e) {
