@@ -231,7 +231,7 @@ export function AppRunList({ profile }: AppRunListProps) {
     return (
       <>
         <div className="header">
-          <h2>AppRun</h2>
+          <h2>AppRun専有型</h2>
         </div>
         {renderBreadcrumb()}
         <div className="loading">読み込み中...</div>
@@ -244,7 +244,7 @@ export function AppRunList({ profile }: AppRunListProps) {
     return (
       <>
         <div className="header">
-          <h2>AppRun</h2>
+          <h2>AppRun専有型</h2>
           <button
             className="btn-reload"
             onClick={() => loadClusters()}
@@ -289,7 +289,7 @@ export function AppRunList({ profile }: AppRunListProps) {
     return (
       <>
         <div className="header">
-          <h2>AppRun</h2>
+          <h2>AppRun専有型</h2>
         </div>
         {renderBreadcrumb()}
 
@@ -374,7 +374,7 @@ export function AppRunList({ profile }: AppRunListProps) {
     return (
       <>
         <div className="header">
-          <h2>AppRun</h2>
+          <h2>AppRun専有型</h2>
         </div>
         {renderBreadcrumb()}
 
@@ -447,7 +447,7 @@ export function AppRunList({ profile }: AppRunListProps) {
     return (
       <>
         <div className="header">
-          <h2>AppRun</h2>
+          <h2>AppRun専有型</h2>
         </div>
         {renderBreadcrumb()}
 
@@ -551,7 +551,7 @@ export function AppRunList({ profile }: AppRunListProps) {
     return (
       <>
         <div className="header">
-          <h2>AppRun</h2>
+          <h2>AppRun専有型</h2>
         </div>
         {renderBreadcrumb()}
 
@@ -601,7 +601,7 @@ export function AppRunList({ profile }: AppRunListProps) {
     return (
       <>
         <div className="header">
-          <h2>AppRun</h2>
+          <h2>AppRun専有型</h2>
         </div>
         {renderBreadcrumb()}
 
