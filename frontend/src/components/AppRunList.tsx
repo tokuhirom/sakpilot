@@ -9,6 +9,7 @@ import {
   GetAppRunWorkerNodes,
   GetAppRunLBNodes,
   ClearAppRunActiveVersion,
+  SetAppRunActiveVersion,
 } from '../../wailsjs/go/main/App';
 import { apprun } from '../../wailsjs/go/models';
 
@@ -37,6 +38,8 @@ export function AppRunList({ profile }: AppRunListProps) {
   const [versionDetail, setVersionDetail] = useState<apprun.AppVersionDetailInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [clearingActiveVersion, setClearingActiveVersion] = useState(false);
+  const [settingActiveVersion, setSettingActiveVersion] = useState(false);
+  const [showVersionMenu, setShowVersionMenu] = useState(false);
 
   const loadClusters = useCallback(async () => {
     if (!profile) return;
@@ -165,6 +168,30 @@ export function AppRunList({ profile }: AppRunListProps) {
       alert('アクティブバージョンのクリアに失敗しました');
     } finally {
       setClearingActiveVersion(false);
+    }
+  };
+
+  const handleSetActiveVersion = async (appId: string, clusterId: string, clusterName: string, appName: string, version: number) => {
+    if (!profile) return;
+    setSettingActiveVersion(true);
+    setShowVersionMenu(false);
+    try {
+      await SetAppRunActiveVersion(profile, appId, version);
+      // 成功したらビューを更新
+      setView({
+        type: 'version',
+        clusterId,
+        clusterName,
+        appId,
+        appName,
+        activeVersion: version,
+        version
+      });
+    } catch (err) {
+      console.error('[AppRunList] handleSetActiveVersion error:', err);
+      alert('アクティブバージョンの設定に失敗しました');
+    } finally {
+      setSettingActiveVersion(false);
     }
   };
 
@@ -644,9 +671,37 @@ export function AppRunList({ profile }: AppRunListProps) {
 
         {versionDetail ? (
           <div style={{ marginTop: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-              <h3 style={{ color: '#00adb5', margin: 0 }}>バージョン {view.version}</h3>
-              {isActive && <span className="status up">Active</span>}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <h3 style={{ color: '#00adb5', margin: 0 }}>バージョン {view.version}</h3>
+                {isActive && <span className="status up">Active</span>}
+                {settingActiveVersion && <span className="spinner-small" />}
+              </div>
+              {!isActive && (
+                <div className="dropdown">
+                  <button
+                    className="btn-icon"
+                    onClick={() => setShowVersionMenu(!showVersionMenu)}
+                  >
+                    ⋯
+                  </button>
+                  <div className={`dropdown-menu ${showVersionMenu ? 'show' : ''}`}>
+                    <button
+                      className="dropdown-item"
+                      onClick={() => handleSetActiveVersion(
+                        view.appId,
+                        view.clusterId,
+                        view.clusterName,
+                        view.appName,
+                        view.version
+                      )}
+                      disabled={settingActiveVersion}
+                    >
+                      このバージョンをアクティブにする
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
