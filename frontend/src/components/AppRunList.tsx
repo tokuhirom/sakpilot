@@ -8,6 +8,7 @@ import {
   GetAppRunLoadBalancers,
   GetAppRunWorkerNodes,
   GetAppRunLBNodes,
+  ClearAppRunActiveVersion,
 } from '../../wailsjs/go/main/App';
 import { apprun } from '../../wailsjs/go/models';
 
@@ -35,6 +36,7 @@ export function AppRunList({ profile }: AppRunListProps) {
   const [lbNodesMap, setLbNodesMap] = useState<Record<string, apprun.LBNodeInfo[]>>({});
   const [versionDetail, setVersionDetail] = useState<apprun.AppVersionDetailInfo | null>(null);
   const [loading, setLoading] = useState(false);
+  const [clearingActiveVersion, setClearingActiveVersion] = useState(false);
 
   const loadClusters = useCallback(async () => {
     if (!profile) return;
@@ -141,6 +143,30 @@ export function AppRunList({ profile }: AppRunListProps) {
       setLoading(false);
     }
   }, [profile]);
+
+  const handleClearActiveVersion = async (appId: string, clusterId: string, clusterName: string, appName: string) => {
+    if (!profile) return;
+    setClearingActiveVersion(true);
+    try {
+      await ClearAppRunActiveVersion(profile, appId);
+      // 成功したらビューを更新（activeVersionを0に）
+      setView({
+        type: 'app',
+        clusterId,
+        clusterName,
+        appId,
+        appName,
+        activeVersion: 0
+      });
+      // バージョン一覧を再読み込み
+      await loadAppVersions(appId);
+    } catch (err) {
+      console.error('[AppRunList] handleClearActiveVersion error:', err);
+      alert('アクティブバージョンのクリアに失敗しました');
+    } finally {
+      setClearingActiveVersion(false);
+    }
+  };
 
   useEffect(() => {
     if (view.type === 'clusters') {
@@ -378,7 +404,18 @@ export function AppRunList({ profile }: AppRunListProps) {
         </div>
         {renderBreadcrumb()}
 
-        <h3 style={{ marginTop: '1rem', color: '#00adb5' }}>バージョン</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem' }}>
+          <h3 style={{ color: '#00adb5', margin: 0 }}>バージョン</h3>
+          {view.activeVersion > 0 && (
+            <button
+              className="btn btn-danger btn-small"
+              onClick={() => handleClearActiveVersion(view.appId, view.clusterId, view.clusterName, view.appName)}
+              disabled={clearingActiveVersion}
+            >
+              {clearingActiveVersion ? '処理中...' : '非アクティブ化'}
+            </button>
+          )}
+        </div>
         {versions.length === 0 ? (
           <div className="empty-state">バージョンがありません</div>
         ) : (
