@@ -12,6 +12,7 @@ import {
   UpdateProfile,
   SetCurrentProfile,
   ValidateCredentials,
+  GetProfileCredentials,
 } from '../wailsjs/go/main/App';
 import { sakura, main } from '../wailsjs/go/models';
 import { ServerList } from './components/ServerList';
@@ -436,8 +437,30 @@ function ProfileForm({ zones, onSuccess, onCancel, isInitialSetup = false, editP
   const [zone, setZone] = useState(editProfile?.defaultZone || 'is1a');
   const [validating, setValidating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [loadingCredentials, setLoadingCredentials] = useState(false);
   const [error, setError] = useState('');
   const [validated, setValidated] = useState(false);
+
+  // 編集モードの場合、既存の認証情報を読み込む
+  useEffect(() => {
+    if (isEditMode && editProfile) {
+      setLoadingCredentials(true);
+      GetProfileCredentials(editProfile.name)
+        .then((creds) => {
+          setAccessToken(creds.accessToken);
+          setAccessTokenSecret(creds.accessTokenSecret);
+          if (creds.zone) {
+            setZone(creds.zone);
+          }
+        })
+        .catch((e) => {
+          setError(`認証情報の読み込みに失敗しました: ${e}`);
+        })
+        .finally(() => {
+          setLoadingCredentials(false);
+        });
+    }
+  }, [isEditMode, editProfile]);
 
   const validateProfileName = (value: string) => {
     return /^[a-zA-Z0-9_-]+$/.test(value);
@@ -463,25 +486,23 @@ function ProfileForm({ zones, onSuccess, onCancel, isInitialSetup = false, editP
   };
 
   const handleSubmit = async () => {
+    if (!name) {
+      setError('プロファイル名を入力してください');
+      return;
+    }
+    if (!validateProfileName(name)) {
+      setError('プロファイル名は英数字、ハイフン、アンダースコアのみ使用できます');
+      return;
+    }
     if (!accessToken || !accessTokenSecret) {
       setError('APIトークンとAPIシークレットを入力してください');
       return;
-    }
-    if (!isEditMode) {
-      if (!name) {
-        setError('プロファイル名を入力してください');
-        return;
-      }
-      if (!validateProfileName(name)) {
-        setError('プロファイル名は英数字、ハイフン、アンダースコアのみ使用できます');
-        return;
-      }
     }
     setSubmitting(true);
     setError('');
     try {
       if (isEditMode) {
-        await UpdateProfile(editProfile.name, accessToken, accessTokenSecret, zone);
+        await UpdateProfile(editProfile.name, name, accessToken, accessTokenSecret, zone);
       } else {
         await CreateProfile(name, accessToken, accessTokenSecret, zone);
         await SetCurrentProfile(name);
@@ -499,31 +520,36 @@ function ProfileForm({ zones, onSuccess, onCancel, isInitialSetup = false, editP
     }
   };
 
+  if (loadingCredentials) {
+    return (
+      <div className="profile-form">
+        <div className="loading">認証情報を読み込み中...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="profile-form">
       {isInitialSetup && <p className="form-description">さくらのクラウドのAPI認証情報を入力してください。</p>}
-      {isEditMode && <p className="form-description">プロファイル "{editProfile.name}" の認証情報を更新します。</p>}
       {error && <div className="error-message">{error}</div>}
-      {!isEditMode && (
-        <div className="form-group">
-          <label>プロファイル名</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="default"
-            disabled={submitting}
-          />
-          <small>英数字、ハイフン、アンダースコアのみ</small>
-        </div>
-      )}
+      <div className="form-group">
+        <label>プロファイル名</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="default"
+          disabled={submitting}
+        />
+        <small>英数字、ハイフン、アンダースコアのみ</small>
+      </div>
       <div className="form-group">
         <label>APIトークン</label>
         <input
           type="text"
           value={accessToken}
           onChange={(e) => { setAccessToken(e.target.value); setValidated(false); }}
-          placeholder={isEditMode ? '新しいアクセストークン' : 'アクセストークン'}
+          placeholder="アクセストークン"
           disabled={submitting}
         />
       </div>
@@ -533,7 +559,7 @@ function ProfileForm({ zones, onSuccess, onCancel, isInitialSetup = false, editP
           type="password"
           value={accessTokenSecret}
           onChange={(e) => { setAccessTokenSecret(e.target.value); setValidated(false); }}
-          placeholder={isEditMode ? '新しいアクセストークンシークレット' : 'アクセストークンシークレット'}
+          placeholder="アクセストークンシークレット"
           disabled={submitting}
         />
       </div>
@@ -556,7 +582,7 @@ function ProfileForm({ zones, onSuccess, onCancel, isInitialSetup = false, editP
         <button
           className="btn btn-primary"
           onClick={handleSubmit}
-          disabled={submitting || !accessToken || !accessTokenSecret || (!isEditMode && !name)}
+          disabled={submitting || !name || !accessToken || !accessTokenSecret}
         >
           {submitting ? (isEditMode ? '更新中...' : '作成中...') : (isEditMode ? '更新' : '作成')}
         </button>

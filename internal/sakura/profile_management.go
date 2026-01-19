@@ -30,11 +30,39 @@ func DeleteProfile(name string) error {
 }
 
 // UpdateProfile updates an existing profile with the given credentials
-func UpdateProfile(name, accessToken, accessTokenSecret, zone string) error {
+// If newName is different from oldName, the profile will be renamed
+func UpdateProfile(oldName, newName, accessToken, accessTokenSecret, zone string) error {
 	op := saclient.NewProfileOp(os.Environ())
 
+	if oldName != newName {
+		// Rename: create new profile and delete old one
+		newProfile := &saclient.Profile{
+			Name: newName,
+			Attributes: map[string]any{
+				"AccessToken":       accessToken,
+				"AccessTokenSecret": accessTokenSecret,
+				"Zone":              zone,
+			},
+		}
+		if err := op.Create(newProfile); err != nil {
+			return err
+		}
+
+		// Update current profile if needed
+		currentName, _ := op.GetCurrentName()
+		if currentName == oldName {
+			if err := op.SetCurrentName(newName); err != nil {
+				return err
+			}
+		}
+
+		// Delete old profile
+		return op.Delete(oldName)
+	}
+
+	// Same name: just update
 	profile := &saclient.Profile{
-		Name: name,
+		Name: oldName,
 		Attributes: map[string]any{
 			"AccessToken":       accessToken,
 			"AccessTokenSecret": accessTokenSecret,
@@ -43,6 +71,26 @@ func UpdateProfile(name, accessToken, accessTokenSecret, zone string) error {
 	}
 	_, err := op.Update(profile)
 	return err
+}
+
+// ProfileCredentials contains the credentials for a profile
+type ProfileCredentials struct {
+	AccessToken       string `json:"accessToken"`
+	AccessTokenSecret string `json:"accessTokenSecret"`
+	Zone              string `json:"zone"`
+}
+
+// GetProfileCredentials returns the credentials for the given profile
+func GetProfileCredentials(name string) (*ProfileCredentials, error) {
+	cfg, err := loadProfileConfig(name)
+	if err != nil {
+		return nil, err
+	}
+	return &ProfileCredentials{
+		AccessToken:       cfg.AccessToken,
+		AccessTokenSecret: cfg.AccessTokenSecret,
+		Zone:              cfg.Zone,
+	}, nil
 }
 
 // SetCurrentProfile sets the current profile name
