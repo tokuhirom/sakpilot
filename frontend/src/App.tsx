@@ -564,10 +564,67 @@ interface ProfileManagementModalProps {
   onProfileDeleted: () => void;
 }
 
+// プロファイルの認証ステータス
+interface ProfileAuthStatus {
+  loading: boolean;
+  error: boolean;
+  accountName?: string;
+  memberCode?: string;
+}
+
 // プロファイル管理モーダル
 function ProfileManagementModal({ profiles, zones, currentProfile, onClose, onProfileCreated, onProfileDeleted }: ProfileManagementModalProps) {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [authStatuses, setAuthStatuses] = useState<Record<string, ProfileAuthStatus>>({});
+
+  // 遅延読み込みで各プロファイルの認証ステータスを取得
+  useEffect(() => {
+    if (showCreateForm) return;
+
+    let cancelled = false;
+    const loadAuthStatuses = async () => {
+      // 初期状態: すべてloading
+      const initialStatuses: Record<string, ProfileAuthStatus> = {};
+      for (const p of profiles) {
+        initialStatuses[p.name] = { loading: true, error: false };
+      }
+      setAuthStatuses(initialStatuses);
+
+      // 1秒後から開始
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (cancelled) return;
+
+      // 100msおきに各プロファイルの認証ステータスを取得
+      for (const p of profiles) {
+        if (cancelled) return;
+        try {
+          const auth = await GetAuthInfo(p.name);
+          if (cancelled) return;
+          setAuthStatuses(prev => ({
+            ...prev,
+            [p.name]: {
+              loading: false,
+              error: false,
+              accountName: auth.accountName,
+              memberCode: auth.memberCode,
+            },
+          }));
+        } catch {
+          if (cancelled) return;
+          setAuthStatuses(prev => ({
+            ...prev,
+            [p.name]: { loading: false, error: true },
+          }));
+        }
+        // 100ms待機
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    };
+
+    loadAuthStatuses();
+    return () => { cancelled = true; };
+  }, [profiles, showCreateForm]);
 
   const handleDelete = async (profileName: string) => {
     if (!confirm(`プロファイル "${profileName}" を削除しますか？この操作は取り消せません。`)) {
@@ -582,6 +639,22 @@ function ProfileManagementModal({ profiles, zones, currentProfile, onClose, onPr
     } finally {
       setDeleting(null);
     }
+  };
+
+  const renderAuthStatus = (profileName: string) => {
+    const status = authStatuses[profileName];
+    if (!status || status.loading) {
+      return <span className="profile-auth-status loading">読み込み中...</span>;
+    }
+    if (status.error) {
+      return <span className="profile-auth-status error">認証エラー</span>;
+    }
+    return (
+      <span className="profile-auth-status">
+        {status.accountName && <span className="auth-account-name">{status.accountName}</span>}
+        {status.memberCode && <span className="auth-member-code">{status.memberCode}</span>}
+      </span>
+    );
   };
 
   return (
@@ -624,6 +697,7 @@ function ProfileManagementModal({ profiles, zones, currentProfile, onClose, onPr
                       {p.accessTokenPrefix && (
                         <span className="profile-token-prefix">Key: {p.accessTokenPrefix}...</span>
                       )}
+                      {renderAuthStatus(p.name)}
                     </div>
                     <button
                       className="btn btn-danger btn-small"

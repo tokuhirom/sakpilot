@@ -629,6 +629,30 @@ body {
   font-family: monospace;
 }
 
+.profile-auth-status {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.profile-auth-status.loading {
+  color: #666;
+  font-style: italic;
+}
+
+.profile-auth-status.error {
+  color: #f87171;
+}
+
+.profile-auth-status .auth-account-name {
+  color: #00adb5;
+  font-weight: 500;
+}
+
+.profile-auth-status .auth-member-code {
+  color: #888;
+}
+
 .btn-small {
   padding: 0.25rem 0.5rem;
   font-size: 0.75rem;
