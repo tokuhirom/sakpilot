@@ -29,6 +29,22 @@ func DeleteProfile(name string) error {
 	return op.Delete(name)
 }
 
+// UpdateProfile updates an existing profile with the given credentials
+func UpdateProfile(name, accessToken, accessTokenSecret, zone string) error {
+	op := saclient.NewProfileOp(os.Environ())
+
+	profile := &saclient.Profile{
+		Name: name,
+		Attributes: map[string]any{
+			"AccessToken":       accessToken,
+			"AccessTokenSecret": accessTokenSecret,
+			"Zone":              zone,
+		},
+	}
+	_, err := op.Update(profile)
+	return err
+}
+
 // SetCurrentProfile sets the current profile name
 func SetCurrentProfile(name string) error {
 	op := saclient.NewProfileOp(os.Environ())

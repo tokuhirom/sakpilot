@@ -60,6 +60,11 @@ func (a *App) DeleteProfile(name string) error {
 	return sakura.DeleteProfile(name)
 }
 
+// UpdateProfile updates an existing profile with the given credentials
+func (a *App) UpdateProfile(name, accessToken, accessTokenSecret, zone string) error {
+	return sakura.UpdateProfile(name, accessToken, accessTokenSecret, zone)
+}
+
 // SetCurrentProfile sets the current profile name
 func (a *App) SetCurrentProfile(name string) error {
 	return sakura.SetCurrentProfile(name)

@@ -9,6 +9,7 @@ import {
   GetAuthInfo,
   CreateProfile,
   DeleteProfile,
+  UpdateProfile,
   SetCurrentProfile,
   ValidateCredentials,
 } from '../wailsjs/go/main/App';
@@ -417,22 +418,24 @@ function ContainerRegistryBreadcrumb({ profile }: { profile: string }) {
   );
 }
 
-// プロファイル作成フォームのProps
+// プロファイル作成/編集フォームのProps
 interface ProfileFormProps {
   zones: sakura.ZoneInfo[];
   onSuccess: () => void;
   onCancel?: () => void;
   isInitialSetup?: boolean;
+  editProfile?: sakura.ProfileInfo; // 編集時に設定
 }
 
-// プロファイル作成フォーム
-function ProfileForm({ zones, onSuccess, onCancel, isInitialSetup = false }: ProfileFormProps) {
-  const [name, setName] = useState('');
+// プロファイル作成/編集フォーム
+function ProfileForm({ zones, onSuccess, onCancel, isInitialSetup = false, editProfile }: ProfileFormProps) {
+  const isEditMode = !!editProfile;
+  const [name, setName] = useState(editProfile?.name || '');
   const [accessToken, setAccessToken] = useState('');
   const [accessTokenSecret, setAccessTokenSecret] = useState('');
-  const [zone, setZone] = useState('is1a');
+  const [zone, setZone] = useState(editProfile?.defaultZone || 'is1a');
   const [validating, setValidating] = useState(false);
-  const [creating, setCreating] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [validated, setValidated] = useState(false);
 
@@ -451,7 +454,7 @@ function ProfileForm({ zones, onSuccess, onCancel, isInitialSetup = false }: Pro
       await ValidateCredentials(accessToken, accessTokenSecret);
       setValidated(true);
       setError('');
-    } catch (e) {
+    } catch {
       setError('認証に失敗しました。トークンとシークレットを確認してください。');
       setValidated(false);
     } finally {
@@ -459,56 +462,69 @@ function ProfileForm({ zones, onSuccess, onCancel, isInitialSetup = false }: Pro
     }
   };
 
-  const handleCreate = async () => {
-    if (!name || !accessToken || !accessTokenSecret) {
-      setError('全ての項目を入力してください');
+  const handleSubmit = async () => {
+    if (!accessToken || !accessTokenSecret) {
+      setError('APIトークンとAPIシークレットを入力してください');
       return;
     }
-    if (!validateProfileName(name)) {
-      setError('プロファイル名は英数字、ハイフン、アンダースコアのみ使用できます');
-      return;
+    if (!isEditMode) {
+      if (!name) {
+        setError('プロファイル名を入力してください');
+        return;
+      }
+      if (!validateProfileName(name)) {
+        setError('プロファイル名は英数字、ハイフン、アンダースコアのみ使用できます');
+        return;
+      }
     }
-    setCreating(true);
+    setSubmitting(true);
     setError('');
     try {
-      await CreateProfile(name, accessToken, accessTokenSecret, zone);
-      await SetCurrentProfile(name);
+      if (isEditMode) {
+        await UpdateProfile(editProfile.name, accessToken, accessTokenSecret, zone);
+      } else {
+        await CreateProfile(name, accessToken, accessTokenSecret, zone);
+        await SetCurrentProfile(name);
+      }
       onSuccess();
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : String(e);
       if (errorMessage.includes('O_EXCL')) {
         setError(`プロファイル "${name}" は既に存在します`);
       } else {
-        setError(`プロファイルの作成に失敗しました: ${errorMessage}`);
+        setError(`プロファイルの${isEditMode ? '更新' : '作成'}に失敗しました: ${errorMessage}`);
       }
     } finally {
-      setCreating(false);
+      setSubmitting(false);
     }
   };
 
   return (
     <div className="profile-form">
       {isInitialSetup && <p className="form-description">さくらのクラウドのAPI認証情報を入力してください。</p>}
+      {isEditMode && <p className="form-description">プロファイル "{editProfile.name}" の認証情報を更新します。</p>}
       {error && <div className="error-message">{error}</div>}
-      <div className="form-group">
-        <label>プロファイル名</label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="default"
-          disabled={creating}
-        />
-        <small>英数字、ハイフン、アンダースコアのみ</small>
-      </div>
+      {!isEditMode && (
+        <div className="form-group">
+          <label>プロファイル名</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="default"
+            disabled={submitting}
+          />
+          <small>英数字、ハイフン、アンダースコアのみ</small>
+        </div>
+      )}
       <div className="form-group">
         <label>APIトークン</label>
         <input
           type="text"
           value={accessToken}
           onChange={(e) => { setAccessToken(e.target.value); setValidated(false); }}
-          placeholder="アクセストークン"
-          disabled={creating}
+          placeholder={isEditMode ? '新しいアクセストークン' : 'アクセストークン'}
+          disabled={submitting}
         />
       </div>
       <div className="form-group">
@@ -517,13 +533,13 @@ function ProfileForm({ zones, onSuccess, onCancel, isInitialSetup = false }: Pro
           type="password"
           value={accessTokenSecret}
           onChange={(e) => { setAccessTokenSecret(e.target.value); setValidated(false); }}
-          placeholder="アクセストークンシークレット"
-          disabled={creating}
+          placeholder={isEditMode ? '新しいアクセストークンシークレット' : 'アクセストークンシークレット'}
+          disabled={submitting}
         />
       </div>
       <div className="form-group">
         <label>デフォルトゾーン</label>
-        <select value={zone} onChange={(e) => setZone(e.target.value)} disabled={creating}>
+        <select value={zone} onChange={(e) => setZone(e.target.value)} disabled={submitting}>
           {zones.map((z) => (
             <option key={z.id} value={z.id}>{z.name} ({z.id})</option>
           ))}
@@ -533,19 +549,19 @@ function ProfileForm({ zones, onSuccess, onCancel, isInitialSetup = false }: Pro
         <button
           className="btn btn-secondary"
           onClick={handleValidate}
-          disabled={validating || creating || !accessToken || !accessTokenSecret}
+          disabled={validating || submitting || !accessToken || !accessTokenSecret}
         >
           {validating ? '検証中...' : validated ? '認証OK' : '認証テスト'}
         </button>
         <button
           className="btn btn-primary"
-          onClick={handleCreate}
-          disabled={creating || !name || !accessToken || !accessTokenSecret}
+          onClick={handleSubmit}
+          disabled={submitting || !accessToken || !accessTokenSecret || (!isEditMode && !name)}
         >
-          {creating ? '作成中...' : '作成'}
+          {submitting ? (isEditMode ? '更新中...' : '作成中...') : (isEditMode ? '更新' : '作成')}
         </button>
         {onCancel && (
-          <button className="btn btn-secondary" onClick={onCancel} disabled={creating}>
+          <button className="btn btn-secondary" onClick={onCancel} disabled={submitting}>
             キャンセル
           </button>
         )}
@@ -562,6 +578,7 @@ interface ProfileManagementModalProps {
   onClose: () => void;
   onProfileCreated: () => void;
   onProfileDeleted: () => void;
+  onProfileUpdated: () => void;
 }
 
 // プロファイルの認証ステータス
@@ -573,14 +590,17 @@ interface ProfileAuthStatus {
 }
 
 // プロファイル管理モーダル
-function ProfileManagementModal({ profiles, zones, currentProfile, onClose, onProfileCreated, onProfileDeleted }: ProfileManagementModalProps) {
+function ProfileManagementModal({ profiles, zones, currentProfile, onClose, onProfileCreated, onProfileDeleted, onProfileUpdated }: ProfileManagementModalProps) {
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingProfile, setEditingProfile] = useState<sakura.ProfileInfo | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [authStatuses, setAuthStatuses] = useState<Record<string, ProfileAuthStatus>>({});
 
+  const isShowingForm = showCreateForm || editingProfile !== null;
+
   // 遅延読み込みで各プロファイルの認証ステータスを取得
   useEffect(() => {
-    if (showCreateForm) return;
+    if (isShowingForm) return;
 
     let cancelled = false;
     const loadAuthStatuses = async () => {
@@ -624,7 +644,7 @@ function ProfileManagementModal({ profiles, zones, currentProfile, onClose, onPr
 
     loadAuthStatuses();
     return () => { cancelled = true; };
-  }, [profiles, showCreateForm]);
+  }, [profiles, isShowingForm]);
 
   const handleDelete = async (profileName: string) => {
     if (!confirm(`プロファイル "${profileName}" を削除しますか？この操作は取り消せません。`)) {
@@ -677,6 +697,19 @@ function ProfileManagementModal({ profiles, zones, currentProfile, onClose, onPr
                 onCancel={() => setShowCreateForm(false)}
               />
             </>
+          ) : editingProfile ? (
+            <>
+              <h4>プロファイル編集</h4>
+              <ProfileForm
+                zones={zones}
+                editProfile={editingProfile}
+                onSuccess={() => {
+                  setEditingProfile(null);
+                  onProfileUpdated();
+                }}
+                onCancel={() => setEditingProfile(null)}
+              />
+            </>
           ) : (
             <>
               <div className="profile-list-header">
@@ -699,14 +732,23 @@ function ProfileManagementModal({ profiles, zones, currentProfile, onClose, onPr
                       )}
                       {renderAuthStatus(p.name)}
                     </div>
-                    <button
-                      className="btn btn-danger btn-small"
-                      onClick={() => handleDelete(p.name)}
-                      disabled={p.name === currentProfile || deleting === p.name}
-                      title={p.name === currentProfile ? '使用中のプロファイルは削除できません' : '削除'}
-                    >
-                      {deleting === p.name ? '削除中...' : '削除'}
-                    </button>
+                    <div className="profile-actions">
+                      <button
+                        className="btn btn-secondary btn-small"
+                        onClick={() => setEditingProfile(p)}
+                        title="編集"
+                      >
+                        編集
+                      </button>
+                      <button
+                        className="btn btn-danger btn-small"
+                        onClick={() => handleDelete(p.name)}
+                        disabled={p.name === currentProfile || deleting === p.name}
+                        title={p.name === currentProfile ? '使用中のプロファイルは削除できません' : '削除'}
+                      >
+                        {deleting === p.name ? '削除中...' : '削除'}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -780,6 +822,10 @@ function App() {
     await loadInitialData();
   };
 
+  const handleProfileUpdated = async () => {
+    await loadInitialData();
+  };
+
   // 初期ロード中
   if (loading && profiles.length === 0) {
     return (
@@ -830,6 +876,7 @@ function App() {
           onClose={() => setShowProfileModal(false)}
           onProfileCreated={handleProfileCreated}
           onProfileDeleted={handleProfileDeleted}
+          onProfileUpdated={handleProfileUpdated}
         />
       )}
     </>

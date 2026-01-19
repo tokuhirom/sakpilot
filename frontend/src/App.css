@@ -653,6 +653,12 @@ body {
   color: #888;
 }
 
+.profile-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
 .btn-small {
   padding: 0.25rem 0.5rem;
   font-size: 0.75rem;
