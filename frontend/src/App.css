@@ -606,6 +606,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  min-height: 4rem;
+  justify-content: center;
 }
 
 .profile-info-row {
@@ -633,6 +635,8 @@ body {
   display: flex;
   gap: 0.5rem;
   font-size: 0.75rem;
+  min-height: 1.2em;
+  align-items: center;
 }
 
 .profile-auth-status.loading {
