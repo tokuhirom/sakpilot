@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.0.9](https://github.com/tokuhirom/sakpilot/compare/v0.0.8...v0.0.9) - 2026-01-19
+- feat: AppRun専有型のバージョン詳細画面に「アクティブにする」機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/28
+
 ## [v0.0.8](https://github.com/tokuhirom/sakpilot/compare/v0.0.7...v0.0.8) - 2026-01-19
 - Add cross-reference to sact in README by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/22
 - feat: プロファイル管理機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/24
