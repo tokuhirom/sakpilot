@@ -336,7 +336,7 @@ body {
   color: #666;
 }
 
-.loading {
+.main-content .loading {
   text-align: center;
   padding: 2rem;
   color: #888;
@@ -458,4 +458,255 @@ body {
 .auth-loading {
   font-size: 0.8rem;
   color: #666;
+}
+
+/* Profile Selector Row */
+.profile-selector-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.profile-selector-row select {
+  flex: 1;
+}
+
+.profile-manage-btn {
+  padding: 0.5rem;
+  font-size: 1rem;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: #16213e;
+  border-radius: 8px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #333;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #00adb5;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.modal-close:hover {
+  color: #fff;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.modal-body h4 {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  color: #fff;
+}
+
+/* Profile Form Styles */
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.profile-form .form-group {
+  margin-bottom: 0;
+}
+
+.profile-form .form-group small {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.profile-form .form-group select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #333;
+  border-radius: 4px;
+  background-color: #0f3460;
+  color: #fff;
+}
+
+.form-description {
+  margin: 0 0 1rem 0;
+  color: #888;
+  font-size: 0.9rem;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.error-message {
+  background-color: #3d0000;
+  color: #f87171;
+  padding: 0.75rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Profile List in Modal */
+.profile-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.profile-list-header span {
+  font-size: 0.9rem;
+  color: #888;
+}
+
+.profile-list .profile-item {
+  cursor: default;
+}
+
+.profile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-height: 4rem;
+  justify-content: center;
+}
+
+.profile-info-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.profile-name {
+  font-weight: 600;
+}
+
+.profile-zone {
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.profile-token-prefix {
+  font-size: 0.7rem;
+  color: #888;
+  font-family: monospace;
+}
+
+.profile-auth-status {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  min-height: 1.2em;
+  align-items: center;
+}
+
+.profile-auth-status.loading {
+  color: #666;
+  font-style: italic;
+}
+
+.profile-auth-status.error {
+  color: #f87171;
+}
+
+.profile-auth-status .auth-account-name {
+  color: #00adb5;
+  font-weight: 500;
+}
+
+.profile-auth-status .auth-member-code {
+  color: #888;
+}
+
+.profile-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.btn-small {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.btn-small:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Confirm Dialog Overlay */
+.confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.confirm-dialog {
+  padding: 1.5rem;
+  background-color: #16213e;
+  border: 1px solid #c62828;
+  border-radius: 8px;
+  max-width: 400px;
+}
+
+.confirm-dialog p {
+  margin: 0 0 0.5rem 0;
+}
+
+.confirm-warning {
+  font-size: 0.85rem;
+  color: #f87171;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  justify-content: flex-end;
 }

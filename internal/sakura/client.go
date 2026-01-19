@@ -20,9 +20,10 @@ type Client struct {
 }
 
 type ProfileInfo struct {
-	Name        string `json:"name"`
-	IsCurrent   bool   `json:"isCurrent"`
-	DefaultZone string `json:"defaultZone"`
+	Name              string `json:"name"`
+	IsCurrent         bool   `json:"isCurrent"`
+	DefaultZone       string `json:"defaultZone"`
+	AccessTokenPrefix string `json:"accessTokenPrefix"`
 }
 
 type profileConfig struct {
@@ -37,7 +38,11 @@ func NewClientFromProfile(profileName string) (*Client, error) {
 		return nil, fmt.Errorf("failed to load profile %s: %w", profileName, err)
 	}
 
-	println("NewClientFromProfile:", profileName, "token prefix:", cfg.AccessToken[:8])
+	tokenPrefix := cfg.AccessToken
+	if len(tokenPrefix) > 8 {
+		tokenPrefix = tokenPrefix[:8]
+	}
+	println("NewClientFromProfile:", profileName, "token prefix:", tokenPrefix)
 
 	// クライアントを作成
 	//nolint:staticcheck // deprecated but works, migration to saclient is complex
@@ -119,13 +124,20 @@ func ListProfiles() ([]ProfileInfo, error) {
 		if _, err := os.Stat(configPath); err == nil {
 			cfg, _ := loadProfileConfig(name)
 			defaultZone := ""
+			accessTokenPrefix := ""
 			if cfg != nil {
 				defaultZone = cfg.Zone
+				if len(cfg.AccessToken) >= 8 {
+					accessTokenPrefix = cfg.AccessToken[:8]
+				} else if len(cfg.AccessToken) > 0 {
+					accessTokenPrefix = cfg.AccessToken
+				}
 			}
 			profiles = append(profiles, ProfileInfo{
-				Name:        name,
-				IsCurrent:   name == currentProfile,
-				DefaultZone: defaultZone,
+				Name:              name,
+				IsCurrent:         name == currentProfile,
+				DefaultZone:       defaultZone,
+				AccessTokenPrefix: accessTokenPrefix,
 			})
 		}
 	}

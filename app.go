@@ -50,6 +50,37 @@ func (a *App) GetDefaultProfile() string {
 	return "default"
 }
 
+// CreateProfile creates a new profile with the given credentials
+func (a *App) CreateProfile(name, accessToken, accessTokenSecret, zone string) error {
+	return sakura.CreateProfile(name, accessToken, accessTokenSecret, zone)
+}
+
+// DeleteProfile deletes the profile with the given name
+func (a *App) DeleteProfile(name string) error {
+	return sakura.DeleteProfile(name)
+}
+
+// UpdateProfile updates an existing profile with the given credentials
+// If newName is different from oldName, the profile will be renamed
+func (a *App) UpdateProfile(oldName, newName, accessToken, accessTokenSecret, zone string) error {
+	return sakura.UpdateProfile(oldName, newName, accessToken, accessTokenSecret, zone)
+}
+
+// GetProfileCredentials returns the credentials for the given profile
+func (a *App) GetProfileCredentials(name string) (*sakura.ProfileCredentials, error) {
+	return sakura.GetProfileCredentials(name)
+}
+
+// SetCurrentProfile sets the current profile name
+func (a *App) SetCurrentProfile(name string) error {
+	return sakura.SetCurrentProfile(name)
+}
+
+// ValidateCredentials validates the given credentials by making an API call
+func (a *App) ValidateCredentials(accessToken, accessTokenSecret string) error {
+	return sakura.ValidateCredentials(accessToken, accessTokenSecret)
+}
+
 func (a *App) GetDefaultZone(profileName string) string {
 	client, err := sakura.NewClientFromProfile(profileName)
 	if err != nil {
