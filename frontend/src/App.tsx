@@ -60,7 +60,7 @@ const globalResources = [
   { path: 'enhanced-db', label: 'エンハンスドDB' },
   { path: 'kms', label: 'KMS' },
   { path: 'apprun-shared', label: 'AppRun共用型' },
-  { path: 'apprun', label: 'AppRun専有型' },
+  { path: 'apprun-dedicated', label: 'AppRun専有型' },
 ];
 
 interface AppContentProps {
@@ -184,7 +184,7 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
               <Route path="object-storage/*" element={<span className="breadcrumb-item active">オブジェクトストレージ</span>} />
               <Route path="enhanced-db" element={<span className="breadcrumb-item active">エンハンスドDB</span>} />
               <Route path="kms" element={<span className="breadcrumb-item active">KMS</span>} />
-              <Route path="apprun" element={<span className="breadcrumb-item active">AppRun 専有型</span>} />
+              <Route path="apprun-dedicated" element={<span className="breadcrumb-item active">AppRun 専有型</span>} />
               <Route path="apprun-shared" element={<span className="breadcrumb-item active">AppRun 共用型</span>} />
               <Route path="bills" element={<span className="breadcrumb-item active">請求</span>} />
             </Routes>
@@ -254,7 +254,7 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
           <Route path="object-storage" element={<ObjectStorageList profile={profile} />} />
           <Route path="enhanced-db" element={<EnhancedDBList profile={profile} />} />
           <Route path="kms" element={<KMSList profile={profile} />} />
-          <Route path="apprun" element={<AppRunDedicatedList profile={profile} />} />
+          <Route path="apprun-dedicated" element={<AppRunDedicatedList profile={profile} />} />
           <Route path="apprun-shared" element={<AppRunSharedList profile={profile} />} />
           <Route path="bills" element={
             authInfo ? (
