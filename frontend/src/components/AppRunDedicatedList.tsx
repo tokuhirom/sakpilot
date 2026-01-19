@@ -13,7 +13,7 @@ import {
 } from '../../wailsjs/go/main/App';
 import { apprun } from '../../wailsjs/go/models';
 
-interface AppRunListProps {
+interface AppRunDedicatedListProps {
   profile: string;
 }
 
@@ -25,7 +25,7 @@ type View =
   | { type: 'app'; clusterId: string; clusterName: string; appId: string; appName: string; activeVersion: number }
   | { type: 'version'; clusterId: string; clusterName: string; appId: string; appName: string; activeVersion: number; version: number };
 
-export function AppRunList({ profile }: AppRunListProps) {
+export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
   const [view, setView] = useState<View>({ type: 'clusters' });
   const [clusters, setClusters] = useState<apprun.ClusterInfo[]>([]);
   const [apps, setApps] = useState<apprun.AppInfo[]>([]);
