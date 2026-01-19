@@ -38,7 +38,11 @@ func NewClientFromProfile(profileName string) (*Client, error) {
 		return nil, fmt.Errorf("failed to load profile %s: %w", profileName, err)
 	}
 
-	println("NewClientFromProfile:", profileName, "token prefix:", cfg.AccessToken[:8])
+	tokenPrefix := cfg.AccessToken
+	if len(tokenPrefix) > 8 {
+		tokenPrefix = tokenPrefix[:8]
+	}
+	println("NewClientFromProfile:", profileName, "token prefix:", tokenPrefix)
 
 	// クライアントを作成
 	//nolint:staticcheck // deprecated but works, migration to saclient is complex
