@@ -623,6 +623,7 @@ function ProfileManagementModal({ profiles, zones, currentProfile, onClose, onPr
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingProfile, setEditingProfile] = useState<sakura.ProfileInfo | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [settingDefault, setSettingDefault] = useState<string | null>(null);
   const [authStatuses, setAuthStatuses] = useState<Record<string, ProfileAuthStatus>>({});
 
   const isShowingForm = showCreateForm || editingProfile !== null;
@@ -675,10 +676,17 @@ function ProfileManagementModal({ profiles, zones, currentProfile, onClose, onPr
     return () => { cancelled = true; };
   }, [profiles, isShowingForm]);
 
-  const handleDelete = async (profileName: string) => {
-    if (!confirm(`プロファイル "${profileName}" を削除しますか？この操作は取り消せません。`)) {
-      return;
-    }
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  const handleDeleteClick = (profileName: string) => {
+    console.log('[ProfileManagementModal] handleDeleteClick called:', profileName);
+    setConfirmDelete(profileName);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!confirmDelete) return;
+    const profileName = confirmDelete;
+    setConfirmDelete(null);
     setDeleting(profileName);
     try {
       await DeleteProfile(profileName);
@@ -687,6 +695,22 @@ function ProfileManagementModal({ profiles, zones, currentProfile, onClose, onPr
       alert(`削除に失敗しました: ${e}`);
     } finally {
       setDeleting(null);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setConfirmDelete(null);
+  };
+
+  const handleSetDefault = async (profileName: string) => {
+    setSettingDefault(profileName);
+    try {
+      await SetCurrentProfile(profileName);
+      onProfileUpdated();
+    } catch (e) {
+      alert(`デフォルトプロファイルの変更に失敗しました: ${e}`);
+    } finally {
+      setSettingDefault(null);
     }
   };
 
@@ -748,7 +772,9 @@ function ProfileManagementModal({ profiles, zones, currentProfile, onClose, onPr
                 </button>
               </div>
               <div className="profile-list">
-                {profiles.map((p) => (
+                {profiles.map((p) => {
+                  console.log('[ProfileManagementModal] profile:', p.name, 'isCurrent:', p.isCurrent, 'deleting:', deleting);
+                  return (
                   <div key={p.name} className={`profile-item ${p.name === currentProfile ? 'current' : ''}`}>
                     <div className="profile-info">
                       <div className="profile-info-row">
@@ -762,6 +788,16 @@ function ProfileManagementModal({ profiles, zones, currentProfile, onClose, onPr
                       {renderAuthStatus(p.name)}
                     </div>
                     <div className="profile-actions">
+                      {!p.isCurrent && (
+                        <button
+                          className="btn btn-primary btn-small"
+                          onClick={() => handleSetDefault(p.name)}
+                          disabled={settingDefault === p.name}
+                          title="デフォルトに設定"
+                        >
+                          {settingDefault === p.name ? '設定中...' : 'デフォルトに設定'}
+                        </button>
+                      )}
                       <button
                         className="btn btn-secondary btn-small"
                         onClick={() => setEditingProfile(p)}
@@ -771,20 +807,32 @@ function ProfileManagementModal({ profiles, zones, currentProfile, onClose, onPr
                       </button>
                       <button
                         className="btn btn-danger btn-small"
-                        onClick={() => handleDelete(p.name)}
-                        disabled={p.name === currentProfile || deleting === p.name}
-                        title={p.name === currentProfile ? '使用中のプロファイルは削除できません' : '削除'}
+                        onClick={() => handleDeleteClick(p.name)}
+                        disabled={p.isCurrent || deleting === p.name}
+                        title={p.isCurrent ? '使用中のプロファイルは削除できません' : '削除'}
                       >
                         {deleting === p.name ? '削除中...' : '削除'}
                       </button>
                     </div>
                   </div>
-                ))}
+                );})}
               </div>
             </>
           )}
         </div>
       </div>
+      {confirmDelete && (
+        <div className="confirm-overlay" onClick={handleDeleteCancel}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <p>プロファイル「{confirmDelete}」を削除しますか？</p>
+            <p className="confirm-warning">この操作は取り消せません。</p>
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleDeleteCancel}>キャンセル</button>
+              <button className="btn btn-danger" onClick={handleDeleteConfirm}>削除する</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
