@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.0.8](https://github.com/tokuhirom/sakpilot/compare/v0.0.7...v0.0.8) - 2026-01-19
+- Add cross-reference to sact in README by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/22
+- feat: プロファイル管理機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/24
+- fix: 認証エラー時に右上に赤いエラーメッセージを表示 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/25
+- fix: AppRun専有型の画面タイトルを「AppRun専有型」に統一 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/26
+- feat: AppRun専有型でアクティブバージョンをクリアする機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/27
+
 ## [v0.0.7](https://github.com/tokuhirom/sakpilot/compare/v0.0.6...v0.0.7) - 2026-01-17
 - fix: actionlint エラーを修正し CI に actionlint を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/20
 
