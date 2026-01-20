@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.0.10](https://github.com/tokuhirom/sakpilot/compare/v0.0.9...v0.0.10) - 2026-01-19
+- refactor: AppRunList を AppRunDedicatedList にリネーム by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/30
+
 ## [v0.0.9](https://github.com/tokuhirom/sakpilot/compare/v0.0.8...v0.0.9) - 2026-01-19
 - feat: AppRun専有型のバージョン詳細画面に「アクティブにする」機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/28
 
