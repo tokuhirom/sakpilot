@@ -333,6 +333,87 @@ func (a *App) GetMSTraces(profileName string) ([]sakura.MSTraceInfo, error) {
 	return service.ListTraces(a.ctx)
 }
 
+func (a *App) GetMSMetricsStorageDetail(profileName, storageID string) (*sakura.MSMetricsStorageDetail, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewMonitoringService(client)
+	return service.GetMetricsStorageDetail(a.ctx, storageID)
+}
+
+func (a *App) GetMSMetricsAccessKeys(profileName, storageID string) ([]sakura.MSMetricsAccessKey, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewMonitoringService(client)
+	return service.ListMetricsAccessKeys(a.ctx, storageID)
+}
+
+func (a *App) QueryMSPrometheusLabels(profileName, storageID string) ([]sakura.PrometheusLabel, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewMonitoringService(client)
+
+	// Get storage detail to get endpoint
+	detail, err := service.GetMetricsStorageDetail(a.ctx, storageID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get access keys to get token
+	keys, err := service.ListMetricsAccessKeys(a.ctx, storageID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("no access keys found for storage %s", storageID)
+	}
+
+	// Use the first access key
+	token := keys[0].Token
+
+	return service.QueryPrometheusLabels(a.ctx, detail.Endpoint, token)
+}
+
+func (a *App) QueryMSPrometheusRange(profileName, storageID, query string, start, end int64, step string) (*sakura.PrometheusQueryRangeResponse, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewMonitoringService(client)
+
+	// Get storage detail to get endpoint
+	detail, err := service.GetMetricsStorageDetail(a.ctx, storageID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get access keys to get token
+	keys, err := service.ListMetricsAccessKeys(a.ctx, storageID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("no access keys found for storage %s", storageID)
+	}
+
+	// Use the first access key
+	token := keys[0].Token
+
+	return service.QueryPrometheusRange(a.ctx, detail.Endpoint, token, sakura.PrometheusQueryRangeParams{
+		Query: query,
+		Start: start,
+		End:   end,
+		Step:  step,
+	})
+}
+
 // AppRun Dedicated API
 func (a *App) GetAppRunClusters(profileName string) ([]apprun.ClusterInfo, error) {
 	service, err := apprun.NewService(profileName)
