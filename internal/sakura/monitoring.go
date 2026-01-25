@@ -280,7 +280,7 @@ func (s *MonitoringService) QueryPrometheusLabels(ctx context.Context, endpoint,
 		endpoint = "https://" + endpoint
 	}
 	// Query __name__ label to get all metric names
-	url := fmt.Sprintf("%s/prometheus/v1/label/__name__/values", endpoint)
+	url := fmt.Sprintf("%s/prometheus/api/v1/label/__name__/values", endpoint)
 	log.Printf("QueryPrometheusLabels: url=%s", url)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -336,7 +336,7 @@ func (s *MonitoringService) QueryPrometheusRange(ctx context.Context, endpoint, 
 	if !strings.HasPrefix(endpoint, "https://") && !strings.HasPrefix(endpoint, "http://") {
 		endpoint = "https://" + endpoint
 	}
-	url := fmt.Sprintf("%s/prometheus/v1/query_range?query=%s&start=%d&end=%d&step=%s",
+	url := fmt.Sprintf("%s/prometheus/api/v1/query_range?query=%s&start=%d&end=%d&step=%s",
 		endpoint,
 		params.Query,
 		params.Start,
