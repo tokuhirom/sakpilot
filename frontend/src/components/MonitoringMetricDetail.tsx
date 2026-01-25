@@ -135,7 +135,7 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
         {loading ? (
           <div className="loading">読み込み中...</div>
         ) : accessKeys.length === 0 ? (
-          <div className="empty-state">メトリクスを取得するにはアクセスキーが必要です</div>
+          <div className="empty-state">メトリクスを取得するには、このメトリクスストレージにアクセスキーを作成してください</div>
         ) : metricNames.length === 0 ? (
           <div className="empty-state">メトリクスが見つかりません</div>
         ) : (
