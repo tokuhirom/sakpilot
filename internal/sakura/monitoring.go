@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -274,14 +273,12 @@ func (s *MonitoringService) ListMetricsAccessKeys(ctx context.Context, storageID
 
 // QueryPrometheusLabels queries Prometheus API to get all metric names
 func (s *MonitoringService) QueryPrometheusLabels(ctx context.Context, endpoint, token string) ([]PrometheusLabel, error) {
-	log.Printf("QueryPrometheusLabels: original endpoint=%s", endpoint)
 	// Ensure endpoint has https:// prefix
 	if !strings.HasPrefix(endpoint, "https://") && !strings.HasPrefix(endpoint, "http://") {
 		endpoint = "https://" + endpoint
 	}
 	// Query __name__ label to get all metric names
 	url := fmt.Sprintf("%s/prometheus/api/v1/label/__name__/values", endpoint)
-	log.Printf("QueryPrometheusLabels: url=%s", url)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -300,11 +297,11 @@ func (s *MonitoringService) QueryPrometheusLabels(ctx context.Context, endpoint,
 	if err != nil {
 		return nil, fmt.Errorf("failed to query Prometheus: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("Prometheus API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("prometheus API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var result struct {
@@ -317,7 +314,7 @@ func (s *MonitoringService) QueryPrometheusLabels(ctx context.Context, endpoint,
 	}
 
 	if result.Status != "success" {
-		return nil, fmt.Errorf("Prometheus query failed with status: %s", result.Status)
+		return nil, fmt.Errorf("prometheus query failed with status: %s", result.Status)
 	}
 
 	labels := make([]PrometheusLabel, 0, len(result.Data))
@@ -360,11 +357,11 @@ func (s *MonitoringService) QueryPrometheusRange(ctx context.Context, endpoint, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to query Prometheus: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("Prometheus API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("prometheus API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var result PrometheusQueryRangeResponse
@@ -373,7 +370,7 @@ func (s *MonitoringService) QueryPrometheusRange(ctx context.Context, endpoint, 
 	}
 
 	if result.Status != "success" {
-		return nil, fmt.Errorf("Prometheus query failed with status: %s", result.Status)
+		return nil, fmt.Errorf("prometheus query failed with status: %s", result.Status)
 	}
 
 	return &result, nil
