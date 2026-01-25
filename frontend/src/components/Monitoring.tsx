@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { GetMSLogs, GetMSMetrics, GetMSTraces } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { BrowserOpenURL } from '../../wailsjs/runtime';
@@ -10,6 +11,7 @@ interface MonitoringProps {
 type SubPage = 'logs' | 'metrics' | 'traces';
 
 export function Monitoring({ profile }: MonitoringProps) {
+  const navigate = useNavigate();
   const [subPage, setSubPage] = useState<SubPage>('logs');
   const [logs, setLogs] = useState<sakura.MSLogInfo[]>([]);
   const [metrics, setMetrics] = useState<sakura.MSMetricInfo[]>([]);
@@ -97,13 +99,24 @@ export function Monitoring({ profile }: MonitoringProps) {
               </td>
               <td style={{ verticalAlign: 'top' }}>{item.description || '-'}</td>
               <td style={{ verticalAlign: 'top' }}>
-                <button 
-                  className="btn btn-secondary" 
-                  style={{ fontSize: '0.7rem', padding: '2px 8px' }}
-                  onClick={() => handleOpenBrowser(item.id)}
-                >
-                  ブラウザで表示
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
+                  {subPage === 'metrics' && (
+                    <button
+                      className="btn btn-primary"
+                      style={{ fontSize: '0.7rem', padding: '2px 8px' }}
+                      onClick={() => navigate(`/${profile}/monitoring/metrics/${item.id}`)}
+                    >
+                      詳細 / グラフ
+                    </button>
+                  )}
+                  <button
+                    className="btn btn-secondary"
+                    style={{ fontSize: '0.7rem', padding: '2px 8px' }}
+                    onClick={() => handleOpenBrowser(item.id)}
+                  >
+                    ブラウザで表示
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

@@ -22,6 +22,7 @@ import { DNSDetail } from './components/DNSDetail';
 import { MonitorList } from './components/MonitorList';
 import { DatabaseList } from './components/DatabaseList';
 import { Monitoring } from './components/Monitoring';
+import { MonitoringMetricDetail } from './components/MonitoringMetricDetail';
 import { AppRunDedicatedList } from './components/AppRunDedicatedList';
 import { AppRunSharedList } from './components/AppRunSharedList';
 import { GSLBList } from './components/GSLBList';
@@ -179,6 +180,7 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
               <Route path="elb" element={<span className="breadcrumb-item active">ELB</span>} />
               <Route path="monitors" element={<span className="breadcrumb-item active">シンプル監視</span>} />
               <Route path="monitoring" element={<span className="breadcrumb-item active">モニタリングスイート</span>} />
+              <Route path="monitoring/metrics/:id" element={<MonitoringMetricBreadcrumb profile={profile} />} />
               <Route path="container-registry" element={<span className="breadcrumb-item active">コンテナレジストリ</span>} />
               <Route path="container-registry/:id" element={<ContainerRegistryBreadcrumb profile={profile} />} />
               <Route path="object-storage/*" element={<span className="breadcrumb-item active">オブジェクトストレージ</span>} />
@@ -244,6 +246,9 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
           } />
           <Route path="monitors" element={<MonitorList profile={profile} />} />
           <Route path="monitoring" element={<Monitoring profile={profile} />} />
+          <Route path="monitoring/metrics/:id" element={
+            <MonitoringMetricDetailWrapper profile={profile} />
+          } />
           <Route path="elb" element={<ProxyLBList profile={profile} />} />
           <Route path="container-registry" element={
             <ContainerRegistryListWrapper profile={profile} />
@@ -422,6 +427,25 @@ function ContainerRegistryBreadcrumb({ profile }: { profile: string }) {
       <span className="breadcrumb-item active">詳細</span>
     </>
   );
+}
+
+function MonitoringMetricBreadcrumb({ profile }: { profile: string }) {
+  const navigate = useNavigate();
+  return (
+    <>
+      <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/${profile}/monitoring`)}>
+        モニタリングスイート
+      </span>
+      <span className="breadcrumb-separator">/</span>
+      <span className="breadcrumb-item active">メトリクス詳細</span>
+    </>
+  );
+}
+
+function MonitoringMetricDetailWrapper({ profile }: { profile: string }) {
+  const { id } = useParams<{ id: string }>();
+  if (!id) return null;
+  return <MonitoringMetricDetail profile={profile} storageId={id} />;
 }
 
 // プロファイル作成/編集フォームのProps

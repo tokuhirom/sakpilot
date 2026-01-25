@@ -2,7 +2,13 @@ package sakura
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
 	client "github.com/sacloud/api-client-go"
 	ms "github.com/sacloud/monitoring-suite-api-go"
@@ -55,6 +61,53 @@ type MSTraceInfo struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description"`
 	Routings    []MSRoutingInfo `json:"routings"`
+}
+
+// MSMetricsStorageDetail represents detailed information about a metrics storage
+type MSMetricsStorageDetail struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Endpoint    string `json:"endpoint"`
+}
+
+// MSMetricsAccessKey represents an access key for metrics storage
+type MSMetricsAccessKey struct {
+	ID          string `json:"id"`
+	UID         string `json:"uid"`
+	Token       string `json:"token"`
+	Description string `json:"description"`
+}
+
+// PrometheusLabel represents a Prometheus label value
+type PrometheusLabel struct {
+	Name string `json:"name"`
+}
+
+// PrometheusQueryRangeParams represents parameters for query_range API
+type PrometheusQueryRangeParams struct {
+	Query string `json:"query"`
+	Start int64  `json:"start"` // Unix timestamp
+	End   int64  `json:"end"`   // Unix timestamp
+	Step  string `json:"step"`  // Duration string like "15s"
+}
+
+// PrometheusMatrixResult represents a single time series result
+type PrometheusMatrixResult struct {
+	Metric map[string]string `json:"metric"`
+	Values [][]interface{}   `json:"values"` // [[timestamp, value], ...]
+}
+
+// PrometheusQueryRangeData represents the data field in query_range response
+type PrometheusQueryRangeData struct {
+	ResultType string                   `json:"resultType"`
+	Result     []PrometheusMatrixResult `json:"result"`
+}
+
+// PrometheusQueryRangeResponse represents the response from query_range
+type PrometheusQueryRangeResponse struct {
+	Status string                    `json:"status"`
+	Data   PrometheusQueryRangeData `json:"data"`
 }
 
 func (s *MonitoringService) ListLogs(ctx context.Context) ([]MSLogInfo, error) {
@@ -158,4 +211,167 @@ func (s *MonitoringService) ListTraces(ctx context.Context) ([]MSTraceInfo, erro
 		})
 	}
 	return list, nil
+}
+
+// GetMetricsStorageDetail retrieves detailed information about a metrics storage
+func (s *MonitoringService) GetMetricsStorageDetail(ctx context.Context, storageID string) (*MSMetricsStorageDetail, error) {
+	c, err := s.getMSClient()
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := strconv.ParseInt(storageID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid storage ID: %w", err)
+	}
+
+	res, err := c.MetricsStoragesRetrieve(ctx, v1.MetricsStoragesRetrieveParams{
+		ResourceID: id,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &MSMetricsStorageDetail{
+		ID:          fmt.Sprintf("%d", res.ID),
+		Name:        res.Name.Value,
+		Description: res.Description.Value,
+		Endpoint:    res.Endpoints.Address,
+	}, nil
+}
+
+// ListMetricsAccessKeys retrieves all access keys for a metrics storage
+func (s *MonitoringService) ListMetricsAccessKeys(ctx context.Context, storageID string) ([]MSMetricsAccessKey, error) {
+	c, err := s.getMSClient()
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := strconv.ParseInt(storageID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid storage ID: %w", err)
+	}
+
+	res, err := c.MetricsStoragesKeysList(ctx, v1.MetricsStoragesKeysListParams{
+		MetricsResourceID: id,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	keys := make([]MSMetricsAccessKey, 0, len(res.Results))
+	for _, k := range res.Results {
+		keys = append(keys, MSMetricsAccessKey{
+			ID:          fmt.Sprintf("%d", k.ID), //nolint:staticcheck // ID is deprecated but still functional
+			UID:         k.UID.String(),
+			Token:       k.Token,
+			Description: k.Description.Value,
+		})
+	}
+	return keys, nil
+}
+
+// QueryPrometheusLabels queries Prometheus API to get all metric names
+func (s *MonitoringService) QueryPrometheusLabels(ctx context.Context, endpoint, token string) ([]PrometheusLabel, error) {
+	// Ensure endpoint has https:// prefix
+	if !strings.HasPrefix(endpoint, "https://") && !strings.HasPrefix(endpoint, "http://") {
+		endpoint = "https://" + endpoint
+	}
+	// Query __name__ label to get all metric names
+	url := fmt.Sprintf("%s/prometheus/api/v1/label/__name__/values", endpoint)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Add authorization header with Bearer token
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Set("Accept", "application/json")
+
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query Prometheus: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("prometheus API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Status string   `json:"status"`
+		Data   []string `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if result.Status != "success" {
+		return nil, fmt.Errorf("prometheus query failed with status: %s", result.Status)
+	}
+
+	labels := make([]PrometheusLabel, 0, len(result.Data))
+	for _, name := range result.Data {
+		labels = append(labels, PrometheusLabel{
+			Name: name,
+		})
+	}
+
+	return labels, nil
+}
+
+// QueryPrometheusRange queries Prometheus API to get time series data
+func (s *MonitoringService) QueryPrometheusRange(ctx context.Context, endpoint, token string, params PrometheusQueryRangeParams) (*PrometheusQueryRangeResponse, error) {
+	// Ensure endpoint has https:// prefix
+	if !strings.HasPrefix(endpoint, "https://") && !strings.HasPrefix(endpoint, "http://") {
+		endpoint = "https://" + endpoint
+	}
+	url := fmt.Sprintf("%s/prometheus/api/v1/query_range?query=%s&start=%d&end=%d&step=%s",
+		endpoint,
+		params.Query,
+		params.Start,
+		params.End,
+		params.Step,
+	)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Set("Accept", "application/json")
+
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query Prometheus: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("prometheus API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result PrometheusQueryRangeResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if result.Status != "success" {
+		return nil, fmt.Errorf("prometheus query failed with status: %s", result.Status)
+	}
+
+	return &result, nil
 }
