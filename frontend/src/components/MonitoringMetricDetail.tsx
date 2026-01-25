@@ -31,13 +31,17 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
       const keys = await GetMSMetricsAccessKeys(profile, storageId);
       setAccessKeys(keys || []);
 
-      // Load metric names from Prometheus
-      try {
-        const labels = await QueryMSPrometheusLabels(profile, storageId);
-        setMetricNames(labels || []);
-      } catch (err) {
-        console.error('[MonitoringMetricDetail] Failed to load metric names:', err);
-        setError('メトリクス名の取得に失敗しました');
+      // Load metric names from Prometheus (only if access keys exist)
+      if (keys && keys.length > 0) {
+        try {
+          const labels = await QueryMSPrometheusLabels(profile, storageId);
+          setMetricNames(labels || []);
+        } catch (err) {
+          console.error('[MonitoringMetricDetail] Failed to load metric names:', err);
+          setError('メトリクス名の取得に失敗しました');
+        }
+      } else {
+        setMetricNames([]);
       }
     } catch (err) {
       console.error('[MonitoringMetricDetail] loadData error:', err);
@@ -130,6 +134,8 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
         {error && <div className="error-message" style={{ marginBottom: '1rem' }}>{error}</div>}
         {loading ? (
           <div className="loading">読み込み中...</div>
+        ) : accessKeys.length === 0 ? (
+          <div className="empty-state">メトリクスを取得するにはアクセスキーが必要です</div>
         ) : metricNames.length === 0 ? (
           <div className="empty-state">メトリクスが見つかりません</div>
         ) : (
