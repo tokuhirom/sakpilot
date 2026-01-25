@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	client "github.com/sacloud/api-client-go"
@@ -272,6 +273,10 @@ func (s *MonitoringService) ListMetricsAccessKeys(ctx context.Context, storageID
 
 // QueryPrometheusLabels queries Prometheus API to get all metric names
 func (s *MonitoringService) QueryPrometheusLabels(ctx context.Context, endpoint, token string) ([]PrometheusLabel, error) {
+	// Ensure endpoint has https:// prefix
+	if !strings.HasPrefix(endpoint, "https://") && !strings.HasPrefix(endpoint, "http://") {
+		endpoint = "https://" + endpoint
+	}
 	// Query __name__ label to get all metric names
 	url := fmt.Sprintf("%s/api/v1/label/__name__/values", endpoint)
 
@@ -324,6 +329,10 @@ func (s *MonitoringService) QueryPrometheusLabels(ctx context.Context, endpoint,
 
 // QueryPrometheusRange queries Prometheus API to get time series data
 func (s *MonitoringService) QueryPrometheusRange(ctx context.Context, endpoint, token string, params PrometheusQueryRangeParams) (*PrometheusQueryRangeResponse, error) {
+	// Ensure endpoint has https:// prefix
+	if !strings.HasPrefix(endpoint, "https://") && !strings.HasPrefix(endpoint, "http://") {
+		endpoint = "https://" + endpoint
+	}
 	url := fmt.Sprintf("%s/api/v1/query_range?query=%s&start=%d&end=%d&step=%s",
 		endpoint,
 		params.Query,
