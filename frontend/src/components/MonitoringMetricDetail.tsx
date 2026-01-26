@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetMSMetricsStorageDetail, GetMSMetricsAccessKeys, QueryMSPrometheusPublishers, QueryMSPrometheusMetricsByPublisher, QueryMSPrometheusLabels } from '../../wailsjs/go/main/App';
+import { GetMSMetricsStorageDetail, GetMSMetricsAccessKeys, QueryMSPrometheusPublishers, QueryMSPrometheusMetricsByPublisher, QueryMSPrometheusMetricsWithoutPublisher } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { MetricGraph } from './MetricGraph';
 
-const ALL_METRICS_KEY = '__all__';
+const CUSTOM_METRICS_KEY = '__custom__';
 
 interface MonitoringMetricDetailProps {
   profile: string;
@@ -64,10 +64,9 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
 
     try {
       let metricNames: string[];
-      if (publisher === ALL_METRICS_KEY) {
-        // Load all metrics
-        const labels = await QueryMSPrometheusLabels(profile, storageId);
-        metricNames = labels?.map(l => l.name) || [];
+      if (publisher === CUSTOM_METRICS_KEY) {
+        // Load metrics without sakuracloud_publisher label
+        metricNames = await QueryMSPrometheusMetricsWithoutPublisher(profile, storageId);
       } else {
         metricNames = await QueryMSPrometheusMetricsByPublisher(profile, storageId, publisher);
       }
@@ -171,13 +170,6 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
           <div className="empty-state">メトリクスを取得するには、このメトリクスストレージにアクセスキーを作成してください</div>
         ) : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <button
-              className={`btn ${selectedPublisher === ALL_METRICS_KEY ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => loadMetricsForPublisher(ALL_METRICS_KEY)}
-              disabled={loadingMetrics}
-            >
-              すべてのメトリクス
-            </button>
             {publishers.map((publisher) => (
               <button
                 key={publisher}
@@ -188,13 +180,20 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
                 {publisher}
               </button>
             ))}
+            <button
+              className={`btn ${selectedPublisher === CUSTOM_METRICS_KEY ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => loadMetricsForPublisher(CUSTOM_METRICS_KEY)}
+              disabled={loadingMetrics}
+            >
+              カスタムメトリクス
+            </button>
           </div>
         )}
       </div>
 
       {selectedPublisher && (
         <div>
-          <h3>{selectedPublisher === ALL_METRICS_KEY ? 'すべてのメトリクス' : selectedPublisher} ({metrics.length})</h3>
+          <h3>{selectedPublisher === CUSTOM_METRICS_KEY ? 'カスタムメトリクス' : selectedPublisher} ({metrics.length})</h3>
           {loadingMetrics ? (
             <div className="loading">読み込み中...</div>
           ) : metrics.length === 0 ? (
