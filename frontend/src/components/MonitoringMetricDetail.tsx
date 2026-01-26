@@ -1,9 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { GetMSMetricsStorageDetail, GetMSMetricsAccessKeys, QueryMSPrometheusPublishers, QueryMSPrometheusMetricsByPublisher, QueryMSPrometheusMetricsWithoutPublisher } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { MetricGraph } from './MetricGraph';
 
 const CUSTOM_METRICS_KEY = '__custom__';
+
+interface MetricInfo {
+  name: string;
+  variant: string;
+}
 
 interface MonitoringMetricDetailProps {
   profile: string;
@@ -15,10 +20,32 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
   const [accessKeys, setAccessKeys] = useState<sakura.MSMetricsAccessKey[]>([]);
   const [publishers, setPublishers] = useState<string[]>([]);
   const [selectedPublisher, setSelectedPublisher] = useState<string | null>(null);
-  const [metrics, setMetrics] = useState<string[]>([]);
+  const [metrics, setMetrics] = useState<MetricInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Group metrics by variant
+  const groupedMetrics = useMemo(() => {
+    const groups: { [variant: string]: MetricInfo[] } = {};
+    for (const metric of metrics) {
+      const variant = metric.variant || '(その他)';
+      if (!groups[variant]) {
+        groups[variant] = [];
+      }
+      groups[variant].push(metric);
+    }
+    // Sort variants alphabetically, but put empty variant last
+    const sortedVariants = Object.keys(groups).sort((a, b) => {
+      if (a === '(その他)') return 1;
+      if (b === '(その他)') return -1;
+      return a.localeCompare(b);
+    });
+    return sortedVariants.map(variant => ({
+      variant,
+      metrics: groups[variant],
+    }));
+  }, [metrics]);
 
   const loadData = useCallback(async () => {
     if (!profile || !storageId) return;
@@ -63,14 +90,19 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
     setMetrics([]);
 
     try {
-      let metricNames: string[];
+      let metricInfos: MetricInfo[];
       if (publisher === CUSTOM_METRICS_KEY) {
-        // Load metrics without sakuracloud_publisher label
-        metricNames = await QueryMSPrometheusMetricsWithoutPublisher(profile, storageId);
+        // Load metrics without sakuracloud_publisher label (returns string[])
+        const metricNames = await QueryMSPrometheusMetricsWithoutPublisher(profile, storageId);
+        metricInfos = (metricNames || []).map(name => ({ name, variant: '' }));
+        // Sort alphabetically
+        metricInfos.sort((a, b) => a.name.localeCompare(b.name));
       } else {
-        metricNames = await QueryMSPrometheusMetricsByPublisher(profile, storageId, publisher);
+        // Load metrics with publisher (returns MetricInfo[])
+        const result = await QueryMSPrometheusMetricsByPublisher(profile, storageId, publisher);
+        metricInfos = (result || []).map(m => ({ name: m.name, variant: m.variant }));
       }
-      setMetrics(metricNames || []);
+      setMetrics(metricInfos);
     } catch (err) {
       console.error('[MonitoringMetricDetail] Failed to load metrics:', err);
       setError('メトリクス一覧の取得に失敗しました');
@@ -199,16 +231,30 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
           ) : metrics.length === 0 ? (
             <div className="empty-state">メトリクスが見つかりません</div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {metrics.map((metricName) => (
-                <MetricGraph
-                  key={metricName}
-                  profile={profile}
-                  storageId={storageId}
-                  metricName={metricName}
-                  onClose={() => {}}
-                  embedded={true}
-                />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+              {groupedMetrics.map(({ variant, metrics: variantMetrics }) => (
+                <div key={variant}>
+                  <h4 style={{
+                    marginBottom: '1rem',
+                    paddingBottom: '0.5rem',
+                    borderBottom: '1px solid #3a3a3a',
+                    color: '#aaa'
+                  }}>
+                    {variant} ({variantMetrics.length})
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {variantMetrics.map((metric) => (
+                      <MetricGraph
+                        key={metric.name}
+                        profile={profile}
+                        storageId={storageId}
+                        metricName={metric.name}
+                        onClose={() => {}}
+                        embedded={true}
+                      />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           )}

@@ -443,7 +443,7 @@ func (a *App) QueryMSPrometheusPublishers(profileName, storageID string) ([]stri
 	return service.QueryPrometheusPublishers(a.ctx, detail.Endpoint, token)
 }
 
-func (a *App) QueryMSPrometheusMetricsByPublisher(profileName, storageID, publisher string) ([]string, error) {
+func (a *App) QueryMSPrometheusMetricsByPublisher(profileName, storageID, publisher string) ([]sakura.MetricInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
 	if err != nil {
 		return nil, err
