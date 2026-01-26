@@ -9,14 +9,72 @@ interface MetricGraphProps {
   storageId: string;
   metricName: string;
   onClose: () => void;
+  embedded?: boolean;
 }
 
-export function MetricGraph({ profile, storageId, metricName, onClose }: MetricGraphProps) {
+// Detect metric type based on name
+type MetricType = 'percent' | 'bytes' | 'default';
+
+const detectMetricType = (metricName: string): MetricType => {
+  // Percentage metrics
+  if (metricName.includes('_percent') || metricName.includes('_ratio')) {
+    return 'percent';
+  }
+  // Byte metrics
+  if (metricName.includes('_bytes') || metricName.includes('_size_')) {
+    return 'bytes';
+  }
+  return 'default';
+};
+
+// Format bytes to human-readable format
+const formatBytes = (bytes: number | null | undefined): string => {
+  if (bytes === null || bytes === undefined) return '';
+  if (bytes === 0) return '0 B';
+
+  const absBytes = Math.abs(bytes);
+  const sign = bytes < 0 ? '-' : '';
+
+  if (absBytes < 1024) {
+    return `${sign}${Math.round(absBytes)} B`;
+  } else if (absBytes < 1024 * 1024) {
+    return `${sign}${(absBytes / 1024).toFixed(1)} KB`;
+  } else if (absBytes < 1024 * 1024 * 1024) {
+    return `${sign}${(absBytes / (1024 * 1024)).toFixed(1)} MB`;
+  } else if (absBytes < 1024 * 1024 * 1024 * 1024) {
+    return `${sign}${(absBytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  } else {
+    return `${sign}${(absBytes / (1024 * 1024 * 1024 * 1024)).toFixed(1)} TB`;
+  }
+};
+
+// Format percentage values
+const formatPercent = (value: number | null | undefined): string => {
+  if (value === null || value === undefined) return '';
+  return `${Math.round(value)}%`;
+};
+
+// Get Y-axis formatter based on metric type
+const getYAxisFormatter = (metricType: MetricType) => {
+  switch (metricType) {
+    case 'percent':
+      return (_u: uPlot, vals: number[]) => vals.map(v => formatPercent(v));
+    case 'bytes':
+      return (_u: uPlot, vals: number[]) => vals.map(v => formatBytes(v));
+    default:
+      return (_u: uPlot, vals: number[]) => vals.map(v => v?.toFixed(2));
+  }
+};
+
+export function MetricGraph({ profile, storageId, metricName, onClose, embedded = false }: MetricGraphProps) {
   const chartRef = useRef<HTMLDivElement>(null);
   const plotRef = useRef<uPlot | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<string>('1h'); // 1h, 6h, 24h, 7d
+
+  // Detect metric type for formatting
+  const metricType = detectMetricType(metricName);
 
   const loadData = async () => {
     if (!profile || !storageId || !metricName) return;
@@ -101,18 +159,142 @@ export function MetricGraph({ profile, storageId, metricName, onClose }: MetricG
       // Create uPlot data structure
       const data: uPlot.AlignedData = [timestamps, ...seriesData];
 
+      // Labels to hide by default
+      const hiddenLabels = new Set([
+        '__name__',
+        'telemetry_sdk_name',
+        'telemetry_sdk_version',
+        'telemetry_sdk_language',
+        'sakuracloud_variant',
+        'sakuracloud_account',
+        'sakuracloud_publisher',
+      ]);
+
+      // Custom label formatters by publisher:variant
+      type LabelFormatter = (metric: { [key: string]: string }) => string | null;
+      const labelFormatters: { [key: string]: LabelFormatter } = {
+        'apprun-dedicated:container_metrics': (m) => {
+          const name = m['application_name'] || '';
+          const version = m['application_version'] || '';
+          const nodeId = m['apprun_worker_node_id'] || '';
+          if (name) {
+            return `${name}:v${version} - ${nodeId}`;
+          }
+          return null;
+        },
+        'apprun-dedicated:lb_metrics': (m) => {
+          const lbName = m['apprun_lb_name'] || '';
+          const lbNodeId = m['apprun_lb_node_id'] || '';
+          if (lbName) {
+            let label = `${lbName} - ${lbNodeId}`;
+            const extras: string[] = [];
+            if (m['method']) extras.push(m['method']);
+            if (m['code']) extras.push(m['code']);
+            if (m['entrypoint']) extras.push(m['entrypoint']);
+            if (m['le']) extras.push(`le=${m['le']}`);
+            if (extras.length > 0) {
+              label += ` (${extras.join(', ')})`;
+            }
+            return label;
+          }
+          return null;
+        },
+        'apprun-dedicated:node_metrics': (m) => {
+          const nodeType = m['apprun_node_type'] || '';
+          let label = '';
+          if (nodeType === 'lb') {
+            const lbName = m['apprun_lb_name'] || '';
+            const lbNodeId = m['apprun_lb_node_id'] || '';
+            label = `${nodeType}: ${lbName} - ${lbNodeId}`;
+          } else if (nodeType === 'worker') {
+            const asgName = m['apprun_asg_name'] || '';
+            const workerNodeId = m['apprun_worker_node_id'] || '';
+            label = `${nodeType}: ${asgName} - ${workerNodeId}`;
+          } else {
+            label = nodeType || '';
+          }
+          const extras: string[] = [];
+          if (m['cpu']) extras.push(`cpu=${m['cpu']}`);
+          if (m['state']) extras.push(m['state']);
+          if (extras.length > 0) {
+            label += ` (${extras.join(', ')})`;
+          }
+          return label || null;
+        },
+        'apprun-dedicated:': (m) => {
+          const name = m['application_name'] || '';
+          const version = m['application_version'] || '';
+          if (name) {
+            return `${name}:v${version}`;
+          }
+          return null;
+        },
+        'apprun-shared:': (m) => {
+          const name = m['application_name'] || '';
+          const version = m['application_version'] || '';
+          if (name) {
+            return `${name}:v${version}`;
+          }
+          return null;
+        },
+      };
+
+      // Default label formatter
+      const defaultLabelFormatter = (metric: { [key: string]: string }): string => {
+        return Object.entries(metric)
+          .filter(([k]) => !hiddenLabels.has(k))
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([k, v]) => `${k}="${v}"`)
+          .join(', ');
+      };
+
+      // Build full labels for tooltip (all labels except hidden ones)
+      const fullLabels: string[] = [''];  // First entry is for Time
+      response.data.result.forEach((result) => {
+        const allLabels = Object.entries(result.metric)
+          .filter(([k]) => k !== '__name__')
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([k, v]) => `${k}="${v}"`)
+          .join('\n');
+        fullLabels.push(allLabels);
+      });
+
       // Create series configuration
       const series: uPlot.Series[] = [
         { label: 'Time' },
         ...response.data.result.map((result, idx) => {
-          const labels = Object.entries(result.metric)
-            .filter(([key]) => key !== '__name__')
-            .map(([key, value]) => `${key}="${value}"`)
-            .join(', ');
+          const publisher = result.metric['sakuracloud_publisher'] || '';
+          const variant = result.metric['sakuracloud_variant'] || '';
+          const key = `${publisher}:${variant}`;
+          const publisherKey = `${publisher}:`;
+
+          // Try custom formatter first
+          const formatter = labelFormatters[key] || labelFormatters[publisherKey];
+          let labels = formatter ? formatter(result.metric) : null;
+
+          // Fall back to default formatter
+          if (!labels) {
+            labels = defaultLabelFormatter(result.metric);
+          }
+
+          // Value formatter for legend
+          const valueFormatter = ((_u: uPlot, v: number | null) => {
+            if (v === null || v === undefined) return '--';
+            switch (metricType) {
+              case 'percent':
+                return formatPercent(v);
+              case 'bytes':
+                return formatBytes(v);
+              default:
+                return v.toFixed(2);
+            }
+          }) as uPlot.Series.Value;
+
           return {
             label: labels || `Series ${idx + 1}`,
             stroke: getColor(idx),
             width: 2,
+            value: valueFormatter,
           };
         }),
       ];
@@ -122,23 +304,61 @@ export function MetricGraph({ profile, storageId, metricName, onClose }: MetricG
         plotRef.current.setData(data);
       } else if (chartRef.current) {
         const opts: uPlot.Options = {
-          width: chartRef.current.clientWidth,
-          height: 400,
+          width: chartRef.current.clientWidth || (embedded ? 700 : 800),
+          height: embedded ? 200 : 400,
           series,
           axes: [
             {
               scale: 'x',
-              values: (u, vals) => vals.map(v => new Date(v * 1000).toLocaleTimeString()),
+              values: (_u, vals) => vals.map(v => new Date(v * 1000).toLocaleTimeString('ja-JP', { hour12: false })),
+              stroke: '#aaa',
+              ticks: { stroke: '#444' },
+              grid: { stroke: '#333' },
+              rotate: -45,
+              gap: 5,
             },
             {
               scale: 'y',
-              values: (u, vals) => vals.map(v => v?.toFixed(2)),
+              values: getYAxisFormatter(metricType),
+              stroke: '#aaa',
+              ticks: { stroke: '#444' },
+              grid: { stroke: '#333' },
             },
           ],
           scales: {
             x: {
               time: true,
             },
+            ...(metricType === 'percent' ? {
+              y: {
+                range: (_u: uPlot, _min: number, _max: number): [number, number] => [0, 100],
+              },
+            } : {}),
+          },
+          legend: {
+            live: true,
+          },
+          hooks: {
+            ready: [
+              (u) => {
+                // Add tooltips to legend items and fix styling
+                const legend = u.root.querySelector('.u-legend');
+                if (legend) {
+                  (legend as HTMLElement).style.textAlign = 'left';
+                }
+                const rows = u.root.querySelectorAll('.u-legend .u-series');
+                rows.forEach((row, i) => {
+                  if (i === 0) {
+                    // Time row - add line break after
+                    (row as HTMLElement).style.display = 'block';
+                    (row as HTMLElement).style.marginBottom = '4px';
+                  } else if (fullLabels[i]) {
+                    (row as HTMLElement).title = fullLabels[i];
+                    (row as HTMLElement).style.cursor = 'help';
+                  }
+                });
+              },
+            ],
           },
         };
 
@@ -153,6 +373,12 @@ export function MetricGraph({ profile, storageId, metricName, onClose }: MetricG
   };
 
   useEffect(() => {
+    // Destroy existing plot before creating new one (important for scale changes)
+    if (plotRef.current) {
+      plotRef.current.destroy();
+      plotRef.current = null;
+    }
+
     loadData();
 
     return () => {
@@ -177,6 +403,41 @@ export function MetricGraph({ profile, storageId, metricName, onClose }: MetricG
     return colors[index % colors.length];
   };
 
+  // Embedded mode: render inline
+  if (embedded) {
+    return (
+      <div style={{
+        backgroundColor: '#2a2a2a',
+        padding: '1rem',
+        borderRadius: '8px',
+        border: '1px solid #3a3a3a',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <h4 style={{ margin: 0, fontSize: '0.9rem' }}>{metricName}</h4>
+          <div style={{ display: 'flex', gap: '0.25rem' }}>
+            {['1h', '6h', '24h', '7d'].map(range => (
+              <button
+                key={range}
+                className={`btn btn-small ${timeRange === range ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setTimeRange(range)}
+                disabled={loading}
+                style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+              >
+                {range}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {loading && <div className="loading" style={{ padding: '1rem' }}>読み込み中...</div>}
+        {error && <div className="error-message" style={{ padding: '0.5rem' }}>{error}</div>}
+
+        <div ref={chartRef} />
+      </div>
+    );
+  }
+
+  // Modal mode: render as overlay
   return (
     <div style={{
       position: 'fixed',
