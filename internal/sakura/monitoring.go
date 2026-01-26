@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -82,6 +83,12 @@ type MSMetricsAccessKey struct {
 // PrometheusLabel represents a Prometheus label value
 type PrometheusLabel struct {
 	Name string `json:"name"`
+}
+
+// MetricInfo represents a metric with its variant
+type MetricInfo struct {
+	Name    string `json:"name"`
+	Variant string `json:"variant"`
 }
 
 // PrometheusQueryRangeParams represents parameters for query_range API
@@ -424,7 +431,7 @@ func (s *MonitoringService) QueryPrometheusPublishers(ctx context.Context, endpo
 }
 
 // QueryPrometheusMetricsByPublisher queries Prometheus API to get metric names for a specific publisher
-func (s *MonitoringService) QueryPrometheusMetricsByPublisher(ctx context.Context, endpoint, token, publisher string) ([]string, error) {
+func (s *MonitoringService) QueryPrometheusMetricsByPublisher(ctx context.Context, endpoint, token, publisher string) ([]MetricInfo, error) {
 	// Ensure endpoint has https:// prefix
 	if !strings.HasPrefix(endpoint, "https://") && !strings.HasPrefix(endpoint, "http://") {
 		endpoint = "https://" + endpoint
@@ -468,18 +475,34 @@ func (s *MonitoringService) QueryPrometheusMetricsByPublisher(ctx context.Contex
 		return nil, fmt.Errorf("prometheus query failed with status: %s", result.Status)
 	}
 
-	// Extract unique metric names from the series data
-	metricSet := make(map[string]struct{})
+	// Extract unique metric names with their variants from the series data
+	// Use name+variant as key to get unique combinations
+	metricMap := make(map[string]MetricInfo)
 	for _, series := range result.Data {
 		if name, ok := series["__name__"]; ok {
-			metricSet[name] = struct{}{}
+			variant := series["sakuracloud_variant"] // may be empty
+			key := name + ":" + variant
+			if _, exists := metricMap[key]; !exists {
+				metricMap[key] = MetricInfo{
+					Name:    name,
+					Variant: variant,
+				}
+			}
 		}
 	}
 
-	metrics := make([]string, 0, len(metricSet))
-	for name := range metricSet {
-		metrics = append(metrics, name)
+	metrics := make([]MetricInfo, 0, len(metricMap))
+	for _, info := range metricMap {
+		metrics = append(metrics, info)
 	}
+
+	// Sort by variant, then by name
+	sort.Slice(metrics, func(i, j int) bool {
+		if metrics[i].Variant != metrics[j].Variant {
+			return metrics[i].Variant < metrics[j].Variant
+		}
+		return metrics[i].Name < metrics[j].Name
+	})
 
 	return metrics, nil
 }
