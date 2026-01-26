@@ -113,30 +113,43 @@ export function MetricGraph({ profile, storageId, metricName, onClose, embedded 
         'sakuracloud_publisher',
       ]);
 
-      // Priority labels by publisher+variant (labels listed first have higher priority)
-      const priorityLabels: { [key: string]: string[] } = {
-        'apprun-dedicated:container_metrics': ['application_name', 'application_version', 'apprun_worker_node_id'],
-        'apprun-dedicated:': ['application_name', 'application_version'],
-        'apprun-shared:': ['application_name', 'application_version'],
+      // Custom label formatters by publisher:variant
+      type LabelFormatter = (metric: { [key: string]: string }) => string | null;
+      const labelFormatters: { [key: string]: LabelFormatter } = {
+        'apprun-dedicated:container_metrics': (m) => {
+          const name = m['application_name'] || '';
+          const version = m['application_version'] || '';
+          const nodeId = m['apprun_worker_node_id'] || '';
+          if (name) {
+            return `${name}:v${version} - ${nodeId}`;
+          }
+          return null;
+        },
+        'apprun-dedicated:': (m) => {
+          const name = m['application_name'] || '';
+          const version = m['application_version'] || '';
+          if (name) {
+            return `${name}:v${version}`;
+          }
+          return null;
+        },
+        'apprun-shared:': (m) => {
+          const name = m['application_name'] || '';
+          const version = m['application_version'] || '';
+          if (name) {
+            return `${name}:v${version}`;
+          }
+          return null;
+        },
       };
 
-      // Function to sort labels by priority
-      const sortLabels = (entries: [string, string][], publisher: string, variant: string): [string, string][] => {
-        const key = `${publisher}:${variant}`;
-        const publisherKey = `${publisher}:`;
-        const priorities = priorityLabels[key] || priorityLabels[publisherKey] || [];
-
-        return entries.sort((a, b) => {
-          const aIdx = priorities.indexOf(a[0]);
-          const bIdx = priorities.indexOf(b[0]);
-          // If both have priority, sort by priority order
-          if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
-          // Priority labels come first
-          if (aIdx !== -1) return -1;
-          if (bIdx !== -1) return 1;
-          // Otherwise alphabetical
-          return a[0].localeCompare(b[0]);
-        });
+      // Default label formatter
+      const defaultLabelFormatter = (metric: { [key: string]: string }): string => {
+        return Object.entries(metric)
+          .filter(([k]) => !hiddenLabels.has(k))
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([k, v]) => `${k}="${v}"`)
+          .join(', ');
       };
 
       // Create series configuration
@@ -147,27 +160,14 @@ export function MetricGraph({ profile, storageId, metricName, onClose, embedded 
           const variant = result.metric['sakuracloud_variant'] || '';
           const key = `${publisher}:${variant}`;
           const publisherKey = `${publisher}:`;
-          const priorities = new Set(priorityLabels[key] || priorityLabels[publisherKey] || []);
 
-          const filteredEntries = Object.entries(result.metric)
-            .filter(([k]) => !hiddenLabels.has(k));
-          const sortedEntries = sortLabels(filteredEntries, publisher, variant);
+          // Try custom formatter first
+          const formatter = labelFormatters[key] || labelFormatters[publisherKey];
+          let labels = formatter ? formatter(result.metric) : null;
 
-          // Separate priority and non-priority labels
-          const priorityParts: string[] = [];
-          const otherParts: string[] = [];
-          for (const [k, v] of sortedEntries) {
-            if (priorities.has(k)) {
-              priorityParts.push(`${k}="${v}"`);
-            } else {
-              otherParts.push(`${k}="${v}"`);
-            }
-          }
-
-          // Format: priority labels first, then others in parentheses (gray)
-          let labels = priorityParts.join(', ');
-          if (otherParts.length > 0) {
-            labels += labels ? ` (${otherParts.join(', ')})` : otherParts.join(', ');
+          // Fall back to default formatter
+          if (!labels) {
+            labels = defaultLabelFormatter(result.metric);
           }
 
           return {
