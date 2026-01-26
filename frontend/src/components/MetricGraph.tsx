@@ -12,12 +12,69 @@ interface MetricGraphProps {
   embedded?: boolean;
 }
 
+// Detect metric type based on name
+type MetricType = 'percent' | 'bytes' | 'default';
+
+const detectMetricType = (metricName: string): MetricType => {
+  // Percentage metrics
+  if (metricName.includes('_percent') || metricName.includes('_ratio')) {
+    return 'percent';
+  }
+  // Byte metrics
+  if (metricName.includes('_bytes') || metricName.includes('_size_')) {
+    return 'bytes';
+  }
+  return 'default';
+};
+
+// Format bytes to human-readable format
+const formatBytes = (bytes: number | null | undefined): string => {
+  if (bytes === null || bytes === undefined) return '';
+  if (bytes === 0) return '0 B';
+
+  const absBytes = Math.abs(bytes);
+  const sign = bytes < 0 ? '-' : '';
+
+  if (absBytes < 1024) {
+    return `${sign}${Math.round(absBytes)} B`;
+  } else if (absBytes < 1024 * 1024) {
+    return `${sign}${(absBytes / 1024).toFixed(1)} KB`;
+  } else if (absBytes < 1024 * 1024 * 1024) {
+    return `${sign}${(absBytes / (1024 * 1024)).toFixed(1)} MB`;
+  } else if (absBytes < 1024 * 1024 * 1024 * 1024) {
+    return `${sign}${(absBytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  } else {
+    return `${sign}${(absBytes / (1024 * 1024 * 1024 * 1024)).toFixed(1)} TB`;
+  }
+};
+
+// Format percentage values
+const formatPercent = (value: number | null | undefined): string => {
+  if (value === null || value === undefined) return '';
+  return `${Math.round(value)}%`;
+};
+
+// Get Y-axis formatter based on metric type
+const getYAxisFormatter = (metricType: MetricType) => {
+  switch (metricType) {
+    case 'percent':
+      return (_u: uPlot, vals: number[]) => vals.map(v => formatPercent(v));
+    case 'bytes':
+      return (_u: uPlot, vals: number[]) => vals.map(v => formatBytes(v));
+    default:
+      return (_u: uPlot, vals: number[]) => vals.map(v => v?.toFixed(2));
+  }
+};
+
 export function MetricGraph({ profile, storageId, metricName, onClose, embedded = false }: MetricGraphProps) {
   const chartRef = useRef<HTMLDivElement>(null);
   const plotRef = useRef<uPlot | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<string>('1h'); // 1h, 6h, 24h, 7d
+
+  // Detect metric type for formatting
+  const metricType = detectMetricType(metricName);
 
   const loadData = async () => {
     if (!profile || !storageId || !metricName) return;
@@ -125,6 +182,45 @@ export function MetricGraph({ profile, storageId, metricName, onClose, embedded 
           }
           return null;
         },
+        'apprun-dedicated:lb_metrics': (m) => {
+          const lbName = m['apprun_lb_name'] || '';
+          const lbNodeId = m['apprun_lb_node_id'] || '';
+          if (lbName) {
+            let label = `${lbName} - ${lbNodeId}`;
+            const extras: string[] = [];
+            if (m['method']) extras.push(m['method']);
+            if (m['code']) extras.push(m['code']);
+            if (m['entrypoint']) extras.push(m['entrypoint']);
+            if (m['le']) extras.push(`le=${m['le']}`);
+            if (extras.length > 0) {
+              label += ` (${extras.join(', ')})`;
+            }
+            return label;
+          }
+          return null;
+        },
+        'apprun-dedicated:node_metrics': (m) => {
+          const nodeType = m['apprun_node_type'] || '';
+          let label = '';
+          if (nodeType === 'lb') {
+            const lbName = m['apprun_lb_name'] || '';
+            const lbNodeId = m['apprun_lb_node_id'] || '';
+            label = `${nodeType}: ${lbName} - ${lbNodeId}`;
+          } else if (nodeType === 'worker') {
+            const asgName = m['apprun_asg_name'] || '';
+            const workerNodeId = m['apprun_worker_node_id'] || '';
+            label = `${nodeType}: ${asgName} - ${workerNodeId}`;
+          } else {
+            label = nodeType || '';
+          }
+          const extras: string[] = [];
+          if (m['cpu']) extras.push(`cpu=${m['cpu']}`);
+          if (m['state']) extras.push(m['state']);
+          if (extras.length > 0) {
+            label += ` (${extras.join(', ')})`;
+          }
+          return label || null;
+        },
         'apprun-dedicated:': (m) => {
           const name = m['application_name'] || '';
           const version = m['application_version'] || '';
@@ -181,10 +277,24 @@ export function MetricGraph({ profile, storageId, metricName, onClose, embedded 
             labels = defaultLabelFormatter(result.metric);
           }
 
+          // Value formatter for legend
+          const valueFormatter = ((_u: uPlot, v: number | null) => {
+            if (v === null || v === undefined) return '--';
+            switch (metricType) {
+              case 'percent':
+                return formatPercent(v);
+              case 'bytes':
+                return formatBytes(v);
+              default:
+                return v.toFixed(2);
+            }
+          }) as uPlot.Series.Value;
+
           return {
             label: labels || `Series ${idx + 1}`,
             stroke: getColor(idx),
             width: 2,
+            value: valueFormatter,
           };
         }),
       ];
@@ -200,23 +310,36 @@ export function MetricGraph({ profile, storageId, metricName, onClose, embedded 
           axes: [
             {
               scale: 'x',
-              values: (u, vals) => vals.map(v => new Date(v * 1000).toLocaleTimeString()),
+              values: (_u, vals) => vals.map(v => new Date(v * 1000).toLocaleTimeString('ja-JP', { hour12: false })),
+              stroke: '#aaa',
+              ticks: { stroke: '#444' },
+              grid: { stroke: '#333' },
+              rotate: -45,
+              gap: 5,
             },
             {
               scale: 'y',
-              values: (u, vals) => vals.map(v => v?.toFixed(2)),
+              values: getYAxisFormatter(metricType),
+              stroke: '#aaa',
+              ticks: { stroke: '#444' },
+              grid: { stroke: '#333' },
             },
           ],
           scales: {
             x: {
               time: true,
             },
+            ...(metricType === 'percent' ? {
+              y: {
+                range: (_u: uPlot, _min: number, _max: number): [number, number] => [0, 100],
+              },
+            } : {}),
           },
           legend: {
             live: true,
           },
           hooks: {
-            init: [
+            ready: [
               (u) => {
                 // Add tooltips to legend items and fix styling
                 const legend = u.root.querySelector('.u-legend');
@@ -250,6 +373,12 @@ export function MetricGraph({ profile, storageId, metricName, onClose, embedded 
   };
 
   useEffect(() => {
+    // Destroy existing plot before creating new one (important for scale changes)
+    if (plotRef.current) {
+      plotRef.current.destroy();
+      plotRef.current = null;
+    }
+
     loadData();
 
     return () => {
