@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.0.11](https://github.com/tokuhirom/sakpilot/compare/v0.0.10...v0.0.11) - 2026-01-25
+- feat: モニタリングスイートのメトリクス詳細表示とグラフ機能 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/32
+
+## [v0.0.11](https://github.com/tokuhirom/sakpilot/compare/v0.0.10...v0.0.11) - 2026-01-25
+- feat: モニタリングスイートのメトリクス詳細表示とグラフ機能 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/32
+
 ## [v0.0.10](https://github.com/tokuhirom/sakpilot/compare/v0.0.9...v0.0.10) - 2026-01-19
 - refactor: AppRunList を AppRunDedicatedList にリネーム by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/30
 
