@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetMSMetricsStorageDetail, GetMSMetricsAccessKeys, QueryMSPrometheusLabels } from '../../wailsjs/go/main/App';
+import { GetMSMetricsStorageDetail, GetMSMetricsAccessKeys, QueryMSPrometheusPublishers, QueryMSPrometheusMetricsByPublisher } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { MetricGraph } from './MetricGraph';
 
@@ -11,10 +11,12 @@ interface MonitoringMetricDetailProps {
 export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricDetailProps) {
   const [detail, setDetail] = useState<sakura.MSMetricsStorageDetail | null>(null);
   const [accessKeys, setAccessKeys] = useState<sakura.MSMetricsAccessKey[]>([]);
-  const [metricNames, setMetricNames] = useState<sakura.PrometheusLabel[]>([]);
+  const [publishers, setPublishers] = useState<string[]>([]);
+  const [selectedPublisher, setSelectedPublisher] = useState<string | null>(null);
+  const [metrics, setMetrics] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!profile || !storageId) return;
@@ -31,23 +33,41 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
       const keys = await GetMSMetricsAccessKeys(profile, storageId);
       setAccessKeys(keys || []);
 
-      // Load metric names from Prometheus (only if access keys exist)
+      // Load publishers from Prometheus (only if access keys exist)
       if (keys && keys.length > 0) {
         try {
-          const labels = await QueryMSPrometheusLabels(profile, storageId);
-          setMetricNames(labels || []);
+          const pubs = await QueryMSPrometheusPublishers(profile, storageId);
+          setPublishers(pubs || []);
         } catch (err) {
-          console.error('[MonitoringMetricDetail] Failed to load metric names:', err);
-          setError('メトリクス名の取得に失敗しました');
+          console.error('[MonitoringMetricDetail] Failed to load publishers:', err);
+          setError('サービス一覧の取得に失敗しました');
         }
       } else {
-        setMetricNames([]);
+        setPublishers([]);
       }
     } catch (err) {
       console.error('[MonitoringMetricDetail] loadData error:', err);
       setError(`データの読み込みに失敗しました: ${err}`);
     } finally {
       setLoading(false);
+    }
+  }, [profile, storageId]);
+
+  const loadMetricsForPublisher = useCallback(async (publisher: string) => {
+    if (!profile || !storageId) return;
+
+    setLoadingMetrics(true);
+    setSelectedPublisher(publisher);
+    setMetrics([]);
+
+    try {
+      const metricNames = await QueryMSPrometheusMetricsByPublisher(profile, storageId, publisher);
+      setMetrics(metricNames || []);
+    } catch (err) {
+      console.error('[MonitoringMetricDetail] Failed to load metrics:', err);
+      setError('メトリクス一覧の取得に失敗しました');
+    } finally {
+      setLoadingMetrics(false);
     }
   }, [profile, storageId]);
 
@@ -73,7 +93,11 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
         <h2>メトリクスストレージ: {detail.name}</h2>
         <button
           className="btn-reload"
-          onClick={() => loadData()}
+          onClick={() => {
+            setSelectedPublisher(null);
+            setMetrics([]);
+            loadData();
+          }}
           disabled={loading}
           title="リロード"
         >
@@ -129,49 +153,53 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
         </div>
       )}
 
-      <div>
-        <h3>利用可能なメトリクス ({metricNames.length})</h3>
+      <div style={{ marginBottom: '2rem' }}>
+        <h3>サービス一覧 ({publishers.length})</h3>
         {error && <div className="error-message" style={{ marginBottom: '1rem' }}>{error}</div>}
         {loading ? (
           <div className="loading">読み込み中...</div>
         ) : accessKeys.length === 0 ? (
           <div className="empty-state">メトリクスを取得するには、このメトリクスストレージにアクセスキーを作成してください</div>
-        ) : metricNames.length === 0 ? (
-          <div className="empty-state">メトリクスが見つかりません</div>
+        ) : publishers.length === 0 ? (
+          <div className="empty-state">サービスが見つかりません</div>
         ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>メトリクス名</th>
-                <th style={{ width: '150px' }}>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {metricNames.map((metric, idx) => (
-                <tr key={idx}>
-                  <td><code>{metric.name}</code></td>
-                  <td>
-                    <button
-                      className="btn btn-secondary btn-small"
-                      onClick={() => setSelectedMetric(metric.name)}
-                    >
-                      グラフ表示
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            {publishers.map((publisher) => (
+              <button
+                key={publisher}
+                className={`btn ${selectedPublisher === publisher ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => loadMetricsForPublisher(publisher)}
+                disabled={loadingMetrics}
+              >
+                {publisher}
+              </button>
+            ))}
+          </div>
         )}
       </div>
 
-      {selectedMetric && (
-        <MetricGraph
-          profile={profile}
-          storageId={storageId}
-          metricName={selectedMetric}
-          onClose={() => setSelectedMetric(null)}
-        />
+      {selectedPublisher && (
+        <div>
+          <h3>{selectedPublisher} のメトリクス ({metrics.length})</h3>
+          {loadingMetrics ? (
+            <div className="loading">読み込み中...</div>
+          ) : metrics.length === 0 ? (
+            <div className="empty-state">メトリクスが見つかりません</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {metrics.map((metricName) => (
+                <MetricGraph
+                  key={metricName}
+                  profile={profile}
+                  storageId={storageId}
+                  metricName={metricName}
+                  onClose={() => {}}
+                  embedded={true}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </>
   );

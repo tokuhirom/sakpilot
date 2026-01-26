@@ -375,3 +375,111 @@ func (s *MonitoringService) QueryPrometheusRange(ctx context.Context, endpoint, 
 
 	return &result, nil
 }
+
+// QueryPrometheusPublishers queries Prometheus API to get all sakuracloud_publisher label values
+func (s *MonitoringService) QueryPrometheusPublishers(ctx context.Context, endpoint, token string) ([]string, error) {
+	// Ensure endpoint has https:// prefix
+	if !strings.HasPrefix(endpoint, "https://") && !strings.HasPrefix(endpoint, "http://") {
+		endpoint = "https://" + endpoint
+	}
+	url := fmt.Sprintf("%s/prometheus/api/v1/label/sakuracloud_publisher/values", endpoint)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Set("Accept", "application/json")
+
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query Prometheus: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("prometheus API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Status string   `json:"status"`
+		Data   []string `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if result.Status != "success" {
+		return nil, fmt.Errorf("prometheus query failed with status: %s", result.Status)
+	}
+
+	return result.Data, nil
+}
+
+// QueryPrometheusMetricsByPublisher queries Prometheus API to get metric names for a specific publisher
+func (s *MonitoringService) QueryPrometheusMetricsByPublisher(ctx context.Context, endpoint, token, publisher string) ([]string, error) {
+	// Ensure endpoint has https:// prefix
+	if !strings.HasPrefix(endpoint, "https://") && !strings.HasPrefix(endpoint, "http://") {
+		endpoint = "https://" + endpoint
+	}
+	// Use series endpoint to get metrics with specific publisher label
+	url := fmt.Sprintf("%s/prometheus/api/v1/series?match[]={sakuracloud_publisher=%q}", endpoint, publisher)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Set("Accept", "application/json")
+
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query Prometheus: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("prometheus API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Status string              `json:"status"`
+		Data   []map[string]string `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if result.Status != "success" {
+		return nil, fmt.Errorf("prometheus query failed with status: %s", result.Status)
+	}
+
+	// Extract unique metric names from the series data
+	metricSet := make(map[string]struct{})
+	for _, series := range result.Data {
+		if name, ok := series["__name__"]; ok {
+			metricSet[name] = struct{}{}
+		}
+	}
+
+	metrics := make([]string, 0, len(metricSet))
+	for name := range metricSet {
+		metrics = append(metrics, name)
+	}
+
+	return metrics, nil
+}

@@ -9,9 +9,10 @@ interface MetricGraphProps {
   storageId: string;
   metricName: string;
   onClose: () => void;
+  embedded?: boolean;
 }
 
-export function MetricGraph({ profile, storageId, metricName, onClose }: MetricGraphProps) {
+export function MetricGraph({ profile, storageId, metricName, onClose, embedded = false }: MetricGraphProps) {
   const chartRef = useRef<HTMLDivElement>(null);
   const plotRef = useRef<uPlot | null>(null);
   const [loading, setLoading] = useState(false);
@@ -122,8 +123,8 @@ export function MetricGraph({ profile, storageId, metricName, onClose }: MetricG
         plotRef.current.setData(data);
       } else if (chartRef.current) {
         const opts: uPlot.Options = {
-          width: chartRef.current.clientWidth,
-          height: 400,
+          width: chartRef.current.clientWidth || (embedded ? 700 : 800),
+          height: embedded ? 200 : 400,
           series,
           axes: [
             {
@@ -177,6 +178,41 @@ export function MetricGraph({ profile, storageId, metricName, onClose }: MetricG
     return colors[index % colors.length];
   };
 
+  // Embedded mode: render inline
+  if (embedded) {
+    return (
+      <div style={{
+        backgroundColor: '#2a2a2a',
+        padding: '1rem',
+        borderRadius: '8px',
+        border: '1px solid #3a3a3a',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <h4 style={{ margin: 0, fontSize: '0.9rem' }}>{metricName}</h4>
+          <div style={{ display: 'flex', gap: '0.25rem' }}>
+            {['1h', '6h', '24h', '7d'].map(range => (
+              <button
+                key={range}
+                className={`btn btn-small ${timeRange === range ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setTimeRange(range)}
+                disabled={loading}
+                style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+              >
+                {range}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {loading && <div className="loading" style={{ padding: '1rem' }}>読み込み中...</div>}
+        {error && <div className="error-message" style={{ padding: '0.5rem' }}>{error}</div>}
+
+        <div ref={chartRef} />
+      </div>
+    );
+  }
+
+  // Modal mode: render as overlay
   return (
     <div style={{
       position: 'fixed',
