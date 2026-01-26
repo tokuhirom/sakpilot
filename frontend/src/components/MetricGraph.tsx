@@ -102,12 +102,23 @@ export function MetricGraph({ profile, storageId, metricName, onClose, embedded 
       // Create uPlot data structure
       const data: uPlot.AlignedData = [timestamps, ...seriesData];
 
+      // Labels to hide by default
+      const hiddenLabels = new Set([
+        '__name__',
+        'telemetry_sdk_name',
+        'telemetry_sdk_version',
+        'telemetry_sdk_language',
+        'sakuracloud_variant',
+        'sakuracloud_account',
+        'sakuracloud_publisher',
+      ]);
+
       // Create series configuration
       const series: uPlot.Series[] = [
         { label: 'Time' },
         ...response.data.result.map((result, idx) => {
           const labels = Object.entries(result.metric)
-            .filter(([key]) => key !== '__name__')
+            .filter(([key]) => !hiddenLabels.has(key))
             .map(([key, value]) => `${key}="${value}"`)
             .join(', ');
           return {
