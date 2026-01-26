@@ -2,7 +2,7 @@
   "openapi": "3.0.0",
   "info": {
     "title": "AppRun専有型 API",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "---\n\n「AppRun専有型」が提供するAPIの利用方法とサンプルを公開しております。\n\n# 基本的な使い方\n\n## APIキーの発行\n\nAPIを利用するためには、認証のための「APIキー」が必要です。事前にキーを発行しておきます。  \nAPIキーは「ユーザーID」「パスワード」に相当する「トークン」と呼ばれる認証情報で構成されています。\n\n|   項目名   | APIキー発行時の項目名        | このドキュメント内での例             |\n|------------|------------------------------|--------------------------------------|\n| ユーザーID | アクセストークン(UUID)       | 01234567-89ab-cdef-0123-456789abcdef |\n| パスワード | アクセストークンシークレット | SAMPLETOKENSAMPLETOKENSAMPLETOKENSAM |\n\n<div class=\"warning\">\n  <b>操作マニュアル</b><br />\n  <ul><li><a href=\"https://manual.sakura.ad.jp/cloud/api/apikey.html\">APIキー | さくらのクラウド ドキュメント</a></li></ul>\n</div>\n\n## APIエンドポイント\nhttps://secure.sakura.ad.jp/cloud/api/apprun-dedicated/1.0/\n\n---\n",
     "contact": {
       "name": "SAKURA internet Inc."
@@ -2439,7 +2439,7 @@
           },
           "value": {
             "type": "string",
-            "maxLength": 255,
+            "maxLength": 4096,
             "description": "環境変数の値｡secret が true で､かつ value が指定されていない場合は前のバージョンの値が利用される｡"
           },
           "secret": {
@@ -2941,7 +2941,6 @@
               }
             ],
             "servicePrincipalID": "123456789012",
-            "autoScalingGroups": [],
             "created": 1577836800
           }
         }
@@ -3353,7 +3352,7 @@
           "clusters": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ReadClusterDetail"
+              "$ref": "#/components/schemas/ReadClusterSummary"
             },
             "description": "クラスタの一覧"
           },
@@ -3371,19 +3370,6 @@
             {
               "clusterID": "13B9EA83-DDB0-4385-9533-3D693A6A310F",
               "name": "mock-cluster",
-              "hasLetsEncryptEmail": true,
-              "ports": [
-                {
-                  "port": 80,
-                  "protocol": "http"
-                },
-                {
-                  "port": 443,
-                  "protocol": "https"
-                }
-              ],
-              "autoScalingGroups": [],
-              "servicePrincipalID": "123456789012",
               "created": 1577836800
             }
           ]
@@ -4118,63 +4104,6 @@
           }
         }
       },
-      "ReadAutoScalingGroupSummary": {
-        "type": "object",
-        "required": [
-          "autoScalingGroupID",
-          "name",
-          "zone",
-          "workerServiceClassPath",
-          "minNodes",
-          "maxNodes",
-          "deleting"
-        ],
-        "properties": {
-          "autoScalingGroupID": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/AutoScalingGroupID"
-              }
-            ],
-            "description": "オートスケーリンググループID"
-          },
-          "name": {
-            "type": "string",
-            "description": "オートスケーリンググループ名"
-          },
-          "zone": {
-            "type": "string",
-            "description": "ゾーン"
-          },
-          "workerServiceClassPath": {
-            "type": "string",
-            "description": "ワーカーノードのサービスクラスパス"
-          },
-          "minNodes": {
-            "type": "integer",
-            "format": "int32",
-            "description": "最小ノード数"
-          },
-          "maxNodes": {
-            "type": "integer",
-            "format": "int32",
-            "description": "最大ノード数"
-          },
-          "nameServers": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "minItems": 1,
-            "maxItems": 3,
-            "description": "ネームサーバー設定"
-          },
-          "deleting": {
-            "type": "boolean",
-            "description": "削除中"
-          }
-        }
-      },
       "ReadCertificate": {
         "type": "object",
         "required": [
@@ -4245,7 +4174,6 @@
           "clusterID",
           "ports",
           "servicePrincipalID",
-          "autoScalingGroups",
           "hasLetsEncryptEmail",
           "created"
         ],
@@ -4277,13 +4205,6 @@
             "description": "サービスプリンシパルのID",
             "example": "123456789012"
           },
-          "autoScalingGroups": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ReadAutoScalingGroupSummary"
-            },
-            "description": "オートスケーリンググループ"
-          },
           "hasLetsEncryptEmail": {
             "type": "boolean",
             "description": "let's encrypt 用のメアドが設定済みかどうか"
@@ -4292,6 +4213,35 @@
             "type": "integer",
             "format": "unixtime",
             "description": "クラスター作成日時"
+          }
+        }
+      },
+      "ReadClusterSummary": {
+        "type": "object",
+        "required": [
+          "name",
+          "clusterID",
+          "created"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 20,
+            "description": "クラスターの名前"
+          },
+          "clusterID": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ClusterID"
+              }
+            ],
+            "description": "クラスタID"
+          },
+          "created": {
+            "type": "integer",
+            "format": "unixtime",
+            "description": "作成日時"
           }
         }
       },
@@ -4311,7 +4261,7 @@
           "value": {
             "type": "string",
             "nullable": true,
-            "maxLength": 255,
+            "maxLength": 4096,
             "description": "環境変数の値｡secret が true の場合は null になる｡"
           },
           "secret": {

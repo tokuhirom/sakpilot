@@ -5593,9 +5593,9 @@ func (s *ListClusterResponse) Decode(d *jx.Decoder) error {
 		case "clusters":
 			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				s.Clusters = make([]ReadClusterDetail, 0)
+				s.Clusters = make([]ReadClusterSummary, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem ReadClusterDetail
+					var elem ReadClusterSummary
 					if err := elem.Decode(d); err != nil {
 						return err
 					}
@@ -8324,232 +8324,6 @@ func (s *ReadAutoScalingGroupDetail) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
-func (s *ReadAutoScalingGroupSummary) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *ReadAutoScalingGroupSummary) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("autoScalingGroupID")
-		s.AutoScalingGroupID.Encode(e)
-	}
-	{
-		e.FieldStart("name")
-		e.Str(s.Name)
-	}
-	{
-		e.FieldStart("zone")
-		e.Str(s.Zone)
-	}
-	{
-		e.FieldStart("workerServiceClassPath")
-		e.Str(s.WorkerServiceClassPath)
-	}
-	{
-		e.FieldStart("minNodes")
-		e.Int32(s.MinNodes)
-	}
-	{
-		e.FieldStart("maxNodes")
-		e.Int32(s.MaxNodes)
-	}
-	{
-		if s.NameServers != nil {
-			e.FieldStart("nameServers")
-			e.ArrStart()
-			for _, elem := range s.NameServers {
-				e.Str(elem)
-			}
-			e.ArrEnd()
-		}
-	}
-	{
-		e.FieldStart("deleting")
-		e.Bool(s.Deleting)
-	}
-}
-
-var jsonFieldsNameOfReadAutoScalingGroupSummary = [8]string{
-	0: "autoScalingGroupID",
-	1: "name",
-	2: "zone",
-	3: "workerServiceClassPath",
-	4: "minNodes",
-	5: "maxNodes",
-	6: "nameServers",
-	7: "deleting",
-}
-
-// Decode decodes ReadAutoScalingGroupSummary from json.
-func (s *ReadAutoScalingGroupSummary) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode ReadAutoScalingGroupSummary to nil")
-	}
-	var requiredBitSet [1]uint8
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "autoScalingGroupID":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				if err := s.AutoScalingGroupID.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"autoScalingGroupID\"")
-			}
-		case "name":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				v, err := d.Str()
-				s.Name = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"name\"")
-			}
-		case "zone":
-			requiredBitSet[0] |= 1 << 2
-			if err := func() error {
-				v, err := d.Str()
-				s.Zone = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"zone\"")
-			}
-		case "workerServiceClassPath":
-			requiredBitSet[0] |= 1 << 3
-			if err := func() error {
-				v, err := d.Str()
-				s.WorkerServiceClassPath = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"workerServiceClassPath\"")
-			}
-		case "minNodes":
-			requiredBitSet[0] |= 1 << 4
-			if err := func() error {
-				v, err := d.Int32()
-				s.MinNodes = int32(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"minNodes\"")
-			}
-		case "maxNodes":
-			requiredBitSet[0] |= 1 << 5
-			if err := func() error {
-				v, err := d.Int32()
-				s.MaxNodes = int32(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"maxNodes\"")
-			}
-		case "nameServers":
-			if err := func() error {
-				s.NameServers = make([]string, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem string
-					v, err := d.Str()
-					elem = string(v)
-					if err != nil {
-						return err
-					}
-					s.NameServers = append(s.NameServers, elem)
-					return nil
-				}); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"nameServers\"")
-			}
-		case "deleting":
-			requiredBitSet[0] |= 1 << 7
-			if err := func() error {
-				v, err := d.Bool()
-				s.Deleting = bool(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"deleting\"")
-			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode ReadAutoScalingGroupSummary")
-	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b10111111,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfReadAutoScalingGroupSummary) {
-					name = jsonFieldsNameOfReadAutoScalingGroupSummary[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *ReadAutoScalingGroupSummary) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ReadAutoScalingGroupSummary) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
 func (s *ReadCertificate) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -8804,14 +8578,6 @@ func (s *ReadClusterDetail) encodeFields(e *jx.Encoder) {
 		e.Str(s.ServicePrincipalID)
 	}
 	{
-		e.FieldStart("autoScalingGroups")
-		e.ArrStart()
-		for _, elem := range s.AutoScalingGroups {
-			elem.Encode(e)
-		}
-		e.ArrEnd()
-	}
-	{
 		e.FieldStart("hasLetsEncryptEmail")
 		e.Bool(s.HasLetsEncryptEmail)
 	}
@@ -8821,14 +8587,13 @@ func (s *ReadClusterDetail) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfReadClusterDetail = [7]string{
+var jsonFieldsNameOfReadClusterDetail = [6]string{
 	0: "name",
 	1: "clusterID",
 	2: "ports",
 	3: "servicePrincipalID",
-	4: "autoScalingGroups",
-	5: "hasLetsEncryptEmail",
-	6: "created",
+	4: "hasLetsEncryptEmail",
+	5: "created",
 }
 
 // Decode decodes ReadClusterDetail from json.
@@ -8892,26 +8657,8 @@ func (s *ReadClusterDetail) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"servicePrincipalID\"")
 			}
-		case "autoScalingGroups":
-			requiredBitSet[0] |= 1 << 4
-			if err := func() error {
-				s.AutoScalingGroups = make([]ReadAutoScalingGroupSummary, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem ReadAutoScalingGroupSummary
-					if err := elem.Decode(d); err != nil {
-						return err
-					}
-					s.AutoScalingGroups = append(s.AutoScalingGroups, elem)
-					return nil
-				}); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"autoScalingGroups\"")
-			}
 		case "hasLetsEncryptEmail":
-			requiredBitSet[0] |= 1 << 5
+			requiredBitSet[0] |= 1 << 4
 			if err := func() error {
 				v, err := d.Bool()
 				s.HasLetsEncryptEmail = bool(v)
@@ -8923,7 +8670,7 @@ func (s *ReadClusterDetail) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"hasLetsEncryptEmail\"")
 			}
 		case "created":
-			requiredBitSet[0] |= 1 << 6
+			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
 				v, err := d.Int()
 				s.Created = int(v)
@@ -8944,7 +8691,7 @@ func (s *ReadClusterDetail) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b01111111,
+		0b00111111,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -8986,6 +8733,134 @@ func (s *ReadClusterDetail) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *ReadClusterDetail) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *ReadClusterSummary) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *ReadClusterSummary) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("name")
+		e.Str(s.Name)
+	}
+	{
+		e.FieldStart("clusterID")
+		s.ClusterID.Encode(e)
+	}
+	{
+		e.FieldStart("created")
+		e.Int(s.Created)
+	}
+}
+
+var jsonFieldsNameOfReadClusterSummary = [3]string{
+	0: "name",
+	1: "clusterID",
+	2: "created",
+}
+
+// Decode decodes ReadClusterSummary from json.
+func (s *ReadClusterSummary) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ReadClusterSummary to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "name":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Name = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"name\"")
+			}
+		case "clusterID":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ClusterID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"clusterID\"")
+			}
+		case "created":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				v, err := d.Int()
+				s.Created = int(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ReadClusterSummary")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000111,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfReadClusterSummary) {
+					name = jsonFieldsNameOfReadClusterSummary[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ReadClusterSummary) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ReadClusterSummary) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

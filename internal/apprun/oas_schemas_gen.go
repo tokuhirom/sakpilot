@@ -1599,13 +1599,13 @@ func (s *ListCertificateResponse) SetNextCursor(val OptCertificateID) {
 // Ref: #/components/schemas/ListClusterResponse
 type ListClusterResponse struct {
 	// クラスタの一覧.
-	Clusters []ReadClusterDetail `json:"clusters"`
+	Clusters []ReadClusterSummary `json:"clusters"`
 	// 次ページのカーソル。次のリクエストでcursorとして指定する。データが残っていなければnull。.
 	NextCursor OptClusterID `json:"nextCursor"`
 }
 
 // GetClusters returns the value of Clusters.
-func (s *ListClusterResponse) GetClusters() []ReadClusterDetail {
+func (s *ListClusterResponse) GetClusters() []ReadClusterSummary {
 	return s.Clusters
 }
 
@@ -1615,7 +1615,7 @@ func (s *ListClusterResponse) GetNextCursor() OptClusterID {
 }
 
 // SetClusters sets the value of Clusters.
-func (s *ListClusterResponse) SetClusters(val []ReadClusterDetail) {
+func (s *ListClusterResponse) SetClusters(val []ReadClusterSummary) {
 	s.Clusters = val
 }
 
@@ -3102,106 +3102,6 @@ func (s *ReadAutoScalingGroupDetail) SetInterfaces(val []AutoScalingGroupNodeInt
 	s.Interfaces = val
 }
 
-// Ref: #/components/schemas/ReadAutoScalingGroupSummary
-type ReadAutoScalingGroupSummary struct {
-	// オートスケーリンググループID.
-	AutoScalingGroupID AutoScalingGroupID `json:"autoScalingGroupID"`
-	// オートスケーリンググループ名.
-	Name string `json:"name"`
-	// ゾーン.
-	Zone string `json:"zone"`
-	// ワーカーノードのサービスクラスパス.
-	WorkerServiceClassPath string `json:"workerServiceClassPath"`
-	// 最小ノード数.
-	MinNodes int32 `json:"minNodes"`
-	// 最大ノード数.
-	MaxNodes int32 `json:"maxNodes"`
-	// ネームサーバー設定.
-	NameServers []string `json:"nameServers"`
-	// 削除中.
-	Deleting bool `json:"deleting"`
-}
-
-// GetAutoScalingGroupID returns the value of AutoScalingGroupID.
-func (s *ReadAutoScalingGroupSummary) GetAutoScalingGroupID() AutoScalingGroupID {
-	return s.AutoScalingGroupID
-}
-
-// GetName returns the value of Name.
-func (s *ReadAutoScalingGroupSummary) GetName() string {
-	return s.Name
-}
-
-// GetZone returns the value of Zone.
-func (s *ReadAutoScalingGroupSummary) GetZone() string {
-	return s.Zone
-}
-
-// GetWorkerServiceClassPath returns the value of WorkerServiceClassPath.
-func (s *ReadAutoScalingGroupSummary) GetWorkerServiceClassPath() string {
-	return s.WorkerServiceClassPath
-}
-
-// GetMinNodes returns the value of MinNodes.
-func (s *ReadAutoScalingGroupSummary) GetMinNodes() int32 {
-	return s.MinNodes
-}
-
-// GetMaxNodes returns the value of MaxNodes.
-func (s *ReadAutoScalingGroupSummary) GetMaxNodes() int32 {
-	return s.MaxNodes
-}
-
-// GetNameServers returns the value of NameServers.
-func (s *ReadAutoScalingGroupSummary) GetNameServers() []string {
-	return s.NameServers
-}
-
-// GetDeleting returns the value of Deleting.
-func (s *ReadAutoScalingGroupSummary) GetDeleting() bool {
-	return s.Deleting
-}
-
-// SetAutoScalingGroupID sets the value of AutoScalingGroupID.
-func (s *ReadAutoScalingGroupSummary) SetAutoScalingGroupID(val AutoScalingGroupID) {
-	s.AutoScalingGroupID = val
-}
-
-// SetName sets the value of Name.
-func (s *ReadAutoScalingGroupSummary) SetName(val string) {
-	s.Name = val
-}
-
-// SetZone sets the value of Zone.
-func (s *ReadAutoScalingGroupSummary) SetZone(val string) {
-	s.Zone = val
-}
-
-// SetWorkerServiceClassPath sets the value of WorkerServiceClassPath.
-func (s *ReadAutoScalingGroupSummary) SetWorkerServiceClassPath(val string) {
-	s.WorkerServiceClassPath = val
-}
-
-// SetMinNodes sets the value of MinNodes.
-func (s *ReadAutoScalingGroupSummary) SetMinNodes(val int32) {
-	s.MinNodes = val
-}
-
-// SetMaxNodes sets the value of MaxNodes.
-func (s *ReadAutoScalingGroupSummary) SetMaxNodes(val int32) {
-	s.MaxNodes = val
-}
-
-// SetNameServers sets the value of NameServers.
-func (s *ReadAutoScalingGroupSummary) SetNameServers(val []string) {
-	s.NameServers = val
-}
-
-// SetDeleting sets the value of Deleting.
-func (s *ReadAutoScalingGroupSummary) SetDeleting(val bool) {
-	s.Deleting = val
-}
-
 // Ref: #/components/schemas/ReadCertificate
 type ReadCertificate struct {
 	// 証明書ID.
@@ -3312,8 +3212,6 @@ type ReadClusterDetail struct {
 	Ports []ReadLoadBalancerPort `json:"ports"`
 	// サービスプリンシパルのID.
 	ServicePrincipalID string `json:"servicePrincipalID"`
-	// オートスケーリンググループ.
-	AutoScalingGroups []ReadAutoScalingGroupSummary `json:"autoScalingGroups"`
 	// Let's encrypt 用のメアドが設定済みかどうか.
 	HasLetsEncryptEmail bool `json:"hasLetsEncryptEmail"`
 	// クラスター作成日時.
@@ -3338,11 +3236,6 @@ func (s *ReadClusterDetail) GetPorts() []ReadLoadBalancerPort {
 // GetServicePrincipalID returns the value of ServicePrincipalID.
 func (s *ReadClusterDetail) GetServicePrincipalID() string {
 	return s.ServicePrincipalID
-}
-
-// GetAutoScalingGroups returns the value of AutoScalingGroups.
-func (s *ReadClusterDetail) GetAutoScalingGroups() []ReadAutoScalingGroupSummary {
-	return s.AutoScalingGroups
 }
 
 // GetHasLetsEncryptEmail returns the value of HasLetsEncryptEmail.
@@ -3375,11 +3268,6 @@ func (s *ReadClusterDetail) SetServicePrincipalID(val string) {
 	s.ServicePrincipalID = val
 }
 
-// SetAutoScalingGroups sets the value of AutoScalingGroups.
-func (s *ReadClusterDetail) SetAutoScalingGroups(val []ReadAutoScalingGroupSummary) {
-	s.AutoScalingGroups = val
-}
-
 // SetHasLetsEncryptEmail sets the value of HasLetsEncryptEmail.
 func (s *ReadClusterDetail) SetHasLetsEncryptEmail(val bool) {
 	s.HasLetsEncryptEmail = val
@@ -3387,6 +3275,46 @@ func (s *ReadClusterDetail) SetHasLetsEncryptEmail(val bool) {
 
 // SetCreated sets the value of Created.
 func (s *ReadClusterDetail) SetCreated(val int) {
+	s.Created = val
+}
+
+// Ref: #/components/schemas/ReadClusterSummary
+type ReadClusterSummary struct {
+	// クラスターの名前.
+	Name string `json:"name"`
+	// クラスタID.
+	ClusterID ClusterID `json:"clusterID"`
+	// 作成日時.
+	Created int `json:"created"`
+}
+
+// GetName returns the value of Name.
+func (s *ReadClusterSummary) GetName() string {
+	return s.Name
+}
+
+// GetClusterID returns the value of ClusterID.
+func (s *ReadClusterSummary) GetClusterID() ClusterID {
+	return s.ClusterID
+}
+
+// GetCreated returns the value of Created.
+func (s *ReadClusterSummary) GetCreated() int {
+	return s.Created
+}
+
+// SetName sets the value of Name.
+func (s *ReadClusterSummary) SetName(val string) {
+	s.Name = val
+}
+
+// SetClusterID sets the value of ClusterID.
+func (s *ReadClusterSummary) SetClusterID(val ClusterID) {
+	s.ClusterID = val
+}
+
+// SetCreated sets the value of Created.
+func (s *ReadClusterSummary) SetCreated(val int) {
 	s.Created = val
 }
 
