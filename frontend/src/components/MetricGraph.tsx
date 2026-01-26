@@ -113,14 +113,63 @@ export function MetricGraph({ profile, storageId, metricName, onClose, embedded 
         'sakuracloud_publisher',
       ]);
 
+      // Priority labels by publisher+variant (labels listed first have higher priority)
+      const priorityLabels: { [key: string]: string[] } = {
+        'apprun-dedicated:container_metrics': ['application_name', 'application_version', 'apprun_worker_node_id'],
+        'apprun-dedicated:': ['application_name', 'application_version'],
+        'apprun-shared:': ['application_name', 'application_version'],
+      };
+
+      // Function to sort labels by priority
+      const sortLabels = (entries: [string, string][], publisher: string, variant: string): [string, string][] => {
+        const key = `${publisher}:${variant}`;
+        const publisherKey = `${publisher}:`;
+        const priorities = priorityLabels[key] || priorityLabels[publisherKey] || [];
+
+        return entries.sort((a, b) => {
+          const aIdx = priorities.indexOf(a[0]);
+          const bIdx = priorities.indexOf(b[0]);
+          // If both have priority, sort by priority order
+          if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+          // Priority labels come first
+          if (aIdx !== -1) return -1;
+          if (bIdx !== -1) return 1;
+          // Otherwise alphabetical
+          return a[0].localeCompare(b[0]);
+        });
+      };
+
       // Create series configuration
       const series: uPlot.Series[] = [
         { label: 'Time' },
         ...response.data.result.map((result, idx) => {
-          const labels = Object.entries(result.metric)
-            .filter(([key]) => !hiddenLabels.has(key))
-            .map(([key, value]) => `${key}="${value}"`)
-            .join(', ');
+          const publisher = result.metric['sakuracloud_publisher'] || '';
+          const variant = result.metric['sakuracloud_variant'] || '';
+          const key = `${publisher}:${variant}`;
+          const publisherKey = `${publisher}:`;
+          const priorities = new Set(priorityLabels[key] || priorityLabels[publisherKey] || []);
+
+          const filteredEntries = Object.entries(result.metric)
+            .filter(([k]) => !hiddenLabels.has(k));
+          const sortedEntries = sortLabels(filteredEntries, publisher, variant);
+
+          // Separate priority and non-priority labels
+          const priorityParts: string[] = [];
+          const otherParts: string[] = [];
+          for (const [k, v] of sortedEntries) {
+            if (priorities.has(k)) {
+              priorityParts.push(`${k}="${v}"`);
+            } else {
+              otherParts.push(`${k}="${v}"`);
+            }
+          }
+
+          // Format: priority labels first, then others in parentheses (gray)
+          let labels = priorityParts.join(', ');
+          if (otherParts.length > 0) {
+            labels += labels ? ` (${otherParts.join(', ')})` : otherParts.join(', ');
+          }
+
           return {
             label: labels || `Series ${idx + 1}`,
             stroke: getColor(idx),
