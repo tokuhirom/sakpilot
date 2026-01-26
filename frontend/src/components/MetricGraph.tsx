@@ -152,6 +152,17 @@ export function MetricGraph({ profile, storageId, metricName, onClose, embedded 
           .join(', ');
       };
 
+      // Build full labels for tooltip (all labels except hidden ones)
+      const fullLabels: string[] = [''];  // First entry is for Time
+      response.data.result.forEach((result) => {
+        const allLabels = Object.entries(result.metric)
+          .filter(([k]) => k !== '__name__')
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([k, v]) => `${k}="${v}"`)
+          .join('\n');
+        fullLabels.push(allLabels);
+      });
+
       // Create series configuration
       const series: uPlot.Series[] = [
         { label: 'Time' },
@@ -200,6 +211,31 @@ export function MetricGraph({ profile, storageId, metricName, onClose, embedded 
             x: {
               time: true,
             },
+          },
+          legend: {
+            live: true,
+          },
+          hooks: {
+            init: [
+              (u) => {
+                // Add tooltips to legend items and fix styling
+                const legend = u.root.querySelector('.u-legend');
+                if (legend) {
+                  (legend as HTMLElement).style.textAlign = 'left';
+                }
+                const rows = u.root.querySelectorAll('.u-legend .u-series');
+                rows.forEach((row, i) => {
+                  if (i === 0) {
+                    // Time row - add line break after
+                    (row as HTMLElement).style.display = 'block';
+                    (row as HTMLElement).style.marginBottom = '4px';
+                  } else if (fullLabels[i]) {
+                    (row as HTMLElement).title = fullLabels[i];
+                    (row as HTMLElement).style.cursor = 'help';
+                  }
+                });
+              },
+            ],
           },
         };
 
