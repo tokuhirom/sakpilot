@@ -17,31 +17,38 @@ import (
 
 // loggingClient wraps http.Client to log request/response
 type loggingClient struct {
-	client ht.Client
+	client       ht.Client
+	lastRequest  string
+	lastResponse string
 }
 
 func (l *loggingClient) Do(req *http.Request) (*http.Response, error) {
-	fmt.Printf("[AppRun HTTP] %s %s\n", req.Method, req.URL.String())
+	l.lastRequest = fmt.Sprintf("%s %s", req.Method, req.URL.String())
 
 	resp, err := l.client.Do(req)
 	if err != nil {
-		fmt.Printf("[AppRun HTTP] error: %v\n", err)
+		l.lastResponse = fmt.Sprintf("error: %v", err)
 		return nil, err
 	}
 
-	// レスポンスボディを読み取ってログに出力
+	// レスポンスボディを読み取って保存
 	body, err := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
 	if err != nil {
-		fmt.Printf("[AppRun HTTP] failed to read body: %v\n", err)
+		l.lastResponse = fmt.Sprintf("failed to read body: %v", err)
 		return nil, err
 	}
 
-	fmt.Printf("[AppRun HTTP] status=%d, body=%s\n", resp.StatusCode, string(body))
+	l.lastResponse = string(body)
 
 	// ボディを再構築して返す
 	resp.Body = io.NopCloser(bytes.NewReader(body))
 	return resp, nil
+}
+
+func (l *loggingClient) LogLastRequestResponse() {
+	fmt.Printf("[AppRun HTTP] Request: %s\n", l.lastRequest)
+	fmt.Printf("[AppRun HTTP] Response: %s\n", l.lastResponse)
 }
 
 const apiURL = "https://secure.sakura.ad.jp/cloud/api/apprun-dedicated/1.0"
@@ -67,7 +74,8 @@ func (a *authSource) BasicAuth(ctx context.Context, operationName OperationName)
 
 // Service AppRun API サービス
 type Service struct {
-	client *Client
+	client     *Client
+	httpClient *loggingClient
 }
 
 // NewService プロファイル名から Service を作成
@@ -96,7 +104,7 @@ func NewService(profileName string) (*Service, error) {
 		return nil, fmt.Errorf("failed to create apprun client: %w", err)
 	}
 
-	return &Service{client: client}, nil
+	return &Service{client: client, httpClient: httpClient}, nil
 }
 
 func loadProfileConfig(profileName string) (*profileConfig, error) {
@@ -412,6 +420,8 @@ func (s *Service) ListAutoScalingGroups(ctx context.Context, clusterID string) (
 		MaxItems:  30, // 最小1、最大30
 	})
 	if err != nil {
+		fmt.Printf("[AppRun] ListAutoScalingGroups error: %v\n", err)
+		s.httpClient.LogLastRequestResponse()
 		return nil, err
 	}
 

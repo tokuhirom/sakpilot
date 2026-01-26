@@ -11,7 +11,7 @@ require (
 	github.com/google/go-containerregistry v0.20.7
 	github.com/google/uuid v1.6.0
 	github.com/ogen-go/ogen v1.18.0
-	github.com/sacloud/api-client-go v0.3.4
+	github.com/sacloud/api-client-go v0.3.5
 	github.com/sacloud/apprun-api-go v0.6.0
 	github.com/sacloud/iaas-api-go v1.24.2
 	github.com/sacloud/kms-api-go v0.3.1

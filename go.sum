@@ -188,8 +188,8 @@ github.com/rogpeppe/go-internal v1.13.1 h1:KvO1DLK/DRN07sQ1LQKScxyZJuNnedQ5/wKSR
 github.com/rogpeppe/go-internal v1.13.1/go.mod h1:uMEvuHeurkdAXX61udpOXGD/AzZDWNMNyH2VO9fmH0o=
 github.com/rs/xid v1.6.0 h1:fV591PaemRlL6JfRxGDEPl69wICngIQ3shQtzfy2gxU=
 github.com/rs/xid v1.6.0/go.mod h1:7XoLgs4eV+QndskICGsho+ADou8ySMSjJKDIan90Nz0=
-github.com/sacloud/api-client-go v0.3.4 h1:2j8YAGk68qqS4gp52IDgUyRuYwkPHYY1jWsVEWTFVBs=
-github.com/sacloud/api-client-go v0.3.4/go.mod h1:axv150sa/th23rU1/EC5ZjNm2I8WyW7X2mkYNGoQKxs=
+github.com/sacloud/api-client-go v0.3.5 h1:0ALibvbC+6MBhN7t61k+RhguhiEQ8+NejqBjq1YpylM=
+github.com/sacloud/api-client-go v0.3.5/go.mod h1:akdcCOl6wszywa0YQ5X8cMnNgWTm+7N4EneODTdiH48=
 github.com/sacloud/apprun-api-go v0.6.0 h1:8/HAu6Vw2a01dCIRkaqrXw/U27wsLy8vekTDfrUN5MM=
 github.com/sacloud/apprun-api-go v0.6.0/go.mod h1:H400OqgfgYclHSO8m5ihPEgUdWnPVinnVlAaMksXS14=
 github.com/sacloud/go-http v0.1.9 h1:Xa5PY8/pb7XWhwG9nAeXSrYXPbtfBWqawgzxD5co3VE=
