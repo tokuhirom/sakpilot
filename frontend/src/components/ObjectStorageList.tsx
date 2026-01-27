@@ -13,6 +13,7 @@ import {
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { SearchBar } from './SearchBar';
+import { JSONLPreview } from './JSONLPreview';
 
 interface ObjectStorageListProps {
   profile: string;
@@ -70,6 +71,17 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
     closeSearch,
   } = useSearch(buckets, (bucket, query) =>
     bucket.name.toLowerCase().includes(query)
+  );
+
+  const {
+    searchQuery: objectSearchQuery,
+    setSearchQuery: setObjectSearchQuery,
+    isSearching: isObjectSearching,
+    searchInputRef: objectSearchInputRef,
+    filteredItems: filteredObjects,
+    closeSearch: closeObjectSearch,
+  } = useSearch(objects, (obj, query) =>
+    obj.key.toLowerCase().includes(query)
   );
 
   const loadSites = useCallback(async () => {
@@ -334,6 +346,11 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
   };
 
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [previewingObject, setPreviewingObject] = useState<sakura.ObjectInfo | null>(null);
+
+  const isPreviewable = (key: string): boolean => {
+    return key.endsWith('.json.gz') || key.endsWith('.jsonl.gz');
+  };
 
   const handleDownload = async (obj: sakura.ObjectInfo) => {
     if (!selectedSite || !selectedBucket) return;
@@ -431,10 +448,23 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
           </div>
         )}
 
+        {objects.length > 0 && (
+          <SearchBar
+            isSearching={isObjectSearching}
+            searchQuery={objectSearchQuery}
+            setSearchQuery={setObjectSearchQuery}
+            closeSearch={closeObjectSearch}
+            searchInputRef={objectSearchInputRef}
+            placeholder="ファイル名で検索... (Escで閉じる)"
+          />
+        )}
+
         {loading && objects.length === 0 ? (
           <div className="loading">読み込み中...</div>
         ) : (prefixes.length === 0 && objects.length === 0) ? (
           <div className="empty-state">オブジェクトがありません</div>
+        ) : objectSearchQuery && filteredObjects.length === 0 ? (
+          <div className="empty-state">「{objectSearchQuery}」に一致するファイルがありません</div>
         ) : (
           <>
             <table className="table">
@@ -443,11 +473,11 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
                   <th>名前</th>
                   <th>サイズ</th>
                   <th>更新日時</th>
-                  <th style={{ width: '80px' }}>操作</th>
+                  <th style={{ width: '100px' }}>操作</th>
                 </tr>
               </thead>
               <tbody>
-                {currentPrefix && (
+                {!objectSearchQuery && currentPrefix && (
                   <tr
                     onClick={handleNavigateUp}
                     style={{ cursor: 'pointer' }}
@@ -458,7 +488,7 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
                     <td>-</td>
                   </tr>
                 )}
-                {prefixes.map((prefix) => (
+                {!objectSearchQuery && prefixes.map((prefix) => (
                   <tr
                     key={prefix}
                     onClick={() => handlePrefixClick(prefix)}
@@ -470,12 +500,22 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
                     <td>-</td>
                   </tr>
                 ))}
-                {objects.map((obj) => (
+                {(objectSearchQuery ? filteredObjects : objects).map((obj) => (
                   <tr key={obj.key}>
                     <td style={{ color: '#e0e0e0' }}>📄 {getDisplayName(obj.key)}</td>
                     <td>{formatSize(obj.size)}</td>
                     <td>{obj.lastModified ? formatDate(obj.lastModified) : '-'}</td>
-                    <td>
+                    <td style={{ display: 'flex', gap: '0.25rem' }}>
+                      {isPreviewable(obj.key) && (
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => setPreviewingObject(obj)}
+                          style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+                          title="プレビュー"
+                        >
+                          👁
+                        </button>
+                      )}
                       <button
                         className="btn btn-secondary"
                         onClick={() => handleDownload(obj)}
@@ -502,6 +542,17 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
               </div>
             )}
           </>
+        )}
+
+        {previewingObject && (
+          <JSONLPreview
+            endpoint={selectedSite.endpoint}
+            accessKey={selectedAccessKeyId}
+            secretKey={secretKey}
+            bucketName={selectedBucket.name}
+            objectKey={previewingObject.key}
+            onClose={() => setPreviewingObject(null)}
+          />
         )}
       </>
     );

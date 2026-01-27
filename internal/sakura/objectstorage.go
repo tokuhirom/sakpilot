@@ -1,7 +1,10 @@
 package sakura
 
 import (
+	"bufio"
+	"compress/gzip"
 	"context"
+	"encoding/json"
 	"io"
 	"os"
 	"strings"
@@ -250,4 +253,96 @@ func DownloadObject(ctx context.Context, endpoint, accessKey, secretKey, bucketN
 	// Copy the data
 	_, err = io.Copy(file, output.Body)
 	return err
+}
+
+// PreviewResult represents the result of previewing a file
+type PreviewResult struct {
+	Lines     []json.RawMessage `json:"lines"`
+	TotalRead int               `json:"totalRead"`
+	Truncated bool              `json:"truncated"`
+	Error     string            `json:"error,omitempty"`
+}
+
+// PreviewGzipJSONL downloads and previews a gzipped JSONL file
+// maxLines: maximum number of lines to return
+func PreviewGzipJSONL(ctx context.Context, endpoint, accessKey, secretKey, bucketName, key string, maxLines int) (*PreviewResult, error) {
+	// Ensure endpoint has https:// prefix
+	if !strings.HasPrefix(endpoint, "https://") && !strings.HasPrefix(endpoint, "http://") {
+		endpoint = "https://" + endpoint
+	}
+
+	cfg := aws.Config{
+		Region: "jp-north-1",
+		Credentials: credentials.NewStaticCredentialsProvider(
+			accessKey,
+			secretKey,
+			"",
+		),
+	}
+
+	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+		o.BaseEndpoint = aws.String(endpoint)
+		o.UsePathStyle = true
+	})
+
+	// Build GetObject input
+	getInput := &s3.GetObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(key),
+	}
+
+	output, err := client.GetObject(ctx, getInput)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = output.Body.Close() }()
+
+	// Create gzip reader
+	gzReader, err := gzip.NewReader(output.Body)
+	if err != nil {
+		return &PreviewResult{
+			Error: "failed to create gzip reader: " + err.Error(),
+		}, nil
+	}
+	defer func() { _ = gzReader.Close() }()
+
+	// Read lines
+	scanner := bufio.NewScanner(gzReader)
+	// Increase buffer size for potentially long JSON lines
+	scanner.Buffer(make([]byte, 1024*1024), 10*1024*1024)
+
+	result := &PreviewResult{
+		Lines: make([]json.RawMessage, 0, maxLines),
+	}
+
+	lineCount := 0
+	for scanner.Scan() {
+		if lineCount >= maxLines {
+			result.Truncated = true
+			break
+		}
+
+		line := scanner.Bytes()
+		// Validate it's valid JSON
+		if json.Valid(line) {
+			// Make a copy since scanner reuses the buffer
+			lineCopy := make([]byte, len(line))
+			copy(lineCopy, line)
+			result.Lines = append(result.Lines, json.RawMessage(lineCopy))
+		}
+		lineCount++
+		result.TotalRead = lineCount
+	}
+
+	if err := scanner.Err(); err != nil {
+		// If we got some lines, still return them with the error
+		if len(result.Lines) > 0 {
+			result.Error = "partial read: " + err.Error()
+			result.Truncated = true
+		} else {
+			return nil, err
+		}
+	}
+
+	return result, nil
 }
