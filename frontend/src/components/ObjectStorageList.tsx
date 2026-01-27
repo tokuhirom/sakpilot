@@ -13,6 +13,8 @@ import {
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { SearchBar } from './SearchBar';
+import { JSONLPreview } from './JSONLPreview';
+import { TextPreview } from './TextPreview';
 
 interface ObjectStorageListProps {
   profile: string;
@@ -60,6 +62,7 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
   const [objectsError, setObjectsError] = useState<string | null>(null);
   const [nextToken, setNextToken] = useState('');
   const [hasMore, setHasMore] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   const {
     searchQuery,
@@ -70,6 +73,17 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
     closeSearch,
   } = useSearch(buckets, (bucket, query) =>
     bucket.name.toLowerCase().includes(query)
+  );
+
+  const {
+    searchQuery: objectSearchQuery,
+    setSearchQuery: setObjectSearchQuery,
+    isSearching: isObjectSearching,
+    searchInputRef: objectSearchInputRef,
+    filteredItems: filteredObjects,
+    closeSearch: closeObjectSearch,
+  } = useSearch(objects, (obj, query) =>
+    obj.key.toLowerCase().includes(query)
   );
 
   const loadSites = useCallback(async () => {
@@ -190,6 +204,25 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBucket]);
+
+  // When searching, load all remaining objects with delay
+  useEffect(() => {
+    if (!objectSearchQuery || !hasMore || loading || searchLoading) return;
+
+    const loadMoreForSearch = async () => {
+      setSearchLoading(true);
+      try {
+        // Wait 300ms before loading more
+        await new Promise(resolve => setTimeout(resolve, 300));
+        await loadObjects(currentPrefix, true);
+      } finally {
+        setSearchLoading(false);
+      }
+    };
+
+    loadMoreForSearch();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [objectSearchQuery, hasMore, objects.length]);
 
   const handleSiteSelect = async (site: sakura.SiteInfo) => {
     setSelectedSite(site);
@@ -334,6 +367,40 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
   };
 
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [previewingObject, setPreviewingObject] = useState<sakura.ObjectInfo | null>(null);
+  const [previewType, setPreviewType] = useState<'jsonl' | 'text' | null>(null);
+
+  // Text file extensions that can be previewed as plain text
+  const textExtensions = ['.ini', '.md', '.json', '.pem', '.txt', '.tfstate', '.yaml', '.yml', '.xml', '.html', '.css', '.js', '.ts', '.py', '.go', '.sh', '.bash', '.log', '.conf', '.cfg', '.env', '.sql'];
+
+  const getPreviewType = (key: string): 'jsonl' | 'text' | null => {
+    const lowerKey = key.toLowerCase();
+    if (lowerKey.endsWith('.json.gz') || lowerKey.endsWith('.jsonl.gz')) {
+      return 'jsonl';
+    }
+    // Check if it's a README file (no extension)
+    const fileName = key.split('/').pop() || '';
+    if (fileName.toUpperCase() === 'README' || fileName.toUpperCase().startsWith('README.')) {
+      return 'text';
+    }
+    // Check text extensions
+    for (const ext of textExtensions) {
+      if (lowerKey.endsWith(ext)) {
+        return 'text';
+      }
+    }
+    return null;
+  };
+
+  const isPreviewable = (key: string): boolean => {
+    return getPreviewType(key) !== null;
+  };
+
+  const handlePreview = (obj: sakura.ObjectInfo) => {
+    const type = getPreviewType(obj.key);
+    setPreviewType(type);
+    setPreviewingObject(obj);
+  };
 
   const handleDownload = async (obj: sakura.ObjectInfo) => {
     if (!selectedSite || !selectedBucket) return;
@@ -431,10 +498,23 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
           </div>
         )}
 
+        {objects.length > 0 && (
+          <SearchBar
+            isSearching={isObjectSearching}
+            searchQuery={objectSearchQuery}
+            setSearchQuery={setObjectSearchQuery}
+            closeSearch={closeObjectSearch}
+            searchInputRef={objectSearchInputRef}
+            placeholder="ファイル名で検索... (Escで閉じる)"
+          />
+        )}
+
         {loading && objects.length === 0 ? (
           <div className="loading">読み込み中...</div>
         ) : (prefixes.length === 0 && objects.length === 0) ? (
           <div className="empty-state">オブジェクトがありません</div>
+        ) : objectSearchQuery && filteredObjects.length === 0 ? (
+          <div className="empty-state">「{objectSearchQuery}」に一致するファイルがありません</div>
         ) : (
           <>
             <table className="table">
@@ -443,11 +523,11 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
                   <th>名前</th>
                   <th>サイズ</th>
                   <th>更新日時</th>
-                  <th style={{ width: '80px' }}>操作</th>
+                  <th style={{ width: '100px' }}>操作</th>
                 </tr>
               </thead>
               <tbody>
-                {currentPrefix && (
+                {!objectSearchQuery && currentPrefix && (
                   <tr
                     onClick={handleNavigateUp}
                     style={{ cursor: 'pointer' }}
@@ -458,7 +538,7 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
                     <td>-</td>
                   </tr>
                 )}
-                {prefixes.map((prefix) => (
+                {!objectSearchQuery && prefixes.map((prefix) => (
                   <tr
                     key={prefix}
                     onClick={() => handlePrefixClick(prefix)}
@@ -470,12 +550,22 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
                     <td>-</td>
                   </tr>
                 ))}
-                {objects.map((obj) => (
+                {(objectSearchQuery ? filteredObjects : objects).map((obj) => (
                   <tr key={obj.key}>
                     <td style={{ color: '#e0e0e0' }}>📄 {getDisplayName(obj.key)}</td>
                     <td>{formatSize(obj.size)}</td>
                     <td>{obj.lastModified ? formatDate(obj.lastModified) : '-'}</td>
-                    <td>
+                    <td style={{ display: 'flex', gap: '0.25rem' }}>
+                      {isPreviewable(obj.key) && (
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => handlePreview(obj)}
+                          style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+                          title="プレビュー"
+                        >
+                          👁
+                        </button>
+                      )}
                       <button
                         className="btn btn-secondary"
                         onClick={() => handleDownload(obj)}
@@ -492,16 +582,44 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
             </table>
             {hasMore && (
               <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-                <button
-                  className="btn btn-primary"
-                  onClick={() => loadObjects(currentPrefix, true)}
-                  disabled={loading}
-                >
-                  {loading ? '読み込み中...' : 'もっと読み込む'}
-                </button>
+                {objectSearchQuery ? (
+                  <div style={{ color: '#888', fontSize: '0.85rem' }}>
+                    {searchLoading || loading ? '検索中... さらに読み込んでいます' : ''}
+                  </div>
+                ) : (
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => loadObjects(currentPrefix, true)}
+                    disabled={loading}
+                  >
+                    {loading ? '読み込み中...' : 'もっと読み込む'}
+                  </button>
+                )}
               </div>
             )}
           </>
+        )}
+
+        {previewingObject && previewType === 'jsonl' && (
+          <JSONLPreview
+            endpoint={selectedSite.endpoint}
+            accessKey={selectedAccessKeyId}
+            secretKey={secretKey}
+            bucketName={selectedBucket.name}
+            objectKey={previewingObject.key}
+            onClose={() => { setPreviewingObject(null); setPreviewType(null); }}
+          />
+        )}
+
+        {previewingObject && previewType === 'text' && (
+          <TextPreview
+            endpoint={selectedSite.endpoint}
+            accessKey={selectedAccessKeyId}
+            secretKey={secretKey}
+            bucketName={selectedBucket.name}
+            objectKey={previewingObject.key}
+            onClose={() => { setPreviewingObject(null); setPreviewType(null); }}
+          />
         )}
       </>
     );
