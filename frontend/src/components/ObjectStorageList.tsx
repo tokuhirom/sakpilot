@@ -61,6 +61,7 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
   const [objectsError, setObjectsError] = useState<string | null>(null);
   const [nextToken, setNextToken] = useState('');
   const [hasMore, setHasMore] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   const {
     searchQuery,
@@ -202,6 +203,25 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBucket]);
+
+  // When searching, load all remaining objects with delay
+  useEffect(() => {
+    if (!objectSearchQuery || !hasMore || loading || searchLoading) return;
+
+    const loadMoreForSearch = async () => {
+      setSearchLoading(true);
+      try {
+        // Wait 300ms before loading more
+        await new Promise(resolve => setTimeout(resolve, 300));
+        await loadObjects(currentPrefix, true);
+      } finally {
+        setSearchLoading(false);
+      }
+    };
+
+    loadMoreForSearch();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [objectSearchQuery, hasMore, objects.length]);
 
   const handleSiteSelect = async (site: sakura.SiteInfo) => {
     setSelectedSite(site);
@@ -532,13 +552,19 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
             </table>
             {hasMore && (
               <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-                <button
-                  className="btn btn-primary"
-                  onClick={() => loadObjects(currentPrefix, true)}
-                  disabled={loading}
-                >
-                  {loading ? '読み込み中...' : 'もっと読み込む'}
-                </button>
+                {objectSearchQuery ? (
+                  <div style={{ color: '#888', fontSize: '0.85rem' }}>
+                    {searchLoading || loading ? '検索中... さらに読み込んでいます' : ''}
+                  </div>
+                ) : (
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => loadObjects(currentPrefix, true)}
+                    disabled={loading}
+                  >
+                    {loading ? '読み込み中...' : 'もっと読み込む'}
+                  </button>
+                )}
               </div>
             )}
           </>
