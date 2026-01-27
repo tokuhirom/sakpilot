@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.0.13](https://github.com/tokuhirom/sakpilot/compare/v0.0.12...v0.0.13) - 2026-01-27
+- feat: オブジェクトストレージにJSONLプレビューと検索機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/39
+
 ## [v0.0.12](https://github.com/tokuhirom/sakpilot/compare/v0.0.11...v0.0.12) - 2026-01-26
 - feat: モニタリングスイートのメトリクスグラフ機能強化 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/36
 - chore: AppRun専有型OpenAPIスペック更新 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/38
