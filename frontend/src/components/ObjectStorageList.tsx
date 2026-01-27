@@ -14,6 +14,7 @@ import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { SearchBar } from './SearchBar';
 import { JSONLPreview } from './JSONLPreview';
+import { TextPreview } from './TextPreview';
 
 interface ObjectStorageListProps {
   profile: string;
@@ -367,9 +368,38 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
 
   const [downloading, setDownloading] = useState<string | null>(null);
   const [previewingObject, setPreviewingObject] = useState<sakura.ObjectInfo | null>(null);
+  const [previewType, setPreviewType] = useState<'jsonl' | 'text' | null>(null);
+
+  // Text file extensions that can be previewed as plain text
+  const textExtensions = ['.ini', '.md', '.json', '.pem', '.txt', '.tfstate', '.yaml', '.yml', '.xml', '.html', '.css', '.js', '.ts', '.py', '.go', '.sh', '.bash', '.log', '.conf', '.cfg', '.env', '.sql'];
+
+  const getPreviewType = (key: string): 'jsonl' | 'text' | null => {
+    const lowerKey = key.toLowerCase();
+    if (lowerKey.endsWith('.json.gz') || lowerKey.endsWith('.jsonl.gz')) {
+      return 'jsonl';
+    }
+    // Check if it's a README file (no extension)
+    const fileName = key.split('/').pop() || '';
+    if (fileName.toUpperCase() === 'README' || fileName.toUpperCase().startsWith('README.')) {
+      return 'text';
+    }
+    // Check text extensions
+    for (const ext of textExtensions) {
+      if (lowerKey.endsWith(ext)) {
+        return 'text';
+      }
+    }
+    return null;
+  };
 
   const isPreviewable = (key: string): boolean => {
-    return key.endsWith('.json.gz') || key.endsWith('.jsonl.gz');
+    return getPreviewType(key) !== null;
+  };
+
+  const handlePreview = (obj: sakura.ObjectInfo) => {
+    const type = getPreviewType(obj.key);
+    setPreviewType(type);
+    setPreviewingObject(obj);
   };
 
   const handleDownload = async (obj: sakura.ObjectInfo) => {
@@ -529,7 +559,7 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
                       {isPreviewable(obj.key) && (
                         <button
                           className="btn btn-secondary"
-                          onClick={() => setPreviewingObject(obj)}
+                          onClick={() => handlePreview(obj)}
                           style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
                           title="プレビュー"
                         >
@@ -570,14 +600,25 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
           </>
         )}
 
-        {previewingObject && (
+        {previewingObject && previewType === 'jsonl' && (
           <JSONLPreview
             endpoint={selectedSite.endpoint}
             accessKey={selectedAccessKeyId}
             secretKey={secretKey}
             bucketName={selectedBucket.name}
             objectKey={previewingObject.key}
-            onClose={() => setPreviewingObject(null)}
+            onClose={() => { setPreviewingObject(null); setPreviewType(null); }}
+          />
+        )}
+
+        {previewingObject && previewType === 'text' && (
+          <TextPreview
+            endpoint={selectedSite.endpoint}
+            accessKey={selectedAccessKeyId}
+            secretKey={secretKey}
+            bucketName={selectedBucket.name}
+            objectKey={previewingObject.key}
+            onClose={() => { setPreviewingObject(null); setPreviewType(null); }}
           />
         )}
       </>

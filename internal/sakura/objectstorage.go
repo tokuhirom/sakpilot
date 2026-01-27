@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -263,6 +264,15 @@ type PreviewResult struct {
 	Error     string            `json:"error,omitempty"`
 }
 
+// TextPreviewResult represents the result of previewing a text file
+type TextPreviewResult struct {
+	Content   string `json:"content"`
+	TotalSize int64  `json:"totalSize"`
+	ReadSize  int64  `json:"readSize"`
+	Truncated bool   `json:"truncated"`
+	Error     string `json:"error,omitempty"`
+}
+
 // PreviewGzipJSONL downloads and previews a gzipped JSONL file
 // maxLines: maximum number of lines to return
 func PreviewGzipJSONL(ctx context.Context, endpoint, accessKey, secretKey, bucketName, key string, maxLines int) (*PreviewResult, error) {
@@ -345,4 +355,77 @@ func PreviewGzipJSONL(ctx context.Context, endpoint, accessKey, secretKey, bucke
 	}
 
 	return result, nil
+}
+
+// PreviewText downloads and previews a plain text file
+// maxBytes: maximum number of bytes to read (default 1MB if 0)
+func PreviewText(ctx context.Context, endpoint, accessKey, secretKey, bucketName, key string, maxBytes int64) (*TextPreviewResult, error) {
+	if maxBytes <= 0 {
+		maxBytes = 1024 * 1024 // 1MB default
+	}
+
+	// Ensure endpoint has https:// prefix
+	if !strings.HasPrefix(endpoint, "https://") && !strings.HasPrefix(endpoint, "http://") {
+		endpoint = "https://" + endpoint
+	}
+
+	cfg := aws.Config{
+		Region: "jp-north-1",
+		Credentials: credentials.NewStaticCredentialsProvider(
+			accessKey,
+			secretKey,
+			"",
+		),
+	}
+
+	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+		o.BaseEndpoint = aws.String(endpoint)
+		o.UsePathStyle = true
+	})
+
+	// First, get object metadata to know total size
+	headOutput, err := client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	totalSize := aws.ToInt64(headOutput.ContentLength)
+
+	// Build GetObject input with range if file is larger than maxBytes
+	getInput := &s3.GetObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(key),
+	}
+
+	truncated := false
+	if totalSize > maxBytes {
+		// Only read first maxBytes
+		getInput.Range = aws.String(fmt.Sprintf("bytes=0-%d", maxBytes-1))
+		truncated = true
+	}
+
+	output, err := client.GetObject(ctx, getInput)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = output.Body.Close() }()
+
+	// Read content
+	content, err := io.ReadAll(io.LimitReader(output.Body, maxBytes))
+	if err != nil {
+		return &TextPreviewResult{
+			Error:     "failed to read content: " + err.Error(),
+			TotalSize: totalSize,
+		}, nil
+	}
+
+	return &TextPreviewResult{
+		Content:   string(content),
+		TotalSize: totalSize,
+		ReadSize:  int64(len(content)),
+		Truncated: truncated,
+	}, nil
 }

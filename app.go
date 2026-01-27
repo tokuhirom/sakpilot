@@ -717,6 +717,10 @@ func (a *App) PreviewGzipJSONL(endpoint, accessKey, secretKey, bucketName, key s
 	return sakura.PreviewGzipJSONL(a.ctx, endpoint, accessKey, secretKey, bucketName, key, maxLines)
 }
 
+func (a *App) PreviewText(endpoint, accessKey, secretKey, bucketName, key string, maxBytes int64) (*sakura.TextPreviewResult, error) {
+	return sakura.PreviewText(a.ctx, endpoint, accessKey, secretKey, bucketName, key, maxBytes)
+}
+
 // Container Registry Secret Key management (Keychain)
 func (a *App) SaveContainerRegistrySecret(registryID, userName, password string) error {
 	return sakura.SaveContainerRegistrySecret(registryID, userName, password)
