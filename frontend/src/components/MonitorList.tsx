@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { GetSimpleMonitors } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 import { SearchBar } from './SearchBar';
 
 interface MonitorListProps {
@@ -44,6 +45,8 @@ export function MonitorList({ profile }: MonitorListProps) {
       setLoading(false);
     }
   }, [profile]);
+
+  useGlobalReload(loadMonitors);
 
   // profile が変更されたらシンプル監視一覧を再取得
   useEffect(() => {

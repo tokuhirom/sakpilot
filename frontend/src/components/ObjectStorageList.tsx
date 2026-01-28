@@ -12,6 +12,7 @@ import {
 } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 import { SearchBar } from './SearchBar';
 import { JSONLPreview } from './JSONLPreview';
 import { TextPreview } from './TextPreview';
@@ -185,6 +186,18 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
       setLoading(false);
     }
   }, [selectedSite, selectedAccessKeyId, secretKey, selectedBucket, nextToken]);
+
+  const handleGlobalReload = useCallback(() => {
+    if (viewMode === 'sites') {
+      loadSites();
+    } else if (viewMode === 'buckets') {
+      loadBuckets();
+    } else if (viewMode === 'objects') {
+      loadObjects(currentPrefix);
+    }
+  }, [viewMode, loadSites, loadBuckets, loadObjects, currentPrefix]);
+
+  useGlobalReload(handleGlobalReload);
 
   useEffect(() => {
     loadSites();

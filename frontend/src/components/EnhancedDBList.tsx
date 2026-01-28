@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { GetEnhancedDBs } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 import { SearchBar } from './SearchBar';
 
 interface EnhancedDBListProps {
@@ -41,6 +42,8 @@ export function EnhancedDBList({ profile }: EnhancedDBListProps) {
       setLoading(false);
     }
   }, [profile]);
+
+  useGlobalReload(loadDatabases);
 
   useEffect(() => {
     loadDatabases();

@@ -10,6 +10,7 @@ import {
   GetContainerRegistryImageTags,
 } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 
 interface ContainerRegistryDetailProps {
   profile: string;
@@ -146,6 +147,19 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
       setLoadingTags(false);
     }
   }, [registry, activeUserName, activePassword]);
+
+  const handleGlobalReload = useCallback(() => {
+    if (viewMode === 'tags' && selectedImage) {
+      loadTags(selectedImage);
+    } else {
+      loadUsers();
+      if (activeUserName && activePassword) {
+        loadImages();
+      }
+    }
+  }, [viewMode, selectedImage, loadUsers, loadImages, loadTags, activeUserName, activePassword]);
+
+  useGlobalReload(handleGlobalReload);
 
   useEffect(() => {
     loadUsers();

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { GetDNSList } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 import { SearchBar } from './SearchBar';
 
 interface DNSListProps {
@@ -46,6 +47,8 @@ export function DNSList({ profile, onSelectDNS }: DNSListProps) {
       setLoading(false);
     }
   }, [profile]);
+
+  useGlobalReload(loadDNS);
 
   // profile が変更されたら DNS 一覧を再取得
   useEffect(() => {

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GetBills, GetBillDetails } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 
 interface BillListProps {
   profile: string;
@@ -29,6 +30,8 @@ export function BillList({ profile, accountId, memberCode }: BillListProps) {
       setLoading(false);
     }
   }, [profile, accountId]);
+
+  useGlobalReload(loadBills);
 
   useEffect(() => {
     loadBills();

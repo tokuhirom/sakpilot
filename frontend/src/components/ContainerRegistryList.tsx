@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { GetContainerRegistries } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 import { SearchBar } from './SearchBar';
 
 interface ContainerRegistryListProps {
@@ -41,6 +42,8 @@ export function ContainerRegistryList({ profile, onSelectRegistry }: ContainerRe
       setLoading(false);
     }
   }, [profile]);
+
+  useGlobalReload(loadRegistries);
 
   useEffect(() => {
     loadRegistries();

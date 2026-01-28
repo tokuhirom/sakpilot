@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, NavLink, useParams, useNavigate, Navigate } from 'react-router-dom';
+import { triggerGlobalReload } from './hooks/useGlobalReload';
 import './App.css';
 import {
   GetProfiles,
@@ -78,7 +79,6 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
   const { profile } = useParams<{ profile: string }>();
   const navigate = useNavigate();
   const [selectedZone, setSelectedZone] = useState('');
-  const [reloadKey, setReloadKey] = useState(0);
 
   // プロファイル変更時にデフォルトゾーンを取得
   useEffect(() => {
@@ -194,7 +194,7 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
           </div>
           <button
             className="btn-reload"
-            onClick={() => setReloadKey(k => k + 1)}
+            onClick={triggerGlobalReload}
             title="リロード"
           >
             ↻
@@ -215,7 +215,7 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
           )}
         </div>
 
-        <Routes key={reloadKey}>
+        <Routes>
           <Route path="servers" element={
             <ServerList profile={profile} zone={selectedZone} zones={zones} onZoneChange={setSelectedZone} />
           } />

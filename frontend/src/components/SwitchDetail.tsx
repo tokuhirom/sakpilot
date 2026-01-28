@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GetSwitchDetail } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 
 interface SwitchDetailProps {
   profile: string;
@@ -25,6 +26,8 @@ export function SwitchDetail({ profile, zone, switchId }: SwitchDetailProps) {
       setLoading(false);
     }
   }, [profile, zone, switchId]);
+
+  useGlobalReload(loadSwitchDetail);
 
   useEffect(() => {
     loadSwitchDetail();

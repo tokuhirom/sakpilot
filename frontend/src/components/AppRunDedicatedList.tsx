@@ -12,6 +12,7 @@ import {
   SetAppRunActiveVersion,
 } from '../../wailsjs/go/main/App';
 import { apprun } from '../../wailsjs/go/models';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 
 interface AppRunDedicatedListProps {
   profile: string;
@@ -195,7 +196,7 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
     }
   };
 
-  useEffect(() => {
+  const handleGlobalReload = useCallback(() => {
     if (view.type === 'clusters') {
       loadClusters();
     } else if (view.type === 'cluster') {
@@ -210,6 +211,12 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
       loadVersionDetail(view.appId, view.version);
     }
   }, [view, loadClusters, loadClusterDetails, loadAppVersions, loadASGDetails, loadLBNodes, loadVersionDetail]);
+
+  useGlobalReload(handleGlobalReload);
+
+  useEffect(() => {
+    handleGlobalReload();
+  }, [handleGlobalReload]);
 
   const renderBreadcrumb = () => {
     const items: { label: string; onClick?: () => void }[] = [];

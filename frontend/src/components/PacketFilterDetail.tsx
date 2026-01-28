@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GetPacketFilterDetail } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 
 interface PacketFilterDetailProps {
   profile: string;
@@ -25,6 +26,8 @@ export function PacketFilterDetail({ profile, zone, packetFilterId }: PacketFilt
       setLoading(false);
     }
   }, [profile, zone, packetFilterId]);
+
+  useGlobalReload(loadPacketFilterDetail);
 
   useEffect(() => {
     loadPacketFilterDetail();

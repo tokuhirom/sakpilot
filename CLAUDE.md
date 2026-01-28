@@ -129,3 +129,24 @@ const formatDate = (dateString: string) => {
   return `${Y}/${M}/${D} ${h}:${m}:${s}`;
 };
 ```
+
+### Global Reload
+
+- すべてのビュー（リスト、詳細ページ）は **グローバルリロード機能** に対応する必要がある
+- トップバーにあるリロードボタン（↻）をクリックすると、現在表示中のページのデータを再取得する
+- 実装方法:
+  1. `useGlobalReload` フックをインポート
+  2. データ取得用の `useCallback` で定義した関数を `useGlobalReload` に渡す
+
+```typescript
+import { useGlobalReload } from '../hooks/useGlobalReload';
+
+// コンポーネント内
+const loadData = useCallback(async () => {
+  // データ取得処理
+}, [dependencies]);
+
+useGlobalReload(loadData);  // これを追加
+```
+
+- 複数のビューを持つコンポーネント（例: AppRunDedicatedList）では、現在のビューに応じて適切なリロード関数を選択すること

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { GetKMSKeys } from '../../wailsjs/go/main/App';
 import { kms } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 import { SearchBar } from './SearchBar';
 
 interface KMSListProps {
@@ -40,6 +41,8 @@ export function KMSList({ profile }: KMSListProps) {
       setLoading(false);
     }
   }, [profile]);
+
+  useGlobalReload(loadKeys);
 
   useEffect(() => {
     loadKeys();

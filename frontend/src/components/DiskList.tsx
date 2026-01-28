@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { GetDisks } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 import { SearchBar } from './SearchBar';
 
 interface DiskListProps {
@@ -45,6 +46,8 @@ export function DiskList({ profile, zone, zones, onZoneChange }: DiskListProps) 
       setLoading(false);
     }
   }, [profile, zone]);
+
+  useGlobalReload(loadDisks);
 
   useEffect(() => {
     loadDisks();
