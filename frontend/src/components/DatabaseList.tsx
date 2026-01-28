@@ -82,14 +82,6 @@ export function DatabaseList({ profile, zone, zones, onZoneChange }: DatabaseLis
       <div className="header">
         <h2>データベース</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button
-            className="btn-reload"
-            onClick={() => loadDatabases()}
-            disabled={loading}
-            title="リロード"
-          >
-            ↻
-          </button>
           <select
             className="zone-select"
             value={zone}

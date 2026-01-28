@@ -56,14 +56,6 @@ export function SwitchList({ profile, zone, zones, onZoneChange, onSelectSwitch 
       <div className="header">
         <h2>スイッチ</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button
-            className="btn-reload"
-            onClick={() => loadSwitches()}
-            disabled={loading}
-            title="リロード"
-          >
-            ↻
-          </button>
           <select
             className="zone-select"
             value={zone}

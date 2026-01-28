@@ -53,14 +53,6 @@ export function ContainerRegistryList({ profile, onSelectRegistry }: ContainerRe
     <>
       <div className="header">
         <h2>コンテナレジストリ</h2>
-        <button
-          className="btn-reload"
-          onClick={() => loadRegistries()}
-          disabled={loading}
-          title="リロード"
-        >
-          ↻
-        </button>
       </div>
 
       <SearchBar

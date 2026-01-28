@@ -54,14 +54,6 @@ export function GSLBList({ profile, onSelectGSLB }: GSLBListProps) {
     <>
       <div className="header">
         <h2>GSLB</h2>
-        <button
-          className="btn-reload"
-          onClick={() => loadGSLBList()}
-          disabled={loading}
-          title="リロード"
-        >
-          ↻
-        </button>
       </div>
 
       <SearchBar

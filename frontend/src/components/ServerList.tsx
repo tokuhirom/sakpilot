@@ -178,14 +178,6 @@ export function ServerList({ profile, zone, zones, onZoneChange }: ServerListPro
       <div className="header">
         <h2>サーバー</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button
-            className="btn-reload"
-            onClick={() => loadServers()}
-            disabled={loading}
-            title="リロード"
-          >
-            ↻
-          </button>
           <select
             className="zone-select"
             value={zone}

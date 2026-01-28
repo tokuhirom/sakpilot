@@ -134,18 +134,6 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
     <>
       <div className="header">
         <h2>メトリクスストレージ: {detail.name}</h2>
-        <button
-          className="btn-reload"
-          onClick={() => {
-            setSelectedPublisher(null);
-            setMetrics([]);
-            loadData();
-          }}
-          disabled={loading}
-          title="リロード"
-        >
-          ↻
-        </button>
       </div>
 
       <div style={{ marginBottom: '2rem' }}>

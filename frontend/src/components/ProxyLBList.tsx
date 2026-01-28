@@ -162,17 +162,6 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
             </button>
             <h2>{selectedProxyLB.name}</h2>
           </div>
-          <button
-            className="btn-reload"
-            onClick={() => {
-              loadDetail(selectedProxyLB.id);
-              loadHealth(selectedProxyLB.id);
-            }}
-            disabled={loadingHealth}
-            title="リロード"
-          >
-            ↻
-          </button>
         </div>
 
         {/* Basic Info */}
@@ -339,14 +328,6 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
     <>
       <div className="header">
         <h2>エンハンスドロードバランサ (ELB)</h2>
-        <button
-          className="btn-reload"
-          onClick={() => loadProxyLBs()}
-          disabled={loading}
-          title="リロード"
-        >
-          ↻
-        </button>
       </div>
 
       <SearchBar

@@ -143,14 +143,6 @@ export function BillList({ profile, accountId, memberCode }: BillListProps) {
     <>
       <div className="header">
         <h2>請求一覧</h2>
-        <button
-          className="btn-reload"
-          onClick={() => loadBills()}
-          disabled={loading}
-          title="リロード"
-        >
-          ↻
-        </button>
       </div>
 
       {loading ? (

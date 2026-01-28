@@ -56,14 +56,6 @@ export function PacketFilterList({ profile, zone, zones, onZoneChange, onSelectP
       <div className="header">
         <h2>パケットフィルター</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button
-            className="btn-reload"
-            onClick={() => loadPacketFilters()}
-            disabled={loading}
-            title="リロード"
-          >
-            ↻
-          </button>
           <select
             className="zone-select"
             value={zone}

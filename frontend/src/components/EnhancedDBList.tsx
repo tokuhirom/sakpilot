@@ -82,14 +82,6 @@ export function EnhancedDBList({ profile }: EnhancedDBListProps) {
     <>
       <div className="header">
         <h2>エンハンスドDB</h2>
-        <button
-          className="btn-reload"
-          onClick={() => loadDatabases()}
-          disabled={loading}
-          title="リロード"
-        >
-          ↻
-        </button>
       </div>
 
       <SearchBar

@@ -305,14 +305,6 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
       <>
         <div className="header">
           <h2>AppRun専有型</h2>
-          <button
-            className="btn-reload"
-            onClick={() => loadClusters()}
-            disabled={loading}
-            title="リロード"
-          >
-            ↻
-          </button>
         </div>
         {renderBreadcrumb()}
         {clusters.length === 0 ? (

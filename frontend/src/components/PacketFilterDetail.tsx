@@ -58,14 +58,6 @@ export function PacketFilterDetail({ profile, zone, packetFilterId }: PacketFilt
     <div className="packetfilter-detail">
       <div className="header">
         <h2>パケットフィルター詳細: {pfInfo.name}</h2>
-        <button
-          className="btn-reload"
-          onClick={() => loadPacketFilterDetail()}
-          disabled={loading}
-          title="リロード"
-        >
-          ↻
-        </button>
       </div>
 
       <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem', background: '#2a2a2a', borderRadius: '8px' }}>

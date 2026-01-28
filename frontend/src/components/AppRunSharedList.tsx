@@ -174,14 +174,6 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
             </button>
             <h2>{view.appName}</h2>
           </div>
-          <button
-            className="btn-reload"
-            onClick={() => loadAppDetail(view.appId)}
-            disabled={loading}
-            title="リロード"
-          >
-            ↻
-          </button>
         </div>
 
         {error && (
@@ -335,14 +327,6 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
     <div className="apprun-shared-list">
       <div className="header">
         <h2>AppRun共用型</h2>
-        <button
-          className="btn-reload"
-          onClick={loadApps}
-          disabled={loading}
-          title="リロード"
-        >
-          ↻
-        </button>
       </div>
 
       {error && (

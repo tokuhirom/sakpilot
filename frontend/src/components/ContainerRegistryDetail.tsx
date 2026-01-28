@@ -241,14 +241,6 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
             </button>
             <h2>{selectedImage} のタグ一覧</h2>
           </div>
-          <button
-            className="btn-reload"
-            onClick={() => loadTags(selectedImage)}
-            disabled={loadingTags}
-            title="リロード"
-          >
-            ↻
-          </button>
         </div>
 
         {tagsError && (

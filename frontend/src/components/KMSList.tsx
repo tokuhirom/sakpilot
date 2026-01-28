@@ -91,14 +91,6 @@ export function KMSList({ profile }: KMSListProps) {
     <>
       <div className="header">
         <h2>KMS</h2>
-        <button
-          className="btn-reload"
-          onClick={() => loadKeys()}
-          disabled={loading}
-          title="リロード"
-        >
-          ↻
-        </button>
       </div>
 
       <SearchBar
