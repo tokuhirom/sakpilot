@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { GetServers, PowerOnServer, PowerOffServer, GetServerStatus } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 import { SearchBar } from './SearchBar';
 
 interface ServerListProps {
@@ -46,6 +47,8 @@ export function ServerList({ profile, zone, zones, onZoneChange }: ServerListPro
       setLoading(false);
     }
   }, [profile, zone]);
+
+  useGlobalReload(loadServers);
 
   // ドロップダウンを閉じるためのクリックリスナー
   useEffect(() => {
@@ -175,14 +178,6 @@ export function ServerList({ profile, zone, zones, onZoneChange }: ServerListPro
       <div className="header">
         <h2>サーバー</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button
-            className="btn-reload"
-            onClick={() => loadServers()}
-            disabled={loading}
-            title="リロード"
-          >
-            ↻
-          </button>
           <select
             className="zone-select"
             value={zone}

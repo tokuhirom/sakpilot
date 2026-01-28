@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GetMSLogs, GetMSMetrics, GetMSTraces } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 import { BrowserOpenURL } from '../../wailsjs/runtime';
 
 interface MonitoringProps {
@@ -38,6 +39,8 @@ export function Monitoring({ profile }: MonitoringProps) {
       setLoading(false);
     }
   }, [profile, subPage]);
+
+  useGlobalReload(loadData);
 
   useEffect(() => {
     loadData();
@@ -129,14 +132,6 @@ export function Monitoring({ profile }: MonitoringProps) {
     <>
       <div className="header">
         <h2>モニタリングスイート</h2>
-        <button
-          className="btn-reload"
-          onClick={() => loadData()}
-          disabled={loading}
-          title="リロード"
-        >
-          ↻
-        </button>
       </div>
 
       <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem' }}>

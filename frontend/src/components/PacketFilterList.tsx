@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { GetPacketFilters } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 import { SearchBar } from './SearchBar';
 
 interface PacketFilterListProps {
@@ -44,6 +45,8 @@ export function PacketFilterList({ profile, zone, zones, onZoneChange, onSelectP
     }
   }, [profile, zone]);
 
+  useGlobalReload(loadPacketFilters);
+
   useEffect(() => {
     loadPacketFilters();
   }, [loadPacketFilters]);
@@ -53,14 +56,6 @@ export function PacketFilterList({ profile, zone, zones, onZoneChange, onSelectP
       <div className="header">
         <h2>パケットフィルター</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button
-            className="btn-reload"
-            onClick={() => loadPacketFilters()}
-            disabled={loading}
-            title="リロード"
-          >
-            ↻
-          </button>
           <select
             className="zone-select"
             value={zone}

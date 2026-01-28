@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { GetDatabases } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 import { SearchBar } from './SearchBar';
 
 interface DatabaseListProps {
@@ -46,6 +47,8 @@ export function DatabaseList({ profile, zone, zones, onZoneChange }: DatabaseLis
     }
   }, [profile, zone]);
 
+  useGlobalReload(loadDatabases);
+
   useEffect(() => {
     loadDatabases();
   }, [loadDatabases]);
@@ -79,14 +82,6 @@ export function DatabaseList({ profile, zone, zones, onZoneChange }: DatabaseLis
       <div className="header">
         <h2>データベース</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button
-            className="btn-reload"
-            onClick={() => loadDatabases()}
-            disabled={loading}
-            title="リロード"
-          >
-            ↻
-          </button>
           <select
             className="zone-select"
             value={zone}

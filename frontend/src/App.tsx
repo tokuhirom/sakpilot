@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, NavLink, useParams, useNavigate, Navigate } from 'react-router-dom';
+import { triggerGlobalReload } from './hooks/useGlobalReload';
 import './App.css';
 import {
   GetProfiles,
@@ -191,6 +192,13 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
               <Route path="bills" element={<span className="breadcrumb-item active">請求</span>} />
             </Routes>
           </div>
+          <button
+            className="btn-reload"
+            onClick={triggerGlobalReload}
+            title="リロード"
+          >
+            ↻
+          </button>
           {loading ? (
             <div className="auth-info">
               <span className="auth-loading">読み込み中...</span>

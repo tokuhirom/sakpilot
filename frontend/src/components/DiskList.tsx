@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { GetDisks } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 import { SearchBar } from './SearchBar';
 
 interface DiskListProps {
@@ -46,6 +47,8 @@ export function DiskList({ profile, zone, zones, onZoneChange }: DiskListProps) 
     }
   }, [profile, zone]);
 
+  useGlobalReload(loadDisks);
+
   useEffect(() => {
     loadDisks();
   }, [loadDisks]);
@@ -68,14 +71,6 @@ export function DiskList({ profile, zone, zones, onZoneChange }: DiskListProps) 
       <div className="header">
         <h2>ディスク</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button
-            className="btn-reload"
-            onClick={() => loadDisks()}
-            disabled={loading}
-            title="リロード"
-          >
-            ↻
-          </button>
           <select
             className="zone-select"
             value={zone}

@@ -7,6 +7,7 @@ import {
   HasAppRunSharedUser,
 } from '../../wailsjs/go/main/App';
 import { apprunshared } from '../../wailsjs/go/models';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 
 interface AppRunSharedListProps {
   profile: string;
@@ -73,6 +74,16 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
       setLoading(false);
     }
   }, [profile]);
+
+  const handleGlobalReload = useCallback(() => {
+    if (view.type === 'list') {
+      loadApps();
+    } else if (view.type === 'detail') {
+      loadAppDetail(view.appId);
+    }
+  }, [view, loadApps, loadAppDetail]);
+
+  useGlobalReload(handleGlobalReload);
 
   useEffect(() => {
     checkUser();
@@ -163,14 +174,6 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
             </button>
             <h2>{view.appName}</h2>
           </div>
-          <button
-            className="btn-reload"
-            onClick={() => loadAppDetail(view.appId)}
-            disabled={loading}
-            title="リロード"
-          >
-            ↻
-          </button>
         </div>
 
         {error && (
@@ -324,14 +327,6 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
     <div className="apprun-shared-list">
       <div className="header">
         <h2>AppRun共用型</h2>
-        <button
-          className="btn-reload"
-          onClick={loadApps}
-          disabled={loading}
-          title="リロード"
-        >
-          ↻
-        </button>
       </div>
 
       {error && (

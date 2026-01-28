@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GetPacketFilterDetail } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 
 interface PacketFilterDetailProps {
   profile: string;
@@ -25,6 +26,8 @@ export function PacketFilterDetail({ profile, zone, packetFilterId }: PacketFilt
       setLoading(false);
     }
   }, [profile, zone, packetFilterId]);
+
+  useGlobalReload(loadPacketFilterDetail);
 
   useEffect(() => {
     loadPacketFilterDetail();
@@ -55,14 +58,6 @@ export function PacketFilterDetail({ profile, zone, packetFilterId }: PacketFilt
     <div className="packetfilter-detail">
       <div className="header">
         <h2>パケットフィルター詳細: {pfInfo.name}</h2>
-        <button
-          className="btn-reload"
-          onClick={() => loadPacketFilterDetail()}
-          disabled={loading}
-          title="リロード"
-        >
-          ↻
-        </button>
       </div>
 
       <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem', background: '#2a2a2a', borderRadius: '8px' }}>

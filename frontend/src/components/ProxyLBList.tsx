@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { GetProxyLBs, GetProxyLBDetail, GetProxyLBHealth } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 import { SearchBar } from './SearchBar';
 
 interface ProxyLBListProps {
@@ -73,6 +74,17 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
       setLoadingHealth(false);
     }
   }, [profile]);
+
+  const handleGlobalReload = useCallback(() => {
+    if (viewMode === 'list') {
+      loadProxyLBs();
+    } else if (selectedProxyLB) {
+      loadDetail(selectedProxyLB.id);
+      loadHealth(selectedProxyLB.id);
+    }
+  }, [viewMode, selectedProxyLB, loadProxyLBs, loadDetail, loadHealth]);
+
+  useGlobalReload(handleGlobalReload);
 
   useEffect(() => {
     loadProxyLBs();
@@ -150,17 +162,6 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
             </button>
             <h2>{selectedProxyLB.name}</h2>
           </div>
-          <button
-            className="btn-reload"
-            onClick={() => {
-              loadDetail(selectedProxyLB.id);
-              loadHealth(selectedProxyLB.id);
-            }}
-            disabled={loadingHealth}
-            title="リロード"
-          >
-            ↻
-          </button>
         </div>
 
         {/* Basic Info */}
@@ -327,14 +328,6 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
     <>
       <div className="header">
         <h2>エンハンスドロードバランサ (ELB)</h2>
-        <button
-          className="btn-reload"
-          onClick={() => loadProxyLBs()}
-          disabled={loading}
-          title="リロード"
-        >
-          ↻
-        </button>
       </div>
 
       <SearchBar

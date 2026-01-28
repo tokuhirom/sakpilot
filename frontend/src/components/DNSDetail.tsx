@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GetDNSDetail } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 
 interface DNSDetailProps {
   profile: string;
@@ -24,6 +25,8 @@ export function DNSDetail({ profile, dnsId }: DNSDetailProps) {
       setLoading(false);
     }
   }, [profile, dnsId]);
+
+  useGlobalReload(loadDNSDetail);
 
   useEffect(() => {
     loadDNSDetail();

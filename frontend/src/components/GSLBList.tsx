@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { GetGSLBList } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 import { SearchBar } from './SearchBar';
 
 interface GSLBListProps {
@@ -43,6 +44,8 @@ export function GSLBList({ profile, onSelectGSLB }: GSLBListProps) {
     }
   }, [profile]);
 
+  useGlobalReload(loadGSLBList);
+
   useEffect(() => {
     loadGSLBList();
   }, [loadGSLBList]);
@@ -51,14 +54,6 @@ export function GSLBList({ profile, onSelectGSLB }: GSLBListProps) {
     <>
       <div className="header">
         <h2>GSLB</h2>
-        <button
-          className="btn-reload"
-          onClick={() => loadGSLBList()}
-          disabled={loading}
-          title="リロード"
-        >
-          ↻
-        </button>
       </div>
 
       <SearchBar

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GetGSLBDetail } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 
 interface GSLBDetailProps {
   profile: string;
@@ -24,6 +25,8 @@ export function GSLBDetail({ profile, gslbId }: GSLBDetailProps) {
       setLoading(false);
     }
   }, [profile, gslbId]);
+
+  useGlobalReload(loadGSLBDetail);
 
   useEffect(() => {
     loadGSLBDetail();

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { GetSwitches } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 import { SearchBar } from './SearchBar';
 
 interface SwitchListProps {
@@ -44,6 +45,8 @@ export function SwitchList({ profile, zone, zones, onZoneChange, onSelectSwitch 
     }
   }, [profile, zone]);
 
+  useGlobalReload(loadSwitches);
+
   useEffect(() => {
     loadSwitches();
   }, [loadSwitches]);
@@ -53,14 +56,6 @@ export function SwitchList({ profile, zone, zones, onZoneChange, onSelectSwitch 
       <div className="header">
         <h2>スイッチ</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button
-            className="btn-reload"
-            onClick={() => loadSwitches()}
-            disabled={loading}
-            title="リロード"
-          >
-            ↻
-          </button>
           <select
             className="zone-select"
             value={zone}

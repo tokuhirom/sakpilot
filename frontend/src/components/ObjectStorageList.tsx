@@ -12,6 +12,7 @@ import {
 } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 import { SearchBar } from './SearchBar';
 import { JSONLPreview } from './JSONLPreview';
 import { TextPreview } from './TextPreview';
@@ -185,6 +186,18 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
       setLoading(false);
     }
   }, [selectedSite, selectedAccessKeyId, secretKey, selectedBucket, nextToken]);
+
+  const handleGlobalReload = useCallback(() => {
+    if (viewMode === 'sites') {
+      loadSites();
+    } else if (viewMode === 'buckets') {
+      loadBuckets();
+    } else if (viewMode === 'objects') {
+      loadObjects(currentPrefix);
+    }
+  }, [viewMode, loadSites, loadBuckets, loadObjects, currentPrefix]);
+
+  useGlobalReload(handleGlobalReload);
 
   useEffect(() => {
     loadSites();
@@ -443,14 +456,6 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
             </button>
             <h2>{selectedBucket.name}</h2>
           </div>
-          <button
-            className="btn-reload"
-            onClick={() => loadObjects(currentPrefix)}
-            disabled={loading}
-            title="リロード"
-          >
-            ↻
-          </button>
         </div>
 
         <div style={{ marginBottom: '0.5rem', padding: '0.5rem', backgroundColor: '#1a1a2e', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '0.25rem', flexWrap: 'wrap' }}>
@@ -639,14 +644,6 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
             </button>
             <h2>{selectedSite.displayName}</h2>
           </div>
-          <button
-            className="btn-reload"
-            onClick={loadBuckets}
-            disabled={loading || !selectedAccessKeyId || !secretKey}
-            title="リロード"
-          >
-            ↻
-          </button>
         </div>
 
         <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#1a1a2e', borderRadius: '8px' }}>
@@ -816,14 +813,6 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
     <>
       <div className="header">
         <h2>オブジェクトストレージ</h2>
-        <button
-          className="btn-reload"
-          onClick={loadSites}
-          disabled={loading}
-          title="リロード"
-        >
-          ↻
-        </button>
       </div>
 
       {loading ? (

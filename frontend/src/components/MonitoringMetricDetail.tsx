@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { GetMSMetricsStorageDetail, GetMSMetricsAccessKeys, QueryMSPrometheusPublishers, QueryMSPrometheusMetricsByPublisher, QueryMSPrometheusMetricsWithoutPublisher } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 import { MetricGraph } from './MetricGraph';
 
 const CUSTOM_METRICS_KEY = '__custom__';
@@ -111,6 +112,8 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
     }
   }, [profile, storageId]);
 
+  useGlobalReload(loadData);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -131,18 +134,6 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
     <>
       <div className="header">
         <h2>メトリクスストレージ: {detail.name}</h2>
-        <button
-          className="btn-reload"
-          onClick={() => {
-            setSelectedPublisher(null);
-            setMetrics([]);
-            loadData();
-          }}
-          disabled={loading}
-          title="リロード"
-        >
-          ↻
-        </button>
       </div>
 
       <div style={{ marginBottom: '2rem' }}>

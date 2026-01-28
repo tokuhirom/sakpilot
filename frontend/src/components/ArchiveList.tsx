@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { GetArchives } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
+import { useGlobalReload } from '../hooks/useGlobalReload';
 import { SearchBar } from './SearchBar';
 
 interface ArchiveListProps {
@@ -46,6 +47,8 @@ export function ArchiveList({ profile, zone, zones, onZoneChange }: ArchiveListP
     }
   }, [profile, zone]);
 
+  useGlobalReload(loadArchives);
+
   useEffect(() => {
     loadArchives();
   }, [loadArchives]);
@@ -78,14 +81,6 @@ export function ArchiveList({ profile, zone, zones, onZoneChange }: ArchiveListP
       <div className="header">
         <h2>アーカイブ</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button
-            className="btn-reload"
-            onClick={() => loadArchives()}
-            disabled={loading}
-            title="リロード"
-          >
-            ↻
-          </button>
           <select
             className="zone-select"
             value={zone}
