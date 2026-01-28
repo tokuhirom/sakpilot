@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.0.14](https://github.com/tokuhirom/sakpilot/compare/v0.0.13...v0.0.14) - 2026-01-28
+- feat: add global reload button to top bar by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/41
+
 ## [v0.0.13](https://github.com/tokuhirom/sakpilot/compare/v0.0.12...v0.0.13) - 2026-01-27
 - feat: オブジェクトストレージにJSONLプレビューと検索機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/39
 
