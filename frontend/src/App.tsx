@@ -78,6 +78,7 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
   const { profile } = useParams<{ profile: string }>();
   const navigate = useNavigate();
   const [selectedZone, setSelectedZone] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
 
   // プロファイル変更時にデフォルトゾーンを取得
   useEffect(() => {
@@ -191,6 +192,13 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
               <Route path="bills" element={<span className="breadcrumb-item active">請求</span>} />
             </Routes>
           </div>
+          <button
+            className="btn-reload"
+            onClick={() => setReloadKey(k => k + 1)}
+            title="リロード"
+          >
+            ↻
+          </button>
           {loading ? (
             <div className="auth-info">
               <span className="auth-loading">読み込み中...</span>
@@ -207,7 +215,7 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
           )}
         </div>
 
-        <Routes>
+        <Routes key={reloadKey}>
           <Route path="servers" element={
             <ServerList profile={profile} zone={selectedZone} zones={zones} onZoneChange={setSelectedZone} />
           } />
