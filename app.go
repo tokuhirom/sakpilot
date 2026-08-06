@@ -9,7 +9,7 @@ import (
 	"sakpilot/internal/kms"
 	"sakpilot/internal/sakura"
 
-	"github.com/sacloud/iaas-api-go"
+	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 

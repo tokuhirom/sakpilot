@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	client "github.com/sacloud/api-client-go"
-	ms "github.com/sacloud/monitoring-suite-api-go"
-	v1 "github.com/sacloud/monitoring-suite-api-go/apis/v1"
+	ms "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite"
+	v1 "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite/apis/v1"
+	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 )
 
 type MonitoringService struct {
@@ -26,15 +26,14 @@ func NewMonitoringService(client *Client) *MonitoringService {
 
 func (s *MonitoringService) getMSClient() (*v1.Client, error) {
 	token, secret := s.client.Credentials()
-	return ms.NewClient(
-		func(p *client.ClientParams) {
-			if p.Options == nil {
-				p.Options = &client.Options{}
-			}
-			p.Options.AccessToken = token
-			p.Options.AccessTokenSecret = secret
-		},
-	)
+	var sc saclient.Client
+	if err := sc.SetEnviron([]string{
+		"SAKURA_ACCESS_TOKEN=" + token,
+		"SAKURA_ACCESS_TOKEN_SECRET=" + secret,
+	}); err != nil {
+		return nil, err
+	}
+	return ms.NewClient(&sc)
 }
 
 type MSRoutingInfo struct {
@@ -141,7 +140,7 @@ func (s *MonitoringService) ListLogs(ctx context.Context) ([]MSLogInfo, error) {
 		info := MSRoutingInfo{
 			ID:   fmt.Sprintf("%d", r.ID), //nolint:staticcheck // ID is deprecated but still functional
 			UID:  r.UID.String(),
-			Name: fmt.Sprintf("%s (%s)", r.PublisherCode.Value, r.Variant),
+			Name: fmt.Sprintf("%s (%s)", r.Publisher.Code, r.Variant),
 		}
 		routingMap[r.LogStorage.ID] = append(routingMap[r.LogStorage.ID], info)
 	}
@@ -181,7 +180,7 @@ func (s *MonitoringService) ListMetrics(ctx context.Context) ([]MSMetricInfo, er
 		info := MSRoutingInfo{
 			ID:   fmt.Sprintf("%d", r.ID), //nolint:staticcheck // ID is deprecated but still functional
 			UID:  r.UID.String(),
-			Name: fmt.Sprintf("%s (%s)", r.PublisherCode.Value, r.Variant),
+			Name: fmt.Sprintf("%s (%s)", r.Publisher.Code, r.Variant),
 		}
 		routingMap[r.MetricsStorage.ID] = append(routingMap[r.MetricsStorage.ID], info)
 	}

@@ -4,14 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 
-	v1 "github.com/sacloud/apprun-api-go/apis/v1"
+	"github.com/sacloud/sacloud-sdk-go/api/apprun"
+	v1 "github.com/sacloud/sacloud-sdk-go/api/apprun/apis/v1"
+	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 )
-
-const apiURL = "https://secure.sakura.ad.jp/cloud/api/apprun/1.0/apprun/api"
 
 // profileConfig usacloud プロファイルの設定
 type profileConfig struct {
@@ -21,7 +20,7 @@ type profileConfig struct {
 
 // Service AppRun共用型 API サービス
 type Service struct {
-	client *v1.ClientWithResponses
+	client *v1.Client
 }
 
 // NewService プロファイル名から Service を作成
@@ -38,11 +37,15 @@ func NewService(profileName string) (*Service, error) {
 	}
 	fmt.Printf("[AppRunShared] NewService: profile=%s, token_prefix=%s...\n", profileName, tokenPrefix)
 
-	client, err := v1.NewClientWithResponses(
-		apiURL,
-		v1.WithHTTPClient(http.DefaultClient),
-		v1.WithRequestEditorFn(v1.AppRunAuthInterceptor(cfg.AccessToken, cfg.AccessTokenSecret)),
-	)
+	var sc saclient.Client
+	if err := sc.SetEnviron([]string{
+		"SAKURA_ACCESS_TOKEN=" + cfg.AccessToken,
+		"SAKURA_ACCESS_TOKEN_SECRET=" + cfg.AccessTokenSecret,
+	}); err != nil {
+		return nil, fmt.Errorf("failed to configure apprun-shared client: %w", err)
+	}
+
+	client, err := apprun.NewClient(&sc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create apprun-shared client: %w", err)
 	}
@@ -113,29 +116,20 @@ type TrafficInfo struct {
 // ListApplications アプリケーション一覧を取得
 func (s *Service) ListApplications(ctx context.Context) ([]AppInfo, error) {
 	fmt.Printf("[AppRunShared] ListApplications: calling API...\n")
-	resp, err := s.client.ListApplicationsWithResponse(ctx, nil)
+	applicationOp := apprun.NewApplicationOp(s.client)
+	result, err := applicationOp.List(ctx, nil)
 	if err != nil {
 		fmt.Printf("[AppRunShared] ListApplications: error=%v\n", err)
 		return nil, err
 	}
 
-	if resp.StatusCode() != http.StatusOK {
-		fmt.Printf("[AppRunShared] ListApplications: status=%d\n", resp.StatusCode())
-		return nil, fmt.Errorf("failed to list applications: status=%d", resp.StatusCode())
-	}
-
-	if resp.JSON200 == nil {
-		return []AppInfo{}, nil
-	}
-
-	data := resp.JSON200.Data
-	apps := make([]AppInfo, 0, len(data))
-	for _, a := range data {
+	apps := make([]AppInfo, 0, len(result.Data))
+	for _, a := range result.Data {
 		apps = append(apps, AppInfo{
-			ID:        a.Id,
+			ID:        a.ID,
 			Name:      a.Name,
 			Status:    string(a.Status),
-			PublicURL: a.PublicUrl,
+			PublicURL: a.PublicURL,
 			CreatedAt: a.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
@@ -147,42 +141,32 @@ func (s *Service) ListApplications(ctx context.Context) ([]AppInfo, error) {
 // GetApplication アプリケーション詳細を取得
 func (s *Service) GetApplication(ctx context.Context, appID string) (*AppDetailInfo, error) {
 	fmt.Printf("[AppRunShared] GetApplication: id=%s\n", appID)
-	resp, err := s.client.GetApplicationWithResponse(ctx, appID)
+	applicationOp := apprun.NewApplicationOp(s.client)
+	a, err := applicationOp.Read(ctx, appID)
 	if err != nil {
 		fmt.Printf("[AppRunShared] GetApplication: error=%v\n", err)
 		return nil, err
 	}
 
-	if resp.StatusCode() != http.StatusOK {
-		fmt.Printf("[AppRunShared] GetApplication: status=%d\n", resp.StatusCode())
-		return nil, fmt.Errorf("failed to get application: status=%d", resp.StatusCode())
-	}
-
-	if resp.JSON200 == nil {
-		return nil, fmt.Errorf("application not found")
-	}
-
-	a := resp.JSON200
-
 	components := make([]ComponentInfo, 0, len(a.Components))
 	for _, c := range a.Components {
 		image := ""
-		if c.DeploySource.ContainerRegistry != nil {
-			image = c.DeploySource.ContainerRegistry.Image
+		if registry, ok := c.DeploySource.ContainerRegistry.Get(); ok {
+			image = registry.Image
 		}
 		components = append(components, ComponentInfo{
 			Name:      c.Name,
 			Image:     image,
-			MaxCPU:    c.MaxCpu,
+			MaxCPU:    c.MaxCPU,
 			MaxMemory: c.MaxMemory,
 		})
 	}
 
 	return &AppDetailInfo{
-		ID:             a.Id,
+		ID:             a.ID,
 		Name:           a.Name,
 		Status:         string(a.Status),
-		PublicURL:      a.PublicUrl,
+		PublicURL:      a.PublicURL,
 		Port:           a.Port,
 		MinScale:       a.MinScale,
 		MaxScale:       a.MaxScale,
@@ -195,47 +179,30 @@ func (s *Service) GetApplication(ctx context.Context, appID string) (*AppDetailI
 // GetApplicationStatus アプリケーションのステータスを取得
 func (s *Service) GetApplicationStatus(ctx context.Context, appID string) (string, error) {
 	fmt.Printf("[AppRunShared] GetApplicationStatus: id=%s\n", appID)
-	resp, err := s.client.GetApplicationStatusWithResponse(ctx, appID)
+	applicationOp := apprun.NewApplicationOp(s.client)
+	status, err := applicationOp.ReadStatus(ctx, appID)
 	if err != nil {
 		fmt.Printf("[AppRunShared] GetApplicationStatus: error=%v\n", err)
 		return "", err
 	}
 
-	if resp.StatusCode() != http.StatusOK {
-		fmt.Printf("[AppRunShared] GetApplicationStatus: status=%d\n", resp.StatusCode())
-		return "", fmt.Errorf("failed to get application status: status=%d", resp.StatusCode())
-	}
-
-	if resp.JSON200 == nil {
-		return "", nil
-	}
-
-	return string(resp.JSON200.Status), nil
+	return string(status.Status), nil
 }
 
 // ListVersions バージョン一覧を取得
 func (s *Service) ListVersions(ctx context.Context, appID string) ([]VersionInfo, error) {
 	fmt.Printf("[AppRunShared] ListVersions: appID=%s\n", appID)
-	resp, err := s.client.ListApplicationVersionsWithResponse(ctx, appID, nil)
+	versionOp := apprun.NewVersionOp(s.client)
+	result, err := versionOp.List(ctx, appID, nil)
 	if err != nil {
 		fmt.Printf("[AppRunShared] ListVersions: error=%v\n", err)
 		return nil, err
 	}
 
-	if resp.StatusCode() != http.StatusOK {
-		fmt.Printf("[AppRunShared] ListVersions: status=%d\n", resp.StatusCode())
-		return nil, fmt.Errorf("failed to list versions: status=%d", resp.StatusCode())
-	}
-
-	if resp.JSON200 == nil {
-		return []VersionInfo{}, nil
-	}
-
-	data := resp.JSON200.Data
-	versions := make([]VersionInfo, 0, len(data))
-	for _, v := range data {
+	versions := make([]VersionInfo, 0, len(result.Data))
+	for _, v := range result.Data {
 		versions = append(versions, VersionInfo{
-			ID:        v.Id,
+			ID:        v.ID,
 			Name:      v.Name,
 			Status:    string(v.Status),
 			CreatedAt: v.CreatedAt.Format("2006-01-02 15:04:05"),
@@ -249,36 +216,20 @@ func (s *Service) ListVersions(ctx context.Context, appID string) ([]VersionInfo
 // ListTraffics トラフィック分散情報を取得
 func (s *Service) ListTraffics(ctx context.Context, appID string) ([]TrafficInfo, error) {
 	fmt.Printf("[AppRunShared] ListTraffics: appID=%s\n", appID)
-	resp, err := s.client.ListApplicationTrafficsWithResponse(ctx, appID)
+	trafficOp := apprun.NewTrafficOp(s.client)
+	result, err := trafficOp.List(ctx, appID)
 	if err != nil {
 		fmt.Printf("[AppRunShared] ListTraffics: error=%v\n", err)
 		return nil, err
 	}
 
-	if resp.StatusCode() != http.StatusOK {
-		fmt.Printf("[AppRunShared] ListTraffics: status=%d\n", resp.StatusCode())
-		return nil, fmt.Errorf("failed to list traffics: status=%d", resp.StatusCode())
-	}
-
-	if resp.JSON200 == nil {
-		return []TrafficInfo{}, nil
-	}
-
-	data := resp.JSON200.Data
-	traffics := make([]TrafficInfo, 0, len(data))
-	for _, t := range data {
-		info := TrafficInfo{}
-
-		// Try to get as TrafficWithVersionName first
-		if vn, err := t.AsTrafficWithVersionName(); err == nil {
-			info.VersionName = vn.VersionName
-			info.Percent = vn.Percent
-		} else if lv, err := t.AsTrafficWithLatestVersion(); err == nil {
-			info.IsLatestVersion = lv.IsLatestVersion
-			info.Percent = lv.Percent
-		}
-
-		traffics = append(traffics, info)
+	traffics := make([]TrafficInfo, 0, len(result.Data))
+	for _, t := range result.Data {
+		traffics = append(traffics, TrafficInfo{
+			VersionName:     t.VersionName,
+			IsLatestVersion: t.IsLatestVersion,
+			Percent:         t.Percent,
+		})
 	}
 
 	fmt.Printf("[AppRunShared] ListTraffics: got %d traffic entries\n", len(traffics))
@@ -288,18 +239,15 @@ func (s *Service) ListTraffics(ctx context.Context, appID string) ([]TrafficInfo
 // HasUser ユーザーが存在するか確認
 func (s *Service) HasUser(ctx context.Context) (bool, error) {
 	fmt.Printf("[AppRunShared] HasUser: checking...\n")
-	resp, err := s.client.GetUserWithResponse(ctx)
+	userOp := apprun.NewUserOp(s.client)
+	_, err := userOp.Read(ctx)
 	if err != nil {
+		if saclient.IsNotFoundError(err) {
+			return false, nil
+		}
 		fmt.Printf("[AppRunShared] HasUser: error=%v\n", err)
 		return false, err
 	}
 
-	if resp.StatusCode() == http.StatusOK {
-		return true, nil
-	}
-	if resp.StatusCode() == http.StatusNotFound {
-		return false, nil
-	}
-
-	return false, fmt.Errorf("failed to check user: status=%d", resp.StatusCode())
+	return true, nil
 }

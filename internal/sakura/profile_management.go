@@ -4,13 +4,16 @@ import (
 	"context"
 	"os"
 
-	"github.com/sacloud/iaas-api-go"
-	"github.com/sacloud/saclient-go"
+	"github.com/sacloud/sacloud-sdk-go/api/iaas"
+	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 )
 
 // CreateProfile creates a new profile with the given credentials
 func CreateProfile(name, accessToken, accessTokenSecret, zone string) error {
-	op := saclient.NewProfileOp(os.Environ())
+	op, err := saclient.NewProfileOp(os.Environ())
+	if err != nil {
+		return err
+	}
 
 	profile := &saclient.Profile{
 		Name: name,
@@ -25,14 +28,20 @@ func CreateProfile(name, accessToken, accessTokenSecret, zone string) error {
 
 // DeleteProfile deletes the profile with the given name
 func DeleteProfile(name string) error {
-	op := saclient.NewProfileOp(os.Environ())
+	op, err := saclient.NewProfileOp(os.Environ())
+	if err != nil {
+		return err
+	}
 	return op.Delete(name)
 }
 
 // UpdateProfile updates an existing profile with the given credentials
 // If newName is different from oldName, the profile will be renamed
 func UpdateProfile(oldName, newName, accessToken, accessTokenSecret, zone string) error {
-	op := saclient.NewProfileOp(os.Environ())
+	op, err := saclient.NewProfileOp(os.Environ())
+	if err != nil {
+		return err
+	}
 
 	if oldName != newName {
 		// Rename: create new profile and delete old one
@@ -69,7 +78,7 @@ func UpdateProfile(oldName, newName, accessToken, accessTokenSecret, zone string
 			"Zone":              zone,
 		},
 	}
-	_, err := op.Update(profile)
+	_, err = op.Update(profile)
 	return err
 }
 
@@ -95,7 +104,10 @@ func GetProfileCredentials(name string) (*ProfileCredentials, error) {
 
 // SetCurrentProfile sets the current profile name
 func SetCurrentProfile(name string) error {
-	op := saclient.NewProfileOp(os.Environ())
+	op, err := saclient.NewProfileOp(os.Environ())
+	if err != nil {
+		return err
+	}
 	return op.SetCurrentName(name)
 }
 
