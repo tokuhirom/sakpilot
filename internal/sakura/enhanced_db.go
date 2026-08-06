@@ -3,7 +3,7 @@ package sakura
 import (
 	"context"
 
-	"github.com/sacloud/iaas-api-go"
+	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 )
 
 type EnhancedDBInfo struct {
