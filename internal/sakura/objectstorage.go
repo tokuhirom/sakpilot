@@ -14,13 +14,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	objectstorage "github.com/sacloud/object-storage-api-go"
-	ossbucket "github.com/sacloud/object-storage-service-go/bucket"
+	objectstorage "github.com/sacloud/sacloud-sdk-go/api/object-storage"
+	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 )
 
 type ObjectStorageService struct {
-	client     *objectstorage.Client
-	ossClient  *objectstorage.Client
+	token  string
+	secret string
 }
 
 type SiteInfo struct {
@@ -57,18 +57,49 @@ type ListObjectsResult struct {
 
 func NewObjectStorageService(c *Client) *ObjectStorageService {
 	token, secret := c.Credentials()
-	osClient := &objectstorage.Client{
-		Token:  token,
-		Secret: secret,
-	}
 	return &ObjectStorageService{
-		client:    osClient,
-		ossClient: osClient,
+		token:  token,
+		secret: secret,
 	}
 }
 
+// saclientAPI builds a fresh saclient.Client authenticated with this
+// service's Sakura Cloud API token/secret via the SAKURA_ACCESS_TOKEN{,_SECRET}
+// environment convention (the only credential path reachable from outside
+// the sacloud-sdk-go module, since the compat option types are internal).
+func (s *ObjectStorageService) saclientAPI() (saclient.ClientAPI, error) {
+	var sc saclient.Client
+	if err := sc.SetEnviron([]string{
+		"SAKURA_ACCESS_TOKEN=" + s.token,
+		"SAKURA_ACCESS_TOKEN_SECRET=" + s.secret,
+	}); err != nil {
+		return nil, err
+	}
+	return &sc, nil
+}
+
+func (s *ObjectStorageService) fedClient() (*objectstorage.FedClient, error) {
+	sc, err := s.saclientAPI()
+	if err != nil {
+		return nil, err
+	}
+	return objectstorage.NewFedClient(sc)
+}
+
+func (s *ObjectStorageService) siteClient(siteID string) (*objectstorage.SiteClient, error) {
+	sc, err := s.saclientAPI()
+	if err != nil {
+		return nil, err
+	}
+	return objectstorage.NewSiteClient(sc, siteID)
+}
+
 func (s *ObjectStorageService) ListSites(ctx context.Context) ([]SiteInfo, error) {
-	siteOp := objectstorage.NewSiteOp(s.client)
+	fedClient, err := s.fedClient()
+	if err != nil {
+		return nil, err
+	}
+	siteOp := objectstorage.NewSiteOp(fedClient)
 	sites, err := siteOp.List(ctx)
 	if err != nil {
 		return nil, err
@@ -77,17 +108,21 @@ func (s *ObjectStorageService) ListSites(ctx context.Context) ([]SiteInfo, error
 	result := make([]SiteInfo, 0, len(sites))
 	for _, site := range sites {
 		result = append(result, SiteInfo{
-			ID:          site.Id,
-			DisplayName: site.DisplayNameJa,
-			Endpoint:    site.S3Endpoint,
+			ID:          site.ID.Or(""),
+			DisplayName: site.DisplayNameJa.Or(""),
+			Endpoint:    site.S3Endpoint.Or(""),
 		})
 	}
 	return result, nil
 }
 
 func (s *ObjectStorageService) ListAccessKeys(ctx context.Context, siteID string) ([]AccessKeyInfo, error) {
-	accountOp := objectstorage.NewAccountOp(s.client)
-	keys, err := accountOp.ListAccessKeys(ctx, siteID)
+	siteClient, err := s.siteClient(siteID)
+	if err != nil {
+		return nil, err
+	}
+	accountOp := objectstorage.NewAccountOp(siteClient)
+	keys, err := accountOp.ListAccessKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -95,12 +130,14 @@ func (s *ObjectStorageService) ListAccessKeys(ctx context.Context, siteID string
 	result := make([]AccessKeyInfo, 0, len(keys))
 	for _, key := range keys {
 		createdAt := ""
-		t := time.Time(key.CreatedAt)
-		if !t.IsZero() {
-			createdAt = t.Format(time.RFC3339)
+		if v, ok := key.CreatedAt.Get(); ok {
+			t := time.Time(v)
+			if !t.IsZero() {
+				createdAt = t.Format(time.RFC3339)
+			}
 		}
 		result = append(result, AccessKeyInfo{
-			ID:        string(key.Id),
+			ID:        string(key.ID.Or("")),
 			SiteID:    siteID,
 			CreatedAt: createdAt,
 		})
@@ -111,25 +148,48 @@ func (s *ObjectStorageService) ListAccessKeys(ctx context.Context, siteID string
 // ListBuckets requires Object Storage access key (not API token)
 // accessKey and secretKey are Object Storage specific credentials
 func (s *ObjectStorageService) ListBuckets(ctx context.Context, siteID, accessKey, secretKey string) ([]BucketInfo, error) {
-	bucketSvc := ossbucket.New(s.ossClient)
-	req := &ossbucket.FindRequest{
-		SiteId:    siteID,
-		AccessKey: accessKey,
-		SecretKey: secretKey,
+	fedClient, err := s.fedClient()
+	if err != nil {
+		return nil, err
 	}
-	buckets, err := bucketSvc.FindWithContext(ctx, req)
+	siteOp := objectstorage.NewSiteOp(fedClient)
+	site, err := siteOp.Read(ctx, siteID)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make([]BucketInfo, 0, len(buckets))
-	for _, bucket := range buckets {
+	endpoint := site.S3Endpoint.Or("")
+	if !strings.HasPrefix(endpoint, "https://") && !strings.HasPrefix(endpoint, "http://") {
+		endpoint = "https://" + endpoint
+	}
+
+	cfg := aws.Config{
+		Region: "jp-north-1", // Sakura Cloud region (doesn't really matter for object storage)
+		Credentials: credentials.NewStaticCredentialsProvider(
+			accessKey,
+			secretKey,
+			"",
+		),
+	}
+
+	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+		o.BaseEndpoint = aws.String(endpoint)
+		o.UsePathStyle = true // Required for S3-compatible services
+	})
+
+	output, err := client.ListBuckets(ctx, &s3.ListBucketsInput{})
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]BucketInfo, 0, len(output.Buckets))
+	for _, bucket := range output.Buckets {
 		creationDate := ""
 		if bucket.CreationDate != nil {
 			creationDate = bucket.CreationDate.Format("2006-01-02T15:04:05Z07:00")
 		}
 		result = append(result, BucketInfo{
-			Name:         bucket.Name,
+			Name:         aws.ToString(bucket.Name),
 			SiteID:       siteID,
 			CreationDate: creationDate,
 		})
