@@ -69,10 +69,11 @@ func NewObjectStorageService(c *Client) *ObjectStorageService {
 // the sacloud-sdk-go module, since the compat option types are internal).
 func (s *ObjectStorageService) saclientAPI() (saclient.ClientAPI, error) {
 	var sc saclient.Client
-	if err := sc.SetEnviron([]string{
-		"SAKURA_ACCESS_TOKEN=" + s.token,
-		"SAKURA_ACCESS_TOKEN_SECRET=" + s.secret,
-	}); err != nil {
+	env := append(os.Environ(),
+		"SAKURA_ACCESS_TOKEN="+s.token,
+		"SAKURA_ACCESS_TOKEN_SECRET="+s.secret,
+	)
+	if err := sc.SetEnviron(env); err != nil {
 		return nil, err
 	}
 	return &sc, nil

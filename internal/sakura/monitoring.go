@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -27,10 +28,11 @@ func NewMonitoringService(client *Client) *MonitoringService {
 func (s *MonitoringService) getMSClient() (*v1.Client, error) {
 	token, secret := s.client.Credentials()
 	var sc saclient.Client
-	if err := sc.SetEnviron([]string{
-		"SAKURA_ACCESS_TOKEN=" + token,
-		"SAKURA_ACCESS_TOKEN_SECRET=" + secret,
-	}); err != nil {
+	env := append(os.Environ(),
+		"SAKURA_ACCESS_TOKEN="+token,
+		"SAKURA_ACCESS_TOKEN_SECRET="+secret,
+	)
+	if err := sc.SetEnviron(env); err != nil {
 		return nil, err
 	}
 	return ms.NewClient(&sc)
