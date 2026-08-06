@@ -1,57 +1,18 @@
 package apprun
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/google/uuid"
-	ht "github.com/ogen-go/ogen/http"
+	apprundedicated "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated"
+	v1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
+	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 )
-
-// loggingClient wraps http.Client to log request/response
-type loggingClient struct {
-	client       ht.Client
-	lastRequest  string
-	lastResponse string
-}
-
-func (l *loggingClient) Do(req *http.Request) (*http.Response, error) {
-	l.lastRequest = fmt.Sprintf("%s %s", req.Method, req.URL.String())
-
-	resp, err := l.client.Do(req)
-	if err != nil {
-		l.lastResponse = fmt.Sprintf("error: %v", err)
-		return nil, err
-	}
-
-	// レスポンスボディを読み取って保存
-	body, err := io.ReadAll(resp.Body)
-	_ = resp.Body.Close()
-	if err != nil {
-		l.lastResponse = fmt.Sprintf("failed to read body: %v", err)
-		return nil, err
-	}
-
-	l.lastResponse = string(body)
-
-	// ボディを再構築して返す
-	resp.Body = io.NopCloser(bytes.NewReader(body))
-	return resp, nil
-}
-
-func (l *loggingClient) LogLastRequestResponse() {
-	fmt.Printf("[AppRun HTTP] Request: %s\n", l.lastRequest)
-	fmt.Printf("[AppRun HTTP] Response: %s\n", l.lastResponse)
-}
-
-const apiURL = "https://secure.sakura.ad.jp/cloud/api/apprun-dedicated/1.0"
 
 // profileConfig usacloud プロファイルの設定
 type profileConfig struct {
@@ -59,23 +20,9 @@ type profileConfig struct {
 	AccessTokenSecret string `json:"AccessTokenSecret"`
 }
 
-// authSource SecuritySource の実装
-type authSource struct {
-	token  string
-	secret string
-}
-
-func (a *authSource) BasicAuth(ctx context.Context, operationName OperationName) (BasicAuth, error) {
-	return BasicAuth{
-		Username: a.token,
-		Password: a.secret,
-	}, nil
-}
-
-// Service AppRun API サービス
+// Service AppRun Dedicated API サービス
 type Service struct {
-	client     *Client
-	httpClient *loggingClient
+	client *v1.Client
 }
 
 // NewService プロファイル名から Service を作成
@@ -92,19 +39,21 @@ func NewService(profileName string) (*Service, error) {
 	}
 	fmt.Printf("[AppRun] NewService: profile=%s, token_prefix=%s...\n", profileName, tokenPrefix)
 
-	auth := &authSource{
-		token:  cfg.AccessToken,
-		secret: cfg.AccessTokenSecret,
+	var sc saclient.Client
+	env := append(os.Environ(),
+		"SAKURA_ACCESS_TOKEN="+cfg.AccessToken,
+		"SAKURA_ACCESS_TOKEN_SECRET="+cfg.AccessTokenSecret,
+	)
+	if err := sc.SetEnviron(env); err != nil {
+		return nil, fmt.Errorf("failed to configure apprun-dedicated client: %w", err)
 	}
 
-	// ログ出力するHTTPクライアントを使用
-	httpClient := &loggingClient{client: http.DefaultClient}
-	client, err := NewClient(apiURL, auth, WithClient(httpClient))
+	client, err := apprundedicated.NewClient(&sc)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create apprun client: %w", err)
+		return nil, fmt.Errorf("failed to create apprun-dedicated client: %w", err)
 	}
 
-	return &Service{client: client, httpClient: httpClient}, nil
+	return &Service{client: client}, nil
 }
 
 func loadProfileConfig(profileName string) (*profileConfig, error) {
@@ -179,13 +128,13 @@ type AppVersionDetailInfo struct {
 
 // ASGInfo Auto Scaling Group 情報
 type ASGInfo struct {
-	ID              string          `json:"id"`
-	Name            string          `json:"name"`
-	Zone            string          `json:"zone"`
-	MinNodes        int             `json:"minNodes"`
-	MaxNodes        int             `json:"maxNodes"`
-	WorkerNodeCount int             `json:"workerNodeCount"`
-	Interfaces      []ASGInterface  `json:"interfaces"`
+	ID              string         `json:"id"`
+	Name            string         `json:"name"`
+	Zone            string         `json:"zone"`
+	MinNodes        int            `json:"minNodes"`
+	MaxNodes        int            `json:"maxNodes"`
+	WorkerNodeCount int            `json:"workerNodeCount"`
+	Interfaces      []ASGInterface `json:"interfaces"`
 }
 
 // ASGInterface ASGのインターフェース情報
@@ -203,9 +152,9 @@ type LBInfo struct {
 
 // WorkerNodeInfo ワーカーノード情報
 type WorkerNodeInfo struct {
-	ID         string              `json:"id"`
-	Status     string              `json:"status"`
-	Draining   bool                `json:"draining"`
+	ID         string                `json:"id"`
+	Status     string                `json:"status"`
+	Draining   bool                  `json:"draining"`
 	Interfaces []WorkerNodeInterface `json:"interfaces"`
 }
 
@@ -217,9 +166,9 @@ type WorkerNodeInterface struct {
 
 // LBNodeInfo ロードバランサーノード情報
 type LBNodeInfo struct {
-	ID         string              `json:"id"`
-	Status     string              `json:"status"`
-	Interfaces []LBNodeInterface   `json:"interfaces"`
+	ID         string            `json:"id"`
+	Status     string            `json:"status"`
+	Interfaces []LBNodeInterface `json:"interfaces"`
 }
 
 // LBNodeInterface LBノードのインターフェース
@@ -230,19 +179,14 @@ type LBNodeInterface struct {
 
 // ListClusters クラスタ一覧を取得
 func (s *Service) ListClusters(ctx context.Context) ([]ClusterInfo, error) {
-	fmt.Printf("[AppRun] ListClusters: calling API...\n")
-	resp, err := s.client.ListClusters(ctx, ListClustersParams{
-		MaxItems: 30, // 最小値は5、最大30
-	})
+	clusterOp := apprundedicated.NewClusterOp(s.client)
+	list, _, err := clusterOp.List(ctx, 30, nil) // 最小値は5、最大30
 	if err != nil {
-		fmt.Printf("[AppRun] ListClusters: error=%v\n", err)
 		return nil, err
 	}
 
-	fmt.Printf("[AppRun] ListClusters: got %d clusters\n", len(resp.Clusters))
-	clusters := make([]ClusterInfo, 0, len(resp.Clusters))
-	for _, c := range resp.Clusters {
-		fmt.Printf("[AppRun] ListClusters: cluster id=%s, name=%s\n", uuid.UUID(c.ClusterID).String(), c.Name)
+	clusters := make([]ClusterInfo, 0, len(list))
+	for _, c := range list {
 		clusters = append(clusters, ClusterInfo{
 			ID:   uuid.UUID(c.ClusterID).String(),
 			Name: c.Name,
@@ -253,24 +197,27 @@ func (s *Service) ListClusters(ctx context.Context) ([]ClusterInfo, error) {
 
 // ListApplications アプリケーション一覧を取得
 func (s *Service) ListApplications(ctx context.Context, clusterID string) ([]AppInfo, error) {
-	params := ListApplicationsParams{
-		MaxItems: 30, // 最小1、最大30
-	}
+	var filterClusterID *v1.ClusterID
 	if clusterID != "" {
 		id, err := uuid.Parse(clusterID)
 		if err != nil {
 			return nil, err
 		}
-		params.ClusterID.SetTo(ClusterID(id))
+		cid := v1.ClusterID(id)
+		filterClusterID = &cid
 	}
 
-	resp, err := s.client.ListApplications(ctx, params)
+	applicationOp := apprundedicated.NewApplicationOp(s.client)
+	list, _, err := applicationOp.List(ctx, 30, nil) // 最小1、最大30
 	if err != nil {
 		return nil, err
 	}
 
-	apps := make([]AppInfo, 0, len(resp.Applications))
-	for _, a := range resp.Applications {
+	apps := make([]AppInfo, 0, len(list))
+	for _, a := range list {
+		if filterClusterID != nil && a.ClusterID != *filterClusterID {
+			continue
+		}
 		activeVersion := 0
 		if !a.ActiveVersion.Null {
 			activeVersion = int(a.ActiveVersion.Value)
@@ -292,16 +239,14 @@ func (s *Service) ListApplicationVersions(ctx context.Context, applicationID str
 		return nil, err
 	}
 
-	resp, err := s.client.ListApplicationVersions(ctx, ListApplicationVersionsParams{
-		ApplicationID: ApplicationID(appID),
-		MaxItems:      30, // 最小1、最大30
-	})
+	versionOp := apprundedicated.NewVersionOp(s.client, v1.ApplicationID(appID))
+	list, _, err := versionOp.List(ctx, 30, nil) // 最小1、最大30
 	if err != nil {
 		return nil, err
 	}
 
-	versions := make([]AppVersionInfo, 0, len(resp.Versions))
-	for _, v := range resp.Versions {
+	versions := make([]AppVersionInfo, 0, len(list))
+	for _, v := range list {
 		// Unix timestamp を日時文字列に変換
 		createdAt := time.Unix(int64(v.Created), 0).Format("2006-01-02 15:04:05")
 		versions = append(versions, AppVersionInfo{
@@ -321,22 +266,19 @@ func (s *Service) GetApplicationVersion(ctx context.Context, applicationID strin
 		return nil, err
 	}
 
-	resp, err := s.client.GetApplicationVersion(ctx, GetApplicationVersionParams{
-		ApplicationID: ApplicationID(appID),
-		Version:       ApplicationVersionNumber(version),
-	})
+	versionOp := apprundedicated.NewVersionOp(s.client, v1.ApplicationID(appID))
+	v, err := versionOp.Read(ctx, v1.ApplicationVersionNumber(version))
 	if err != nil {
 		return nil, err
 	}
 
-	v := resp.ApplicationVersion
 	createdAt := time.Unix(int64(v.Created), 0).Format("2006-01-02 15:04:05")
 
 	exposedPorts := make([]ExposedPortInfo, 0, len(v.ExposedPorts))
 	for _, p := range v.ExposedPorts {
 		lbPort := 0
-		if !p.LoadBalancerPort.Null {
-			lbPort = int(p.LoadBalancerPort.Value)
+		if p.LoadBalancerPort != nil {
+			lbPort = int(*p.LoadBalancerPort)
 		}
 		hosts := ""
 		if len(p.Host) > 0 {
@@ -350,11 +292,15 @@ func (s *Service) GetApplicationVersion(ctx context.Context, applicationID strin
 		})
 	}
 
-	envVars := make([]EnvVarInfo, 0, len(v.Env))
-	for _, e := range v.Env {
+	envVars := make([]EnvVarInfo, 0, len(v.EnvVars))
+	for _, e := range v.EnvVars {
+		value := ""
+		if e.Value != nil {
+			value = *e.Value
+		}
 		envVars = append(envVars, EnvVarInfo{
 			Key:    e.Key,
-			Value:  e.Value.Value,
+			Value:  value,
 			Secret: e.Secret,
 		})
 	}
@@ -364,11 +310,11 @@ func (s *Service) GetApplicationVersion(ctx context.Context, applicationID strin
 		CPU:               int(v.CPU),
 		Memory:            int(v.Memory),
 		ScalingMode:       string(v.ScalingMode),
-		FixedScale:        int(v.FixedScale.Value),
-		MinScale:          int(v.MinScale.Value),
-		MaxScale:          int(v.MaxScale.Value),
-		ScaleInThreshold:  int(v.ScaleInThreshold.Value),
-		ScaleOutThreshold: int(v.ScaleOutThreshold.Value),
+		FixedScale:        int32OrZero(v.FixedScale),
+		MinScale:          int32OrZero(v.MinScale),
+		MaxScale:          int32OrZero(v.MaxScale),
+		ScaleInThreshold:  int32OrZero(v.ScaleInThreshold),
+		ScaleOutThreshold: int32OrZero(v.ScaleOutThreshold),
 		Image:             v.Image,
 		Cmd:               v.Cmd,
 		ActiveNodeCount:   int(v.ActiveNodeCount),
@@ -378,6 +324,13 @@ func (s *Service) GetApplicationVersion(ctx context.Context, applicationID strin
 	}, nil
 }
 
+func int32OrZero(p *int32) int {
+	if p == nil {
+		return 0
+	}
+	return int(*p)
+}
+
 // SetActiveVersion アプリケーションのアクティブバージョンを設定
 func (s *Service) SetActiveVersion(ctx context.Context, applicationID string, version int) error {
 	appID, err := uuid.Parse(applicationID)
@@ -385,12 +338,9 @@ func (s *Service) SetActiveVersion(ctx context.Context, applicationID string, ve
 		return err
 	}
 
-	req := &UpdateApplication{}
-	req.ActiveVersion.SetTo(int32(version))
-
-	return s.client.UpdateApplication(ctx, req, UpdateApplicationParams{
-		ApplicationID: ApplicationID(appID),
-	})
+	toVersion := int32(version)
+	applicationOp := apprundedicated.NewApplicationOp(s.client)
+	return applicationOp.Update(ctx, v1.ApplicationID(appID), &toVersion)
 }
 
 // ClearActiveVersion アプリケーションのアクティブバージョンをクリア（nullに設定）
@@ -400,12 +350,8 @@ func (s *Service) ClearActiveVersion(ctx context.Context, applicationID string) 
 		return err
 	}
 
-	req := &UpdateApplication{}
-	req.ActiveVersion.SetToNull()
-
-	return s.client.UpdateApplication(ctx, req, UpdateApplicationParams{
-		ApplicationID: ApplicationID(appID),
-	})
+	applicationOp := apprundedicated.NewApplicationOp(s.client)
+	return applicationOp.Update(ctx, v1.ApplicationID(appID), nil)
 }
 
 // ListAutoScalingGroups ASG 一覧を取得
@@ -415,18 +361,15 @@ func (s *Service) ListAutoScalingGroups(ctx context.Context, clusterID string) (
 		return nil, err
 	}
 
-	resp, err := s.client.ListAutoScalingGroups(ctx, ListAutoScalingGroupsParams{
-		ClusterID: ClusterID(cID),
-		MaxItems:  30, // 最小1、最大30
-	})
+	asgOp := apprundedicated.NewAutoScalingGroupOp(s.client, v1.ClusterID(cID))
+	list, _, err := asgOp.List(ctx, 30, nil) // 最小1、最大30
 	if err != nil {
 		fmt.Printf("[AppRun] ListAutoScalingGroups error: %v\n", err)
-		s.httpClient.LogLastRequestResponse()
 		return nil, err
 	}
 
-	asgs := make([]ASGInfo, 0, len(resp.AutoScalingGroups))
-	for _, a := range resp.AutoScalingGroups {
+	asgs := make([]ASGInfo, 0, len(list))
+	for _, a := range list {
 		interfaces := make([]ASGInterface, 0, len(a.Interfaces))
 		for _, iface := range a.Interfaces {
 			interfaces = append(interfaces, ASGInterface{
@@ -458,17 +401,14 @@ func (s *Service) ListLoadBalancers(ctx context.Context, clusterID, asgID string
 		return nil, err
 	}
 
-	resp, err := s.client.ListLoadBalancers(ctx, ListLoadBalancersParams{
-		ClusterID:          ClusterID(cID),
-		AutoScalingGroupID: AutoScalingGroupID(aID),
-		MaxItems:           30, // 最小2、最大30
-	})
+	lbOp := apprundedicated.NewLoadBalancerOp(s.client, v1.ClusterID(cID), v1.AutoScalingGroupID(aID))
+	list, _, err := lbOp.List(ctx, 30, nil) // 最小2、最大30
 	if err != nil {
 		return nil, err
 	}
 
-	lbs := make([]LBInfo, 0, len(resp.LoadBalancers))
-	for _, lb := range resp.LoadBalancers {
+	lbs := make([]LBInfo, 0, len(list))
+	for _, lb := range list {
 		lbs = append(lbs, LBInfo{
 			ID:               uuid.UUID(lb.LoadBalancerID).String(),
 			Name:             lb.Name,
@@ -489,26 +429,19 @@ func (s *Service) ListWorkerNodes(ctx context.Context, clusterID, asgID string) 
 		return nil, err
 	}
 
-	resp, err := s.client.ListWorkerNodes(ctx, ListWorkerNodesParams{
-		ClusterID:          ClusterID(cID),
-		AutoScalingGroupID: AutoScalingGroupID(aID),
-		MaxItems:           100, // 最小2、最大100
-	})
+	workerNodeOp := apprundedicated.NewWorkerNodeOp(s.client, v1.ClusterID(cID), v1.AutoScalingGroupID(aID))
+	list, _, err := workerNodeOp.List(ctx, 100, nil) // 最小2、最大100
 	if err != nil {
 		return nil, err
 	}
 
-	nodes := make([]WorkerNodeInfo, 0, len(resp.WorkerNodes))
-	for _, n := range resp.WorkerNodes {
+	nodes := make([]WorkerNodeInfo, 0, len(list))
+	for _, n := range list {
 		interfaces := make([]WorkerNodeInterface, 0, len(n.NetworkInterfaces))
 		for _, iface := range n.NetworkInterfaces {
-			addrs := make([]string, 0, len(iface.Addresses))
-			for _, addr := range iface.Addresses {
-				addrs = append(addrs, addr.Address)
-			}
 			interfaces = append(interfaces, WorkerNodeInterface{
 				Index:     int(iface.InterfaceIndex),
-				Addresses: addrs,
+				Addresses: iface.Addresses,
 			})
 		}
 		nodes = append(nodes, WorkerNodeInfo{
@@ -536,18 +469,14 @@ func (s *Service) ListLoadBalancerNodes(ctx context.Context, clusterID, asgID, l
 		return nil, err
 	}
 
-	resp, err := s.client.ListLoadBalancerNodes(ctx, ListLoadBalancerNodesParams{
-		ClusterID:          ClusterID(cID),
-		AutoScalingGroupID: AutoScalingGroupID(aID),
-		LoadBalancerID:     LoadBalancerID(loadBalancerID),
-		MaxItems:           30, // 最小2、最大30
-	})
+	lbOp := apprundedicated.NewLoadBalancerOp(s.client, v1.ClusterID(cID), v1.AutoScalingGroupID(aID))
+	list, err := lbOp.ListNodes(ctx, v1.LoadBalancerID(loadBalancerID), 30, nil) // 最小2、最大30
 	if err != nil {
 		return nil, err
 	}
 
-	nodes := make([]LBNodeInfo, 0, len(resp.LoadBalancerNodes))
-	for _, n := range resp.LoadBalancerNodes {
+	nodes := make([]LBNodeInfo, 0, len(list))
+	for _, n := range list {
 		interfaces := make([]LBNodeInterface, 0, len(n.Interfaces))
 		for _, iface := range n.Interfaces {
 			addrs := make([]string, 0, len(iface.Addresses))

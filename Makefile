@@ -1,9 +1,4 @@
-.PHONY: generate ogen build lint
-
-generate: ogen
-
-ogen:
-	ogen --target internal/apprun --package apprun --clean openapis/apprun-dedicated.json
+.PHONY: build lint
 
 build:
 	go build ./...
