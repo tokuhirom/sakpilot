@@ -38,10 +38,11 @@ func NewService(profileName string) (*Service, error) {
 	fmt.Printf("[AppRunShared] NewService: profile=%s, token_prefix=%s...\n", profileName, tokenPrefix)
 
 	var sc saclient.Client
-	if err := sc.SetEnviron([]string{
-		"SAKURA_ACCESS_TOKEN=" + cfg.AccessToken,
-		"SAKURA_ACCESS_TOKEN_SECRET=" + cfg.AccessTokenSecret,
-	}); err != nil {
+	env := append(os.Environ(),
+		"SAKURA_ACCESS_TOKEN="+cfg.AccessToken,
+		"SAKURA_ACCESS_TOKEN_SECRET="+cfg.AccessTokenSecret,
+	)
+	if err := sc.SetEnviron(env); err != nil {
 		return nil, fmt.Errorf("failed to configure apprun-shared client: %w", err)
 	}
 

@@ -44,10 +44,11 @@ func NewService(profileName string) (*Service, error) {
 	}
 
 	var sc saclient.Client
-	if err := sc.SetEnviron([]string{
-		"SAKURA_ACCESS_TOKEN=" + cfg.AccessToken,
-		"SAKURA_ACCESS_TOKEN_SECRET=" + cfg.AccessTokenSecret,
-	}); err != nil {
+	env := append(os.Environ(),
+		"SAKURA_ACCESS_TOKEN="+cfg.AccessToken,
+		"SAKURA_ACCESS_TOKEN_SECRET="+cfg.AccessTokenSecret,
+	)
+	if err := sc.SetEnviron(env); err != nil {
 		return nil, fmt.Errorf("failed to configure kms client: %w", err)
 	}
 
