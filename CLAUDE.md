@@ -73,6 +73,23 @@ golangci-lint run
 cd frontend && npx tsc --noEmit
 ```
 
+## Frontend Tests
+
+Reactコンポーネント/フックのテストにはVitest + React Testing Libraryを使用する。
+
+```bash
+# 一度だけ実行(CI/コミット前向け)
+cd frontend && npm run test
+
+# watchモード
+cd frontend && npm run test:watch
+```
+
+- 設定は `frontend/vite.config.ts` の `test` フィールド、共通セットアップは `frontend/src/test/setup.ts`
+- テストファイルはテスト対象と同じディレクトリに `*.test.ts` / `*.test.tsx` として置く(例: `src/components/NFSList.test.tsx`)
+- `frontend/wailsjs/go/main/App` のような生成済みGoバインディングは `vi.mock('../../wailsjs/go/main/App')` で自動モックし、`vi.mocked(FnName).mockResolvedValueOnce(...)` で戻り値を差し替える
+- ポーリングなど`setInterval`を使う処理をテストする場合、`userEvent`はfakeTimers下で内部delayが解決せず固まるため、クリックには`fireEvent`を使い、待機には(testing-libraryの`waitFor`ではなく)fakeTimers対応の`vi.waitFor`を使うこと。実例は `src/components/NFSList.test.tsx` を参照
+
 ## Git Workflow
 
 - mainブランチに直接コミットしない。必ずブランチを作成してPRを出すこと
