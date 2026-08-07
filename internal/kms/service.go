@@ -85,28 +85,56 @@ func (s *Service) ListKeys(ctx context.Context) ([]KeyInfo, error) {
 
 	result := make([]KeyInfo, 0, len(keys))
 	for _, k := range keys {
-		latestVersion := 0
-		if v, ok := k.LatestVersion.Get(); ok {
-			latestVersion = v
-		}
-		createdAt := parseDateTime(k.CreatedAt).Format("2006-01-02T15:04:05Z07:00")
-		result = append(result, KeyInfo{
-			ID:            k.ID,
-			Name:          k.Name,
-			Description:   k.Description,
-			Status:        string(k.Status),
-			KeyOrigin:     string(k.KeyOrigin),
-			LatestVersion: latestVersion,
-			Tags:          k.Tags,
-			CreatedAt:     createdAt,
-		})
+		result = append(result, *toKeyInfo(&k))
 	}
 	return result, nil
+}
+
+// GetKey KMSキーの詳細を取得
+func (s *Service) GetKey(ctx context.Context, id string) (*KeyInfo, error) {
+	k, err := s.keyOp.Read(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return toKeyInfo(k), nil
 }
 
 // DeleteKey KMSキーを削除
 func (s *Service) DeleteKey(ctx context.Context, id string) error {
 	return s.keyOp.Delete(ctx, id)
+}
+
+// RotateKey KMSキーをローテーションし、更新後の情報を返す
+func (s *Service) RotateKey(ctx context.Context, id string) (*KeyInfo, error) {
+	k, err := s.keyOp.Rotate(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return toKeyInfo(k), nil
+}
+
+// ChangeKeyStatus KMSキーのステータスを変更する（active/restricted/suspended）
+func (s *Service) ChangeKeyStatus(ctx context.Context, id string, status string) error {
+	return s.keyOp.ChangeStatus(ctx, id, v1.ChangeKeyStatusStatus(status))
+}
+
+// toKeyInfo v1.Key を KeyInfo に変換
+func toKeyInfo(k *v1.Key) *KeyInfo {
+	latestVersion := 0
+	if v, ok := k.LatestVersion.Get(); ok {
+		latestVersion = v
+	}
+	createdAt := parseDateTime(k.CreatedAt).Format("2006-01-02T15:04:05Z07:00")
+	return &KeyInfo{
+		ID:            k.ID,
+		Name:          k.Name,
+		Description:   k.Description,
+		Status:        string(k.Status),
+		KeyOrigin:     string(k.KeyOrigin),
+		LatestVersion: latestVersion,
+		Tags:          k.Tags,
+		CreatedAt:     createdAt,
+	}
 }
 
 // parseDateTime v1.DateTimeを time.Time に変換

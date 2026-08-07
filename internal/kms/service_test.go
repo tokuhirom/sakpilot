@@ -128,3 +128,128 @@ func TestService_DeleteKey(t *testing.T) {
 		t.Fatalf("got %d keys after delete, want 0: %+v", len(keys), keys)
 	}
 }
+
+func TestService_GetKey(t *testing.T) {
+	srv := mockkms.NewTestServer(mockkms.Config{})
+	defer srv.Close()
+
+	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy")
+	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_KMS", srv.TestURL())
+
+	sc := newTestSaclient(t, srv.TestURL())
+	rawClient, err := sdkkms.NewClient(sc)
+	if err != nil {
+		t.Fatalf("sdkkms.NewClient: %v", err)
+	}
+	keyOp := sdkkms.NewKeyOp(rawClient)
+	created, err := keyOp.Create(context.Background(), v1.CreateKey{
+		Name:        "test-key",
+		Description: v1.NewOptString("a test key"),
+		KeyOrigin:   v1.KeyOriginEnumGenerated,
+	})
+	if err != nil {
+		t.Fatalf("seed Create: %v", err)
+	}
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+
+	service, err := kms.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	got, err := service.GetKey(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("GetKey: %v", err)
+	}
+	if got.ID != created.ID {
+		t.Errorf("ID = %q, want %q", got.ID, created.ID)
+	}
+	if got.Name != "test-key" {
+		t.Errorf("Name = %q, want %q", got.Name, "test-key")
+	}
+	if got.Description != "a test key" {
+		t.Errorf("Description = %q, want %q", got.Description, "a test key")
+	}
+}
+
+func TestService_RotateKey(t *testing.T) {
+	srv := mockkms.NewTestServer(mockkms.Config{})
+	defer srv.Close()
+
+	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy")
+	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_KMS", srv.TestURL())
+
+	sc := newTestSaclient(t, srv.TestURL())
+	rawClient, err := sdkkms.NewClient(sc)
+	if err != nil {
+		t.Fatalf("sdkkms.NewClient: %v", err)
+	}
+	keyOp := sdkkms.NewKeyOp(rawClient)
+	created, err := keyOp.Create(context.Background(), v1.CreateKey{
+		Name:      "test-key",
+		KeyOrigin: v1.KeyOriginEnumGenerated,
+	})
+	if err != nil {
+		t.Fatalf("seed Create: %v", err)
+	}
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+
+	service, err := kms.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	got, err := service.RotateKey(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("RotateKey: %v", err)
+	}
+	if got.LatestVersion != 2 {
+		t.Errorf("LatestVersion = %d, want 2", got.LatestVersion)
+	}
+}
+
+func TestService_ChangeKeyStatus(t *testing.T) {
+	srv := mockkms.NewTestServer(mockkms.Config{})
+	defer srv.Close()
+
+	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy")
+	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_KMS", srv.TestURL())
+
+	sc := newTestSaclient(t, srv.TestURL())
+	rawClient, err := sdkkms.NewClient(sc)
+	if err != nil {
+		t.Fatalf("sdkkms.NewClient: %v", err)
+	}
+	keyOp := sdkkms.NewKeyOp(rawClient)
+	created, err := keyOp.Create(context.Background(), v1.CreateKey{
+		Name:      "test-key",
+		KeyOrigin: v1.KeyOriginEnumGenerated,
+	})
+	if err != nil {
+		t.Fatalf("seed Create: %v", err)
+	}
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+
+	service, err := kms.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	if err := service.ChangeKeyStatus(context.Background(), created.ID, "suspended"); err != nil {
+		t.Fatalf("ChangeKeyStatus: %v", err)
+	}
+
+	got, err := service.GetKey(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("GetKey: %v", err)
+	}
+	if got.Status != "suspended" {
+		t.Errorf("Status = %q, want %q", got.Status, "suspended")
+	}
+}

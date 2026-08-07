@@ -70,12 +70,12 @@
 - SDK比較で残る不足: Create/Update（ルール追加・編集、未着手）
 
 ### KMS
-- テスト: `KMSList.test.tsx` あり（一覧表示・削除確認フローをカバー）
-- バックエンド: `internal/kms/service.go` に分離実装。List/**Delete** 実装済み（Goテスト `service_test.go` に `TestService_DeleteKey` 追加済み）
-- app.go: `GetKMSKeys`/`DeleteKMSKey` を公開
+- テスト: `KMSList.test.tsx`（一覧表示・詳細遷移・削除確認フロー）、`KMSDetail.test.tsx`（基本情報表示・ローテーション・ステータス変更・キャンセル・失敗時のalert）ともに整備済み
+- バックエンド: `internal/kms/service.go` に分離実装。List/**Get**/**Delete**/**Rotate**/**ChangeStatus** 実装済み（Goテスト `service_test.go` に対応する各テスト追加済み）
+- app.go: `GetKMSKeys`/`GetKMSKey`/`DeleteKMSKey`/`RotateKMSKey`/`ChangeKMSKeyStatus` を公開
 - ✅ **対応済み（PR #90）**: 削除機能を追加
-- SDK比較で残る不足: Read（Get）/Create/Update/Rotate（ローテーション）/ChangeStatus（有効化・無効化）/ScheduleDestruction（削除予約）/Encrypt/Decrypt
-- **TODO**: 次点でGet（詳細取得）/Rotate/ChangeStatusの実装を検討。Delete実装（`internal/kms/service.go` + `service_test.go`）と同じパターンで追加しやすい
+- ✅ **対応済み**: Get（詳細取得）/Rotate（ローテーション）/ChangeStatus（active/restricted/suspended切り替え）を追加。`KMSDetail.tsx`を新設し一覧の行クリックで遷移。あわせて`KMSList.tsx`のステータス表示が実際のAPI値（active/restricted/suspended/pending_destruction）と一致していなかった表示バグを修正
+- SDK比較で残る不足: Create/Update/ScheduleDestruction（削除予約）/Encrypt/Decrypt（未着手）
 
 ---
 
@@ -180,17 +180,17 @@
 - FEテスト新規追加: `DiskList.test.tsx`（削除フロー・キャンセル・未接続表示）, `ArchiveList.test.tsx`（削除フロー・キャンセル・busy状態のボタン無効化）
 - SimpleMonitorのGet（詳細取得）を実装。`internal/sakura/global.go` に `GetSimpleMonitor`、`app.go` に `GetSimpleMonitorDetail` を追加し、`MonitorDetail.tsx`（基本情報・ヘルスチェック設定表示）と一覧からの行クリック遷移を追加
 - `ContainerRegistryDetail.test.tsx` を追加（基本情報表示、ユーザー一覧の権限別表示、パスワード保存/取消/削除フロー、保存済み資格情報での自動アクティブ化とイメージ一覧取得、イメージ→タグ一覧遷移と戻る操作をカバー）
+- KMSの残り機能（Get/Rotate/ChangeStatus）を実装。`KMSDetail.tsx`と`KMSDetail.test.tsx`を新規追加し、`KMSList.tsx`のステータス表示バグ（実際のAPI値と不一致）も修正
 
 ### 次セッションの優先順位
 
 **B. 中規模（実装パターンは確立済み）**
-1. KMSの残り機能: Get（詳細）/Rotate（ローテーション）/ChangeStatus（有効化・無効化）— Delete実装（`internal/kms/service.go`）と同じパターン
-2. ProxyLBの証明書管理（GetCertificates/SetCertificates/DeleteCertificates/RenewLetsEncryptCert）— HTTPS運用上重要度高
-3. `AppRunSharedList.test.tsx` / `MonitoringMetricDetail.test.tsx` のFEテスト
+1. ProxyLBの証明書管理（GetCertificates/SetCertificates/DeleteCertificates/RenewLetsEncryptCert）— HTTPS運用上重要度高
+2. `AppRunSharedList.test.tsx` / `MonitoringMetricDetail.test.tsx` のFEテスト
 
 **C. 大物・要方針決定（着手前にスコープを確認）**
-4. ObjectStorage: バケット/アクセスキーのCreate/Delete、`ObjectStorageList.test.tsx`（ロジック濃度最大・実装コストも高い）
-5. AppRun（専有/共用）: 削除・デプロイ操作。Version Create（新バージョンのデプロイ）は「閲覧中心」という現状スコープを超えるため、実装するか自体を判断してから着手
+3. ObjectStorage: バケット/アクセスキーのCreate/Delete、`ObjectStorageList.test.tsx`（ロジック濃度最大・実装コストも高い）
+4. AppRun（専有/共用）: 削除・デプロイ操作。Version Create（新バージョンのデプロイ）は「閲覧中心」という現状スコープを超えるため、実装するか自体を判断してから着手
 
 ### その他
 - `internal/sakura/server.go` の `println` デバッグ文の削除（別issueとして切り出し推奨、未着手）

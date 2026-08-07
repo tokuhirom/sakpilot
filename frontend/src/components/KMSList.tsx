@@ -7,9 +7,10 @@ import { SearchBar } from './SearchBar';
 
 interface KMSListProps {
   profile: string;
+  onSelectKey: (id: string) => void;
 }
 
-export function KMSList({ profile }: KMSListProps) {
+export function KMSList({ profile, onSelectKey }: KMSListProps) {
   const [keys, setKeys] = useState<kms.KeyInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<kms.KeyInfo | null>(null);
@@ -87,19 +88,21 @@ export function KMSList({ profile }: KMSListProps) {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'enabled': return 'up';
-      case 'disabled': return 'down';
-      case 'pending_deletion': return 'down';
+    switch (status.toLowerCase()) {
+      case 'active': return 'up';
+      case 'restricted': return 'down';
+      case 'suspended': return 'down';
+      case 'pending_destruction': return 'down';
       default: return '';
     }
   };
 
   const getStatusName = (status: string) => {
-    switch (status) {
-      case 'enabled': return '有効';
-      case 'disabled': return '無効';
-      case 'pending_deletion': return '削除予定';
+    switch (status.toLowerCase()) {
+      case 'active': return 'アクティブ';
+      case 'restricted': return '制限中';
+      case 'suspended': return '停止中';
+      case 'pending_destruction': return '削除予定';
       default: return status;
     }
   };
@@ -135,7 +138,7 @@ export function KMSList({ profile }: KMSListProps) {
         </div>
       ) : (
         filteredKeys.map((key) => (
-          <div key={key.id} className="card">
+          <div key={key.id} className="card" onClick={() => onSelectKey(key.id)} style={{ cursor: 'pointer' }}>
             <div className="card-header">
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -179,7 +182,10 @@ export function KMSList({ profile }: KMSListProps) {
                 ID: {key.id}
                 <button
                   className="btn btn-danger btn-small"
-                  onClick={() => handleDeleteClick(key)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteClick(key);
+                  }}
                   disabled={deleting === key.id}
                   title="削除"
                 >
