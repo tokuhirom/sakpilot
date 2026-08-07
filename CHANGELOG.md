@@ -1,5 +1,27 @@
 # Changelog
 
+## [v0.0.16](https://github.com/tokuhirom/sakpilot/compare/v0.0.15...v0.0.16) - 2026-08-07
+- add disk deletion feature by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/71
+- fix: サイドバーの表示崩れを修正(ウィンドウ高さを超える場合) by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/72
+- add HTTP access log for Sakura Cloud API calls by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/74
+- add NFS appliance support by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/75
+- add Vitest + React Testing Library test framework for frontend by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/76
+- docs: フロントエンドテストの方針をCLAUDE.mdに追記 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/77
+- 全リソースのテスト/機能ギャップ精査 PLAN.md を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/78
+- 石狩第3ゾーン(is1c)をゾーン一覧に追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/79
+- feat: サーバー/NFSに再起動(Reset)機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/80
+- feat: データベースアプライアンスに電源操作・削除機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/81
+- feat: スイッチに削除機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/82
+- feat: パケットフィルターに削除機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/83
+- feat: DNSゾーンに削除機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/84
+- feat: シンプル監視に削除機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/86
+- feat: エンハンスドDBに削除機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/87
+- feat: エンハンスドロードバランサに削除機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/88
+- feat: コンテナレジストリに削除機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/89
+- feat: KMSキーに削除機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/90
+- docs: PLAN.mdをPR #80-90の実施結果に合わせて更新 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/91
+- feat: GSLBに削除機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/85
+
 ## [v0.0.15](https://github.com/tokuhirom/sakpilot/compare/v0.0.14...v0.0.15) - 2026-08-07
 - オブジェクトストレージAPIをsacloud-sdk-go/api/object-storageへ移行 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/58
 - chore(deps-dev): bump vite and @vitejs/plugin-react in /frontend by @dependabot[bot] in https://github.com/tokuhirom/sakpilot/pull/57
