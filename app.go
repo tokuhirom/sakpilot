@@ -839,6 +839,15 @@ func (a *App) GetEnhancedDBs(profileName string) ([]sakura.EnhancedDBInfo, error
 	return service.List(a.ctx)
 }
 
+func (a *App) DeleteEnhancedDB(profileName, enhancedDBId string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewEnhancedDBService(client)
+	return service.Delete(a.ctx, enhancedDBId)
+}
+
 // KMS
 func (a *App) GetKMSKeys(profileName string) ([]kms.KeyInfo, error) {
 	service, err := kms.NewService(profileName)
