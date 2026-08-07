@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
+	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 )
 
 type EnhancedDBInfo struct {
@@ -50,4 +51,9 @@ func (s *EnhancedDBService) List(ctx context.Context) ([]EnhancedDBInfo, error) 
 		})
 	}
 	return dbs, nil
+}
+
+func (s *EnhancedDBService) Delete(ctx context.Context, id string) error {
+	op := iaas.NewEnhancedDBOp(s.client.Caller())
+	return op.Delete(ctx, types.StringID(id))
 }
