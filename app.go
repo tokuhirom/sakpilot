@@ -322,6 +322,61 @@ func (a *App) GetDatabases(profileName, zone string) ([]sakura.DatabaseInfo, err
 	return service.List(a.ctx, zone)
 }
 
+// NFS
+func (a *App) GetNFSList(profileName, zone string) ([]sakura.NFSInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewNFSService(client)
+	return service.List(a.ctx, zone)
+}
+
+func (a *App) PowerOnNFS(profileName, zone, nfsID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewNFSService(client)
+	return service.PowerOn(a.ctx, zone, nfsID)
+}
+
+func (a *App) PowerOffNFS(profileName, zone, nfsID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewNFSService(client)
+	return service.PowerOff(a.ctx, zone, nfsID)
+}
+
+func (a *App) ForceStopNFS(profileName, zone, nfsID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewNFSService(client)
+	return service.ForceStop(a.ctx, zone, nfsID)
+}
+
+func (a *App) DeleteNFS(profileName, zone, nfsID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewNFSService(client)
+	return service.Delete(a.ctx, zone, nfsID)
+}
+
+func (a *App) GetNFSStatus(profileName, zone, nfsID string) (string, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return "", err
+	}
+	service := sakura.NewNFSService(client)
+	return service.GetStatus(a.ctx, zone, nfsID)
+}
+
 // DNS Detail
 func (a *App) GetDNSDetail(profileName, dnsId string) (*sakura.DNSInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
