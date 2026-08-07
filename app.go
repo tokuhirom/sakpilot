@@ -875,3 +875,12 @@ func (a *App) GetProxyLBHealth(profileName, proxyLBId string) (*sakura.ProxyLBHe
 	service := sakura.NewProxyLBService(client)
 	return service.GetHealth(a.ctx, proxyLBId)
 }
+
+func (a *App) DeleteProxyLB(profileName, proxyLBId string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewProxyLBService(client)
+	return service.Delete(a.ctx, proxyLBId)
+}
