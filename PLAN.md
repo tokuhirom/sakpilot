@@ -29,10 +29,10 @@
 | NFS | ✅ あり | ✅ | ✅ | 完備。FEテストとResetを追加済み（PR #80） |
 | ObjectStorage | ❌ なし | ❌ **なし** | (対象外) | 閲覧・DLのみ。バケット/キー作成削除が丸ごと未実装（未着手） |
 | ContainerRegistry | ✅ あり | ✅ | (対象外) | 削除機能+FEテスト(List/Detail)を追加済み（PR #89、#95） |
-| AppRun (専有/共用) | 🟡 一部あり | ❌ **なし** | (対象外) | 共用型のみFEテスト追加済み。閲覧＋アクティブバージョン切替のみ（専有型は未着手、方針判断待ち） |
+| AppRun (専有/共用) | ✅ あり | ❌ **なし** | (対象外) | 専有型・共用型ともFEテスト追加済み。閲覧＋アクティブバージョン切替のみ（デプロイ・削除は方針判断待ち） |
 | Bill | ❌ なし | (対象外) | (対象外) | 読み取り専用リソースなので概ね妥当 |
 
-**17リソース中、FEテストが未着手なのは ObjectStorage / AppRun（専有型） / Bill。**
+**17リソース中、FEテストが未着手なのは ObjectStorage / Bill。**
 
 ---
 
@@ -155,7 +155,7 @@
 - **TODO**: ユーザー管理機能の追加を検討
 
 ### AppRun（専有型 / 共用型）
-- テスト: `AppRunSharedList.test.tsx` あり（ユーザー未設定時の案内・一覧表示・エラー表示・詳細遷移とコンポーネント/トラフィック/バージョン履歴表示・戻る操作をカバー）。`AppRunDedicatedList.tsx` は6種のview＋パンくず生成＋アクティブバージョン切替と**調査対象中もっとも分岐が複雑**でテスト価値が高く、引き続き未着手
+- テスト: `AppRunSharedList.test.tsx` あり（ユーザー未設定時の案内・一覧表示・エラー表示・詳細遷移とコンポーネント/トラフィック/バージョン履歴表示・戻る操作をカバー）。`AppRunDedicatedList.test.tsx` も追加済み（cluster→app→version遷移とアクティブバージョン設定・ASGのLB/ワーカーノード表示・非アクティブ化/アクティブ化の成功・失敗フローをカバー。`lb` view単体はUI上到達経路が無く未カバー）
 - バックエンド: `internal/apprun/`（専有型）・`internal/apprunshared/`（共用型）に分離実装。List/Read/`SetActiveVersion`/`ClearActiveVersion` のみ
 - SDK比較で不足:
   - 専有型: Cluster/Application/ASG/LoadBalancerの**Create/Delete**、**Versionの Create（新バージョンのデプロイ）**/Delete、WorkerNodeのUpdate（draining）、Certificate系全般
@@ -190,11 +190,14 @@
 - `AppRunSharedList.test.tsx` を追加（ユーザー未設定時の案内・HasAppRunSharedUser失敗時のフォールバック・一覧表示/空状態/エラー表示・詳細遷移とコンポーネント/トラフィック/バージョン履歴表示・戻る操作をカバー）
 - `MonitoringMetricDetail.test.tsx` を追加（基本情報表示・アクセスキー0件時の案内・publisher一覧取得失敗時のエラー表示・publisher選択によるメトリクスのvariantグルーピング・カスタムメトリクス・メトリクス0件時の表示をカバー。`MetricGraph`はuPlot/canvas依存のため`vi.mock`でスタブ化）
 
+### ✅ 完了（2026-08-07 追加セッション4）
+- `AppRunDedicatedList.test.tsx` を追加（クラスタ一覧の空状態、cluster→app→versionの遷移とパンくずでの戻り、ドロップダウンからのアクティブバージョン設定（成功/失敗）、非アクティブ化ボタン（成功/失敗）、ASG詳細でのLB・ワーカーノード表示とLBごとの`GetAppRunLBNodes`呼び出しをカバー）。`lb` view（ロードバランサー単体詳細）はUIからクリックで到達するトリガーが実装内に無く、テスト対象外とした
+
 ### 次セッションの優先順位
 
 **C. 大物・要方針決定（着手前にスコープを確認）**
 1. ObjectStorage: バケット/アクセスキーのCreate/Delete、`ObjectStorageList.test.tsx`（ロジック濃度最大・実装コストも高い）
-2. AppRun（専有型）: `AppRunDedicatedList.test.tsx`（6種のview＋パンくず生成＋アクティブバージョン切替、調査対象中もっとも分岐が複雑）。削除・デプロイ操作はSDK比較で不足あり。Version Create（新バージョンのデプロイ）は「閲覧中心」という現状スコープを超えるため、実装するか自体を判断してから着手
+2. AppRun（専有型）: 削除・デプロイ操作はSDK比較で不足あり。Version Create（新バージョンのデプロイ）は「閲覧中心」という現状スコープを超えるため、実装するか自体を判断してから着手。`lb` viewへの遷移導線が無い点も要確認（意図的な未実装か、実装漏れか）
 
 ### その他
 - `internal/sakura/server.go` の `println` デバッグ文の削除（別issueとして切り出し推奨、未着手）
