@@ -83,6 +83,12 @@ func (s *ServerService) PowerOff(ctx context.Context, zone string, serverID stri
 	return serverOp.Shutdown(ctx, zone, id, &iaas.ShutdownOption{Force: false})
 }
 
+func (s *ServerService) Delete(ctx context.Context, zone string, serverID string) error {
+	serverOp := iaas.NewServerOp(s.client.Caller())
+	id := types.StringID(serverID)
+	return serverOp.Delete(ctx, zone, id)
+}
+
 func (s *ServerService) ForceStop(ctx context.Context, zone string, serverID string) error {
 	serverOp := iaas.NewServerOp(s.client.Caller())
 	id := types.StringID(serverID)

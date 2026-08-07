@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { GetServers, PowerOnServer, PowerOffServer, GetServerStatus } from '../../wailsjs/go/main/App';
+import { GetServers, PowerOnServer, PowerOffServer, DeleteServer, GetServerStatus } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -17,7 +17,7 @@ interface ConfirmDialog {
   serverName: string;
   serverId: string;
   serverZone: string;
-  action: 'powerOn' | 'powerOff';
+  action: 'powerOn' | 'powerOff' | 'delete';
 }
 
 export function ServerList({ profile, zone, zones, onZoneChange }: ServerListProps) {
@@ -94,7 +94,7 @@ export function ServerList({ profile, zone, zones, onZoneChange }: ServerListPro
   }, [profile, loadServers]);
 
   // 確認ダイアログを表示
-  const showConfirmDialog = (e: React.MouseEvent, serverZone: string, serverId: string, serverName: string, action: 'powerOn' | 'powerOff') => {
+  const showConfirmDialog = (e: React.MouseEvent, serverZone: string, serverId: string, serverName: string, action: 'powerOn' | 'powerOff' | 'delete') => {
     e.stopPropagation();
     setOpenDropdown(null);
     setConfirmDialog({
@@ -113,16 +113,22 @@ export function ServerList({ profile, zone, zones, onZoneChange }: ServerListPro
     const { serverZone, serverId, action } = confirmDialog;
     setConfirmDialog(null);
 
-    // 即座にスピナーを表示
-    setPendingServers(prev => new Set(prev).add(serverId));
+    // 即座にスピナーを表示（削除の場合はポーリング不要）
+    if (action !== 'delete') {
+      setPendingServers(prev => new Set(prev).add(serverId));
+    }
 
     try {
       if (action === 'powerOn') {
         await PowerOnServer(profile, serverZone, serverId);
         startPolling(serverZone, serverId, 'up');
-      } else {
+      } else if (action === 'powerOff') {
         await PowerOffServer(profile, serverZone, serverId);
         startPolling(serverZone, serverId, 'down');
+      } else if (action === 'delete') {
+        await DeleteServer(profile, serverZone, serverId);
+        // 削除後にリストを更新
+        loadServers();
       }
     } catch (err) {
       console.error('[ServerList] Action error:', err);
@@ -282,6 +288,15 @@ export function ServerList({ profile, zone, zones, onZoneChange }: ServerListPro
                     停止
                   </button>
                   <div style={{ borderTop: '1px solid #333', margin: '4px 0' }}></div>
+                  <button
+                    className="dropdown-item"
+                    onClick={(e) => showConfirmDialog(e, server.zone, server.id, server.name, 'delete')}
+                    disabled={pendingServers.has(server.id)}
+                    style={{ color: '#f87171' }}
+                  >
+                    削除
+                  </button>
+                  <div style={{ borderTop: '1px solid #333', margin: '4px 0' }}></div>
                   <div className="dropdown-item" style={{ fontSize: '0.7rem', color: '#666', cursor: 'default' }}>
                     ID: {server.id}
                   </div>
@@ -315,11 +330,16 @@ export function ServerList({ profile, zone, zones, onZoneChange }: ServerListPro
             maxWidth: '400px',
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>
-              {confirmDialog.action === 'powerOn' ? 'サーバー起動' : 'サーバー停止'}
+              {confirmDialog.action === 'powerOn' ? 'サーバー起動' : confirmDialog.action === 'powerOff' ? 'サーバー停止' : 'サーバー削除'}
             </h3>
             <p style={{ margin: '0 0 20px 0', color: '#aaa' }}>
               <strong style={{ color: '#fff' }}>{confirmDialog.serverName}</strong> を
-              {confirmDialog.action === 'powerOn' ? '起動' : '停止'}しますか？
+              {confirmDialog.action === 'powerOn' ? '起動' : confirmDialog.action === 'powerOff' ? '停止' : '削除'}しますか？
+              {confirmDialog.action === 'delete' && (
+                <span style={{ display: 'block', marginTop: '8px', color: '#f87171', fontSize: '0.85rem' }}>
+                  この操作は取り消せません。接続されているディスクは削除されません。
+                </span>
+              )}
             </p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button
@@ -339,14 +359,14 @@ export function ServerList({ profile, zone, zones, onZoneChange }: ServerListPro
                 onClick={executeAction}
                 style={{
                   padding: '8px 16px',
-                  backgroundColor: confirmDialog.action === 'powerOn' ? '#22c55e' : '#ef4444',
+                  backgroundColor: confirmDialog.action === 'powerOn' ? '#22c55e' : confirmDialog.action === 'powerOff' ? '#ef4444' : '#c62828',
                   border: 'none',
                   borderRadius: '4px',
                   color: '#fff',
                   cursor: 'pointer',
                 }}
               >
-                {confirmDialog.action === 'powerOn' ? '起動する' : '停止する'}
+                {confirmDialog.action === 'powerOn' ? '起動する' : confirmDialog.action === 'powerOff' ? '停止する' : '削除する'}
               </button>
             </div>
           </div>
