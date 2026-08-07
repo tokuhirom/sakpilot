@@ -99,7 +99,7 @@ xattr -cr /Applications/SakPilot.app
 - Node.js 18+
 - [Wails CLI](https://wails.io/docs/gettingstarted/installation) v2
 
-devbox を使う場合は `devbox shell` で Go・Wails の開発環境が揃います（ただし後述の Linux 依存パッケージは別途インストールが必要です）。
+[mise](https://mise.jdx.dev/) を使う場合は `mise install` で Go・Wails の開発環境が揃います（ただし後述の Linux 依存パッケージは別途インストールが必要です）。
 
 #### Linux の追加依存パッケージ
 
