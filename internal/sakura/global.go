@@ -310,3 +310,8 @@ func (s *GlobalService) ListContainerRegistryUsers(ctx context.Context, id strin
 	}
 	return list, nil
 }
+
+func (s *GlobalService) DeleteContainerRegistry(ctx context.Context, id string) error {
+	crOp := iaas.NewContainerRegistryOp(s.client.Caller())
+	return crOp.Delete(ctx, types.StringID(id))
+}
