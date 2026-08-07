@@ -53,3 +53,8 @@ func (s *ArchiveService) List(ctx context.Context, zone string) ([]ArchiveInfo, 
 	}
 	return archives, nil
 }
+
+func (s *ArchiveService) Delete(ctx context.Context, zone string, archiveID string) error {
+	archiveOp := iaas.NewArchiveOp(s.client.Caller())
+	return archiveOp.Delete(ctx, zone, types.StringID(archiveID))
+}

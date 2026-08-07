@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetArchives } from '../../wailsjs/go/main/App';
+import { GetArchives, DeleteArchive } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -15,6 +15,8 @@ interface ArchiveListProps {
 export function ArchiveList({ profile, zone, zones, onZoneChange }: ArchiveListProps) {
   const [archives, setArchives] = useState<sakura.ArchiveInfo[]>([]);
   const [loading, setLoading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<sakura.ArchiveInfo | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const {
     searchQuery,
@@ -64,6 +66,29 @@ export function ArchiveList({ profile, zone, zones, onZoneChange }: ArchiveListP
     const m = String(date.getMinutes()).padStart(2, '0');
 
     return `${Y}/${M}/${D} ${h}:${m}`;
+  };
+
+  const handleDeleteClick = (archive: sakura.ArchiveInfo) => {
+    setConfirmDelete(archive);
+  };
+
+  const handleDeleteCancel = () => {
+    setConfirmDelete(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!confirmDelete) return;
+    const archive = confirmDelete;
+    setConfirmDelete(null);
+    setDeleting(archive.id);
+    try {
+      await DeleteArchive(profile, zone, archive.id);
+      await loadArchives();
+    } catch (e) {
+      alert(`削除に失敗しました: ${e}`);
+    } finally {
+      setDeleting(null);
+    }
   };
 
   const formatAvailability = (availability: string) => {
@@ -118,11 +143,13 @@ export function ArchiveList({ profile, zone, zones, onZoneChange }: ArchiveListP
               <th>サイズ</th>
               <th>状態</th>
               <th>作成日時</th>
+              <th>操作</th>
             </tr>
           </thead>
           <tbody>
             {filteredArchives.map((archive) => {
               const availability = formatAvailability(archive.availability);
+              const isBusy = archive.availability === 'uploading' || archive.availability === 'migrating';
               return (
                 <tr key={archive.id}>
                   <td>
@@ -154,11 +181,34 @@ export function ArchiveList({ profile, zone, zones, onZoneChange }: ArchiveListP
                     <span className={`status ${availability.className}`}>{availability.label}</span>
                   </td>
                   <td style={{ textAlign: 'left' }}>{formatDate(archive.createdAt)}</td>
+                  <td style={{ textAlign: 'left' }}>
+                    <button
+                      className="btn btn-danger btn-small"
+                      onClick={() => handleDeleteClick(archive)}
+                      disabled={isBusy || deleting === archive.id}
+                      title={isBusy ? '処理中のアーカイブは削除できません' : '削除'}
+                    >
+                      {deleting === archive.id ? '削除中...' : '削除'}
+                    </button>
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+      )}
+
+      {confirmDelete && (
+        <div className="confirm-overlay" onClick={handleDeleteCancel}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <p>アーカイブ「{confirmDelete.name}」を削除しますか？</p>
+            <p className="confirm-warning">この操作は取り消せません。</p>
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleDeleteCancel}>キャンセル</button>
+              <button className="btn btn-danger" onClick={handleDeleteConfirm}>削除する</button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
