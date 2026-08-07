@@ -285,6 +285,15 @@ func (a *App) GetArchives(profileName, zone string) ([]sakura.ArchiveInfo, error
 	return service.List(a.ctx, zone)
 }
 
+func (a *App) DeleteArchive(profileName, zone, archiveID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewArchiveService(client)
+	return service.Delete(a.ctx, zone, archiveID)
+}
+
 // Databases
 func (a *App) GetDatabases(profileName, zone string) ([]sakura.DatabaseInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
