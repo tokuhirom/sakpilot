@@ -387,6 +387,15 @@ func (a *App) GetDNSDetail(profileName, dnsId string) (*sakura.DNSInfo, error) {
 	return service.GetDNS(a.ctx, dnsId)
 }
 
+func (a *App) DeleteDNS(profileName, dnsId string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.DeleteDNS(a.ctx, dnsId)
+}
+
 // Monitoring Suite
 func (a *App) GetMSLogs(profileName string) ([]sakura.MSLogInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)

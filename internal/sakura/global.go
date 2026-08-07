@@ -140,6 +140,11 @@ func (s *GlobalService) GetDNS(ctx context.Context, id string) (*DNSInfo, error)
 	}, nil
 }
 
+func (s *GlobalService) DeleteDNS(ctx context.Context, id string) error {
+	dnsOp := iaas.NewDNSOp(s.client.Caller())
+	return dnsOp.Delete(ctx, types.StringID(id))
+}
+
 func (s *GlobalService) ListCertificates(ctx context.Context) ([]CertificateInfo, error) {
 	certOp := iaas.NewCertificateAuthorityOp(s.client.Caller())
 	result, err := certOp.Find(ctx, &iaas.FindCondition{})
