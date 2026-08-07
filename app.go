@@ -1000,6 +1000,30 @@ func (a *App) DeleteKMSKey(profileName, keyId string) error {
 	return service.DeleteKey(a.ctx, keyId)
 }
 
+func (a *App) GetKMSKey(profileName, keyId string) (*kms.KeyInfo, error) {
+	service, err := kms.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetKey(a.ctx, keyId)
+}
+
+func (a *App) RotateKMSKey(profileName, keyId string) (*kms.KeyInfo, error) {
+	service, err := kms.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.RotateKey(a.ctx, keyId)
+}
+
+func (a *App) ChangeKMSKeyStatus(profileName, keyId, status string) error {
+	service, err := kms.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.ChangeKeyStatus(a.ctx, keyId, status)
+}
+
 // ProxyLB (Enhanced Load Balancer)
 func (a *App) GetProxyLBs(profileName string) ([]sakura.ProxyLBInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
