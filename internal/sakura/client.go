@@ -52,9 +52,9 @@ func NewClientFromProfile(profileName string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("status, profileName=%s, accessToken=%s, accountName=%s, memberCode=%s, authMethod=%s\n",
+	fmt.Printf("status, profileName=%s, accessTokenPrefix=%s..., accountName=%s, memberCode=%s, authMethod=%s\n",
 		profileName,
-		cfg.AccessToken,
+		tokenPrefix,
 		read.AccountName,
 		read.MemberCode,
 		read.AuthMethod)
@@ -79,7 +79,11 @@ func loadProfileConfig(profileName string) (*profileConfig, error) {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, err
 	}
-	fmt.Printf("Loading profile %s, accessToken=%s\n", profileName, cfg.AccessToken)
+	tokenPrefix := cfg.AccessToken
+	if len(tokenPrefix) > 8 {
+		tokenPrefix = tokenPrefix[:8]
+	}
+	fmt.Printf("Loading profile %s, accessTokenPrefix=%s...\n", profileName, tokenPrefix)
 	return &cfg, nil
 }
 
