@@ -29,10 +29,10 @@
 | NFS | ✅ あり | ✅ | ✅ | 完備。FEテストとResetを追加済み（PR #80） |
 | ObjectStorage | ❌ なし | ❌ **なし** | (対象外) | 閲覧・DLのみ。バケット/キー作成削除が丸ごと未実装（未着手） |
 | ContainerRegistry | ✅ あり | ✅ | (対象外) | 削除機能+FEテスト(List/Detail)を追加済み（PR #89、#95） |
-| AppRun (専有/共用) | ❌ なし | ❌ **なし** | (対象外) | 閲覧＋アクティブバージョン切替のみ（未着手、方針判断待ち） |
+| AppRun (専有/共用) | 🟡 一部あり | ❌ **なし** | (対象外) | 共用型のみFEテスト追加済み。閲覧＋アクティブバージョン切替のみ（専有型は未着手、方針判断待ち） |
 | Bill | ❌ なし | (対象外) | (対象外) | 読み取り専用リソースなので概ね妥当 |
 
-**17リソース中、FEテストが未着手なのは ObjectStorage / AppRun / Bill。**
+**17リソース中、FEテストが未着手なのは ObjectStorage / AppRun（専有型） / Bill。**
 
 ---
 
@@ -109,10 +109,10 @@
 - SDK比較で残る不足: Create/Update/UpdateSettings/MonitorResponseTime（応答時間グラフ）/HealthStatus（未着手）
 
 ### Monitoring Suite（Monitoring.tsx / MonitoringMetricDetail.tsx / MetricGraph.tsx）
-- テスト: なし。`MonitoringMetricDetail.tsx` はpublisher切り替え・メトリクスのグルーピング（useMemo）・エラー分岐があり、**テストを書く価値がある候補**
-- `MetricGraph.tsx` はuPlot依存が強くjsdomでの描画テストはコスト高。フォーマッタ関数（formatBytes/formatPercent/detectMetricType）を切り出せば単体テスト可能
+- テスト: `MonitoringMetricDetail.test.tsx` あり（基本情報表示・アクセスキー0件時の案内・publisher切り替えとメトリクスのグルーピング表示・カスタムメトリクス・エラー分岐をカバー。`MetricGraph`はuPlot/canvas依存のため`vi.mock`でスタブ化）
+- `MetricGraph.tsx` はuPlot依存が強くjsdomでの描画テストはコスト高のため未着手。フォーマッタ関数（formatBytes/formatPercent/detectMetricType）を切り出せば単体テスト可能
 - バックエンド: Logs/Metrics/Traces/StorageDetail/AccessKeys/Prometheusクエリ系はRead系のみ実装。ストレージ・アクセスキーの Create/Update/Destroy は未実装
-- **TODO**: `MonitoringMetricDetail.test.tsx` を追加（優先度中）
+- ✅ **対応済み**: `MonitoringMetricDetail.test.tsx` を追加
 
 ---
 
@@ -155,7 +155,7 @@
 - **TODO**: ユーザー管理機能の追加を検討
 
 ### AppRun（専有型 / 共用型）
-- テスト: なし。`AppRunDedicatedList.tsx` は6種のview＋パンくず生成＋アクティブバージョン切替と**調査対象中もっとも分岐が複雑**でテスト価値が高い。`AppRunSharedList.tsx` も一定のロジックがありテスト価値がある
+- テスト: `AppRunSharedList.test.tsx` あり（ユーザー未設定時の案内・一覧表示・エラー表示・詳細遷移とコンポーネント/トラフィック/バージョン履歴表示・戻る操作をカバー）。`AppRunDedicatedList.tsx` は6種のview＋パンくず生成＋アクティブバージョン切替と**調査対象中もっとも分岐が複雑**でテスト価値が高く、引き続き未着手
 - バックエンド: `internal/apprun/`（専有型）・`internal/apprunshared/`（共用型）に分離実装。List/Read/`SetActiveVersion`/`ClearActiveVersion` のみ
 - SDK比較で不足:
   - 専有型: Cluster/Application/ASG/LoadBalancerの**Create/Delete**、**Versionの Create（新バージョンのデプロイ）**/Delete、WorkerNodeのUpdate（draining）、Certificate系全般
@@ -186,14 +186,15 @@
 ### ✅ 完了（2026-08-07 追加セッション2）
 - ProxyLBの証明書管理（GetCertificates/SetCertificates/DeleteCertificates/RenewLetsEncryptCert）を実装。`internal/sakura/proxylb.go`にサービスメソッドを追加、`app.go`に4つのRPCを公開、`ProxyLBList.tsx`にSSL証明書カード（表示/設定フォーム/削除確認/Let's Encrypt更新確認）を追加し`ProxyLBList.test.tsx`にテストを追加
 
+### ✅ 完了（2026-08-07 追加セッション3）
+- `AppRunSharedList.test.tsx` を追加（ユーザー未設定時の案内・HasAppRunSharedUser失敗時のフォールバック・一覧表示/空状態/エラー表示・詳細遷移とコンポーネント/トラフィック/バージョン履歴表示・戻る操作をカバー）
+- `MonitoringMetricDetail.test.tsx` を追加（基本情報表示・アクセスキー0件時の案内・publisher一覧取得失敗時のエラー表示・publisher選択によるメトリクスのvariantグルーピング・カスタムメトリクス・メトリクス0件時の表示をカバー。`MetricGraph`はuPlot/canvas依存のため`vi.mock`でスタブ化）
+
 ### 次セッションの優先順位
 
-**B. 中規模（実装パターンは確立済み）**
-1. `AppRunSharedList.test.tsx` / `MonitoringMetricDetail.test.tsx` のFEテスト
-
 **C. 大物・要方針決定（着手前にスコープを確認）**
-2. ObjectStorage: バケット/アクセスキーのCreate/Delete、`ObjectStorageList.test.tsx`（ロジック濃度最大・実装コストも高い）
-3. AppRun（専有/共用）: 削除・デプロイ操作。Version Create（新バージョンのデプロイ）は「閲覧中心」という現状スコープを超えるため、実装するか自体を判断してから着手
+1. ObjectStorage: バケット/アクセスキーのCreate/Delete、`ObjectStorageList.test.tsx`（ロジック濃度最大・実装コストも高い）
+2. AppRun（専有型）: `AppRunDedicatedList.test.tsx`（6種のview＋パンくず生成＋アクティブバージョン切替、調査対象中もっとも分岐が複雑）。削除・デプロイ操作はSDK比較で不足あり。Version Create（新バージョンのデプロイ）は「閲覧中心」という現状スコープを超えるため、実装するか自体を判断してから着手
 
 ### その他
 - `internal/sakura/server.go` の `println` デバッグ文の削除（別issueとして切り出し推奨、未着手）
