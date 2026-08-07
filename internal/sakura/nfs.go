@@ -75,6 +75,12 @@ func (s *NFSService) ForceStop(ctx context.Context, zone string, nfsID string) e
 	return nfsOp.Shutdown(ctx, zone, id, &iaas.ShutdownOption{Force: true})
 }
 
+func (s *NFSService) Reset(ctx context.Context, zone string, nfsID string) error {
+	nfsOp := iaas.NewNFSOp(s.client.Caller())
+	id := types.StringID(nfsID)
+	return nfsOp.Reset(ctx, zone, id)
+}
+
 func (s *NFSService) Delete(ctx context.Context, zone string, nfsID string) error {
 	nfsOp := iaas.NewNFSOp(s.client.Caller())
 	id := types.StringID(nfsID)

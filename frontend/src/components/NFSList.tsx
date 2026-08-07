@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { GetNFSList, PowerOnNFS, PowerOffNFS, DeleteNFS, GetNFSStatus } from '../../wailsjs/go/main/App';
+import { GetNFSList, PowerOnNFS, PowerOffNFS, DeleteNFS, GetNFSStatus, ResetNFS } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -17,7 +17,7 @@ interface ConfirmDialog {
   nfsName: string;
   nfsId: string;
   nfsZone: string;
-  action: 'powerOn' | 'powerOff' | 'delete';
+  action: 'powerOn' | 'powerOff' | 'reset' | 'delete';
 }
 
 export function NFSList({ profile, zone, zones, onZoneChange }: NFSListProps) {
@@ -25,7 +25,7 @@ export function NFSList({ profile, zone, zones, onZoneChange }: NFSListProps) {
   const [loading, setLoading] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog | null>(null);
-  const [pendingNFS, setPendingNFS] = useState<Set<string>>(new Set());
+  const [pendingNFS, setPendingNFS] = useState<Map<string, 'powerOn' | 'powerOff' | 'reset'>>(new Map());
   const pollingIntervalRef = useRef<Record<string, number>>({});
 
   const loadNFSList = useCallback(async () => {
@@ -74,7 +74,7 @@ export function NFSList({ profile, zone, zones, onZoneChange }: NFSListProps) {
           clearInterval(pollingIntervalRef.current[nfsId]);
           delete pollingIntervalRef.current[nfsId];
           setPendingNFS(prev => {
-            const next = new Set(prev);
+            const next = new Map(prev);
             next.delete(nfsId);
             return next;
           });
@@ -89,7 +89,7 @@ export function NFSList({ profile, zone, zones, onZoneChange }: NFSListProps) {
   }, [profile, loadNFSList]);
 
   // 確認ダイアログを表示
-  const showConfirmDialog = (e: React.MouseEvent, nfsZone: string, nfsId: string, nfsName: string, action: 'powerOn' | 'powerOff' | 'delete') => {
+  const showConfirmDialog = (e: React.MouseEvent, nfsZone: string, nfsId: string, nfsName: string, action: 'powerOn' | 'powerOff' | 'reset' | 'delete') => {
     e.stopPropagation();
     setOpenDropdown(null);
     setConfirmDialog({
@@ -109,7 +109,7 @@ export function NFSList({ profile, zone, zones, onZoneChange }: NFSListProps) {
     setConfirmDialog(null);
 
     if (action !== 'delete') {
-      setPendingNFS(prev => new Set(prev).add(nfsId));
+      setPendingNFS(prev => new Map(prev).set(nfsId, action));
     }
 
     try {
@@ -119,6 +119,17 @@ export function NFSList({ profile, zone, zones, onZoneChange }: NFSListProps) {
       } else if (action === 'powerOff') {
         await PowerOffNFS(profile, nfsZone, nfsId);
         startPolling(nfsZone, nfsId, 'down');
+      } else if (action === 'reset') {
+        await ResetNFS(profile, nfsZone, nfsId);
+        // Resetはステータスが変化しないため、一定時間後にスピナーを解除する
+        window.setTimeout(() => {
+          setPendingNFS(prev => {
+            const next = new Map(prev);
+            next.delete(nfsId);
+            return next;
+          });
+          loadNFSList();
+        }, 5000);
       } else if (action === 'delete') {
         await DeleteNFS(profile, nfsZone, nfsId);
         loadNFSList();
@@ -126,7 +137,7 @@ export function NFSList({ profile, zone, zones, onZoneChange }: NFSListProps) {
     } catch (err) {
       console.error('[NFSList] Action error:', err);
       setPendingNFS(prev => {
-        const next = new Set(prev);
+        const next = new Map(prev);
         next.delete(nfsId);
         return next;
       });
@@ -227,7 +238,7 @@ export function NFSList({ profile, zone, zones, onZoneChange }: NFSListProps) {
                         borderRadius: '50%',
                         animation: 'spin 1s linear infinite',
                       }}></span>
-                      {n.status === 'up' ? '停止中...' : '起動中...'}
+                      {pendingNFS.get(n.id) === 'reset' ? '再起動中...' : n.status === 'up' ? '停止中...' : '起動中...'}
                     </span>
                   ) : (
                     <span className={`status ${n.status.toLowerCase() === 'up' ? 'up' : 'down'}`} style={{ padding: '2px 6px', fontSize: '0.65rem' }}>
@@ -290,6 +301,13 @@ export function NFSList({ profile, zone, zones, onZoneChange }: NFSListProps) {
                   >
                     停止
                   </button>
+                  <button
+                    className="dropdown-item"
+                    onClick={(e) => showConfirmDialog(e, n.zone, n.id, n.name, 'reset')}
+                    disabled={n.status.toLowerCase() !== 'up' || pendingNFS.has(n.id)}
+                  >
+                    再起動
+                  </button>
                   <div style={{ borderTop: '1px solid #333', margin: '4px 0' }}></div>
                   <button
                     className="dropdown-item"
@@ -333,11 +351,11 @@ export function NFSList({ profile, zone, zones, onZoneChange }: NFSListProps) {
             maxWidth: '400px',
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>
-              {confirmDialog.action === 'powerOn' ? 'NFS起動' : confirmDialog.action === 'powerOff' ? 'NFS停止' : 'NFS削除'}
+              {confirmDialog.action === 'powerOn' ? 'NFS起動' : confirmDialog.action === 'powerOff' ? 'NFS停止' : confirmDialog.action === 'reset' ? 'NFS再起動' : 'NFS削除'}
             </h3>
             <p style={{ margin: '0 0 20px 0', color: '#aaa' }}>
               <strong style={{ color: '#fff' }}>{confirmDialog.nfsName}</strong> を
-              {confirmDialog.action === 'powerOn' ? '起動' : confirmDialog.action === 'powerOff' ? '停止' : '削除'}しますか？
+              {confirmDialog.action === 'powerOn' ? '起動' : confirmDialog.action === 'powerOff' ? '停止' : confirmDialog.action === 'reset' ? '再起動' : '削除'}しますか？
               {confirmDialog.action === 'delete' && (
                 <span style={{ display: 'block', marginTop: '8px', color: '#f87171', fontSize: '0.85rem' }}>
                   この操作は取り消せません。
@@ -362,14 +380,14 @@ export function NFSList({ profile, zone, zones, onZoneChange }: NFSListProps) {
                 onClick={executeAction}
                 style={{
                   padding: '8px 16px',
-                  backgroundColor: confirmDialog.action === 'powerOn' ? '#22c55e' : confirmDialog.action === 'powerOff' ? '#ef4444' : '#c62828',
+                  backgroundColor: confirmDialog.action === 'powerOn' ? '#22c55e' : confirmDialog.action === 'powerOff' ? '#ef4444' : confirmDialog.action === 'reset' ? '#f59e0b' : '#c62828',
                   border: 'none',
                   borderRadius: '4px',
                   color: '#fff',
                   cursor: 'pointer',
                 }}
               >
-                {confirmDialog.action === 'powerOn' ? '起動する' : confirmDialog.action === 'powerOff' ? '停止する' : '削除する'}
+                {confirmDialog.action === 'powerOn' ? '起動する' : confirmDialog.action === 'powerOff' ? '停止する' : confirmDialog.action === 'reset' ? '再起動する' : '削除する'}
               </button>
             </div>
           </div>
