@@ -87,6 +87,11 @@ func (s *ProxyLBService) Get(ctx context.Context, id string) (*ProxyLBInfo, erro
 	return &info, nil
 }
 
+func (s *ProxyLBService) Delete(ctx context.Context, id string) error {
+	op := iaas.NewProxyLBOp(s.client.Caller())
+	return op.Delete(ctx, types.StringID(id))
+}
+
 func (s *ProxyLBService) GetHealth(ctx context.Context, id string) (*ProxyLBHealthInfo, error) {
 	op := iaas.NewProxyLBOp(s.client.Caller())
 	proxyLBID := types.StringID(id)
