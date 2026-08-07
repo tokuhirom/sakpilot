@@ -22,6 +22,7 @@ import { DNSList } from './components/DNSList';
 import { DNSDetail } from './components/DNSDetail';
 import { MonitorList } from './components/MonitorList';
 import { DatabaseList } from './components/DatabaseList';
+import { NFSList } from './components/NFSList';
 import { Monitoring } from './components/Monitoring';
 import { MonitoringMetricDetail } from './components/MonitoringMetricDetail';
 import { AppRunDedicatedList } from './components/AppRunDedicatedList';
@@ -48,6 +49,7 @@ const zoneResources = [
   { path: 'archives', label: 'アーカイブ' },
   { path: 'switches', label: 'スイッチ' },
   { path: 'databases', label: 'データベース' },
+  { path: 'nfs', label: 'NFS' },
   { path: 'packetfilters', label: 'パケットフィルター' },
 ];
 
@@ -172,6 +174,7 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
               <Route path="switches" element={<span className="breadcrumb-item active">スイッチ</span>} />
               <Route path="switches/:id" element={<SwitchBreadcrumb profile={profile} />} />
               <Route path="databases" element={<span className="breadcrumb-item active">データベース</span>} />
+              <Route path="nfs" element={<span className="breadcrumb-item active">NFS</span>} />
               <Route path="packetfilters" element={<span className="breadcrumb-item active">パケットフィルター</span>} />
               <Route path="packetfilters/:id" element={<PacketFilterBreadcrumb profile={profile} />} />
               <Route path="dns" element={<span className="breadcrumb-item active">DNS</span>} />
@@ -227,6 +230,9 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
           } />
           <Route path="databases" element={
             <DatabaseList profile={profile} zone={selectedZone} zones={zones} onZoneChange={setSelectedZone} />
+          } />
+          <Route path="nfs" element={
+            <NFSList profile={profile} zone={selectedZone} zones={zones} onZoneChange={setSelectedZone} />
           } />
           <Route path="switches" element={
             <SwitchListWrapper profile={profile} zone={selectedZone} zones={zones} onZoneChange={setSelectedZone} />
