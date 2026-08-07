@@ -848,6 +848,14 @@ func (a *App) GetKMSKeys(profileName string) ([]kms.KeyInfo, error) {
 	return service.ListKeys(a.ctx)
 }
 
+func (a *App) DeleteKMSKey(profileName, keyId string) error {
+	service, err := kms.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteKey(a.ctx, keyId)
+}
+
 // ProxyLB (Enhanced Load Balancer)
 func (a *App) GetProxyLBs(profileName string) ([]sakura.ProxyLBInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
