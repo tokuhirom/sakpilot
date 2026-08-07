@@ -7,9 +7,10 @@ import { SearchBar } from './SearchBar';
 
 interface MonitorListProps {
   profile: string;
+  onSelectMonitor: (id: string) => void;
 }
 
-export function MonitorList({ profile }: MonitorListProps) {
+export function MonitorList({ profile, onSelectMonitor }: MonitorListProps) {
   const [monitors, setMonitors] = useState<sakura.SimpleMonitorInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<sakura.SimpleMonitorInfo | null>(null);
@@ -56,7 +57,8 @@ export function MonitorList({ profile }: MonitorListProps) {
     loadMonitors();
   }, [loadMonitors]);
 
-  const handleDeleteClick = (m: sakura.SimpleMonitorInfo) => {
+  const handleDeleteClick = (e: React.MouseEvent, m: sakura.SimpleMonitorInfo) => {
+    e.stopPropagation();
     setConfirmDelete(m);
   };
 
@@ -112,8 +114,8 @@ export function MonitorList({ profile }: MonitorListProps) {
           </thead>
           <tbody>
             {filteredMonitors.map((m) => (
-              <tr key={m.id}>
-                <td>{m.name}</td>
+              <tr key={m.id} onClick={() => onSelectMonitor(m.id)} style={{ cursor: 'pointer' }} className="row-hover">
+                <td style={{ color: '#00adb5', fontWeight: 'bold' }}>{m.name}</td>
                 <td>{m.target}</td>
                 <td>
                   <span className={`status ${m.enabled ? 'up' : 'down'}`}>
@@ -123,7 +125,7 @@ export function MonitorList({ profile }: MonitorListProps) {
                 <td style={{ textAlign: 'left' }}>
                   <button
                     className="btn btn-danger btn-small"
-                    onClick={() => handleDeleteClick(m)}
+                    onClick={(e) => handleDeleteClick(e, m)}
                     disabled={deleting === m.id}
                     title="削除"
                   >

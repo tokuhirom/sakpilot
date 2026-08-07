@@ -21,6 +21,7 @@ import { DiskList } from './components/DiskList';
 import { DNSList } from './components/DNSList';
 import { DNSDetail } from './components/DNSDetail';
 import { MonitorList } from './components/MonitorList';
+import { MonitorDetail } from './components/MonitorDetail';
 import { DatabaseList } from './components/DatabaseList';
 import { NFSList } from './components/NFSList';
 import { Monitoring } from './components/Monitoring';
@@ -183,6 +184,7 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
               <Route path="gslb/:id" element={<GSLBBreadcrumb profile={profile} />} />
               <Route path="elb" element={<span className="breadcrumb-item active">ELB</span>} />
               <Route path="monitors" element={<span className="breadcrumb-item active">シンプル監視</span>} />
+              <Route path="monitors/:id" element={<MonitorBreadcrumb profile={profile} />} />
               <Route path="monitoring" element={<span className="breadcrumb-item active">モニタリングスイート</span>} />
               <Route path="monitoring/metrics/:id" element={<MonitoringMetricBreadcrumb profile={profile} />} />
               <Route path="container-registry" element={<span className="breadcrumb-item active">コンテナレジストリ</span>} />
@@ -258,7 +260,10 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
           <Route path="gslb/:id" element={
             <GSLBDetailWrapper profile={profile} />
           } />
-          <Route path="monitors" element={<MonitorList profile={profile} />} />
+          <Route path="monitors" element={<MonitorListWrapper profile={profile} />} />
+          <Route path="monitors/:id" element={
+            <MonitorDetailWrapper profile={profile} />
+          } />
           <Route path="monitoring" element={<Monitoring profile={profile} />} />
           <Route path="monitoring/metrics/:id" element={
             <MonitoringMetricDetailWrapper profile={profile} />
@@ -344,6 +349,22 @@ function DNSDetailWrapper({ profile }: { profile: string }) {
   return <DNSDetail profile={profile} dnsId={id} />;
 }
 
+function MonitorListWrapper({ profile }: { profile: string }) {
+  const navigate = useNavigate();
+  return (
+    <MonitorList
+      profile={profile}
+      onSelectMonitor={(id) => navigate(`/${profile}/monitors/${id}`)}
+    />
+  );
+}
+
+function MonitorDetailWrapper({ profile }: { profile: string }) {
+  const { id } = useParams<{ id: string }>();
+  if (!id) return null;
+  return <MonitorDetail profile={profile} monitorId={id} />;
+}
+
 function GSLBListWrapper({ profile }: { profile: string }) {
   const navigate = useNavigate();
   return (
@@ -410,6 +431,19 @@ function DNSBreadcrumb({ profile }: { profile: string }) {
     <>
       <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/${profile}/dns`)}>
         DNS
+      </span>
+      <span className="breadcrumb-separator">/</span>
+      <span className="breadcrumb-item active">詳細</span>
+    </>
+  );
+}
+
+function MonitorBreadcrumb({ profile }: { profile: string }) {
+  const navigate = useNavigate();
+  return (
+    <>
+      <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/${profile}/monitors`)}>
+        シンプル監視
       </span>
       <span className="breadcrumb-separator">/</span>
       <span className="breadcrumb-item active">詳細</span>

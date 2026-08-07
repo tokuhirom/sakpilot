@@ -23,7 +23,7 @@
 | DNS | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #84） |
 | GSLB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #85、CI待ちでauto-merge設定済み） |
 | ProxyLB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #88）。証明書管理は引き続き未実装 |
-| SimpleMonitor | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #86）。Get(詳細)は引き続き未実装 |
+| SimpleMonitor | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #86）。Get(詳細)・詳細ページを追加済み |
 | Database | ✅ あり | ✅ | ✅ | 起動/停止/再起動+削除+FEテストを追加済み（PR #81） |
 | EnhancedDB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #87） |
 | NFS | ✅ あり | ✅ | ✅ | 完備。FEテストとResetを追加済み（PR #80） |
@@ -101,11 +101,11 @@
 - **TODO**: 証明書管理・トラフィック監視はHTTPS運用上重要なため次点で優先度高め
 
 ### SimpleMonitor
-- テスト: `MonitorList.test.tsx` あり（一覧表示・削除確認フローをカバー）
-- バックエンド: List/**Delete** 実装済み（詳細取得＝Getは引き続き未実装）
+- テスト: `MonitorList.test.tsx` あり（一覧表示・詳細遷移・削除確認フローをカバー）
+- バックエンド: List/**Get**/Delete 実装済み
 - ✅ **対応済み（PR #86）**: 削除機能を追加
-- SDK比較で残る不足: Create/Read（Get）/Update/UpdateSettings/MonitorResponseTime（応答時間グラフ）/HealthStatus
-- **TODO**: 詳細ページ（Get）の追加を優先検討。監視対象の設定内容・応答時間グラフが見えないのは運用上の穴
+- ✅ **対応済み**: Get（詳細取得）と `MonitorDetail.tsx`（基本情報・ヘルスチェック設定）を追加。一覧の行クリックで詳細へ遷移
+- SDK比較で残る不足: Create/Update/UpdateSettings/MonitorResponseTime（応答時間グラフ）/HealthStatus（未着手）
 
 ### Monitoring Suite（Monitoring.tsx / MonitoringMetricDetail.tsx / MetricGraph.tsx）
 - テスト: なし。`MonitoringMetricDetail.tsx` はpublisher切り替え・メトリクスのグルーピング（useMemo）・エラー分岐があり、**テストを書く価値がある候補**
@@ -177,12 +177,12 @@
 
 ### ✅ 完了（2026-08-07 追加セッション）
 - FEテスト新規追加: `DiskList.test.tsx`（削除フロー・キャンセル・未接続表示）, `ArchiveList.test.tsx`（削除フロー・キャンセル・busy状態のボタン無効化）
+- SimpleMonitorのGet（詳細取得）を実装。`internal/sakura/global.go` に `GetSimpleMonitor`、`app.go` に `GetSimpleMonitorDetail` を追加し、`MonitorDetail.tsx`（基本情報・ヘルスチェック設定表示）と一覧からの行クリック遷移を追加
 
 ### 次セッションの優先順位
 
 **A. 低コストですぐ着手できるもの**
-1. SimpleMonitorのGet（詳細取得）実装 — Listのみで詳細ページが作れない状態を解消
-2. `ContainerRegistryDetail.test.tsx` — パスワード保存/削除フロー、資格情報自動アクティブ化のテスト
+1. `ContainerRegistryDetail.test.tsx` — パスワード保存/削除フロー、資格情報自動アクティブ化のテスト
 
 **B. 中規模（実装パターンは確立済み）**
 4. KMSの残り機能: Get（詳細）/Rotate（ローテーション）/ChangeStatus（有効化・無効化）— Delete実装（`internal/kms/service.go`）と同じパターン

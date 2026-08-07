@@ -37,6 +37,31 @@ type SimpleMonitorInfo struct {
 	Enabled     bool   `json:"enabled"`
 }
 
+type SimpleMonitorHealthCheckInfo struct {
+	Protocol       string `json:"protocol"`
+	Port           string `json:"port"`
+	Path           string `json:"path"`
+	Status         string `json:"status"`
+	Host           string `json:"host"`
+	ContainsString string `json:"containsString"`
+}
+
+type SimpleMonitorDetailInfo struct {
+	ID                 string                        `json:"id"`
+	Name               string                        `json:"name"`
+	Description        string                        `json:"description"`
+	Target             string                        `json:"target"`
+	Enabled            bool                          `json:"enabled"`
+	Availability       string                        `json:"availability"`
+	DelayLoop          int                           `json:"delayLoop"`
+	MaxCheckAttempts   int                           `json:"maxCheckAttempts"`
+	RetryInterval      int                           `json:"retryInterval"`
+	Timeout            int                           `json:"timeout"`
+	NotifyEmailEnabled bool                          `json:"notifyEmailEnabled"`
+	NotifySlackEnabled bool                          `json:"notifySlackEnabled"`
+	HealthCheck        *SimpleMonitorHealthCheckInfo `json:"healthCheck,omitempty"`
+}
+
 type GSLBServerInfo struct {
 	IPAddress string `json:"ipAddress"`
 	Enabled   bool   `json:"enabled"`
@@ -182,6 +207,42 @@ func (s *GlobalService) ListSimpleMonitors(ctx context.Context) ([]SimpleMonitor
 		})
 	}
 	return list, nil
+}
+
+func (s *GlobalService) GetSimpleMonitor(ctx context.Context, id string) (*SimpleMonitorDetailInfo, error) {
+	smOp := iaas.NewSimpleMonitorOp(s.client.Caller())
+	m, err := smOp.Read(ctx, types.StringID(id))
+	if err != nil {
+		return nil, err
+	}
+
+	detail := &SimpleMonitorDetailInfo{
+		ID:                 m.ID.String(),
+		Name:               m.Name,
+		Description:        m.Description,
+		Target:             m.Target,
+		Enabled:            m.Enabled.Bool(),
+		Availability:       string(m.Availability),
+		DelayLoop:          m.DelayLoop,
+		MaxCheckAttempts:   m.MaxCheckAttempts,
+		RetryInterval:      m.RetryInterval,
+		Timeout:            m.Timeout,
+		NotifyEmailEnabled: m.NotifyEmailEnabled.Bool(),
+		NotifySlackEnabled: m.NotifySlackEnabled.Bool(),
+	}
+
+	if m.HealthCheck != nil {
+		detail.HealthCheck = &SimpleMonitorHealthCheckInfo{
+			Protocol:       string(m.HealthCheck.Protocol),
+			Port:           m.HealthCheck.Port.String(),
+			Path:           m.HealthCheck.Path,
+			Status:         m.HealthCheck.Status.String(),
+			Host:           m.HealthCheck.Host,
+			ContainsString: m.HealthCheck.ContainsString,
+		}
+	}
+
+	return detail, nil
 }
 
 func (s *GlobalService) DeleteSimpleMonitor(ctx context.Context, id string) error {
