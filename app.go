@@ -162,6 +162,15 @@ func (a *App) DeleteServer(profileName, zone, serverID string) error {
 	return service.Delete(a.ctx, zone, serverID)
 }
 
+func (a *App) ResetServer(profileName, zone, serverID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewServerService(client)
+	return service.Reset(a.ctx, zone, serverID)
+}
+
 func (a *App) GetServerStatus(profileName, zone, serverID string) (string, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
 	if err != nil {
@@ -366,6 +375,15 @@ func (a *App) DeleteNFS(profileName, zone, nfsID string) error {
 	}
 	service := sakura.NewNFSService(client)
 	return service.Delete(a.ctx, zone, nfsID)
+}
+
+func (a *App) ResetNFS(profileName, zone, nfsID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewNFSService(client)
+	return service.Reset(a.ctx, zone, nfsID)
 }
 
 func (a *App) GetNFSStatus(profileName, zone, nfsID string) (string, error) {
