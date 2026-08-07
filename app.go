@@ -322,6 +322,60 @@ func (a *App) GetDatabases(profileName, zone string) ([]sakura.DatabaseInfo, err
 	return service.List(a.ctx, zone)
 }
 
+func (a *App) PowerOnDatabase(profileName, zone, databaseID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewDatabaseService(client)
+	return service.PowerOn(a.ctx, zone, databaseID)
+}
+
+func (a *App) PowerOffDatabase(profileName, zone, databaseID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewDatabaseService(client)
+	return service.PowerOff(a.ctx, zone, databaseID)
+}
+
+func (a *App) ForceStopDatabase(profileName, zone, databaseID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewDatabaseService(client)
+	return service.ForceStop(a.ctx, zone, databaseID)
+}
+
+func (a *App) ResetDatabase(profileName, zone, databaseID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewDatabaseService(client)
+	return service.Reset(a.ctx, zone, databaseID)
+}
+
+func (a *App) DeleteDatabase(profileName, zone, databaseID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewDatabaseService(client)
+	return service.Delete(a.ctx, zone, databaseID)
+}
+
+func (a *App) GetDatabaseStatus(profileName, zone, databaseID string) (string, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return "", err
+	}
+	service := sakura.NewDatabaseService(client)
+	return service.GetStatus(a.ctx, zone, databaseID)
+}
+
 // NFS
 func (a *App) GetNFSList(profileName, zone string) ([]sakura.NFSInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)

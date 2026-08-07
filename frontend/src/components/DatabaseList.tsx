@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { GetDatabases } from '../../wailsjs/go/main/App';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { GetDatabases, PowerOnDatabase, PowerOffDatabase, DeleteDatabase, GetDatabaseStatus, ResetDatabase } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -12,23 +12,21 @@ interface DatabaseListProps {
   onZoneChange: (zone: string) => void;
 }
 
+interface ConfirmDialog {
+  show: boolean;
+  databaseName: string;
+  databaseId: string;
+  databaseZone: string;
+  action: 'powerOn' | 'powerOff' | 'reset' | 'delete';
+}
+
 export function DatabaseList({ profile, zone, zones, onZoneChange }: DatabaseListProps) {
   const [databases, setDatabases] = useState<sakura.DatabaseInfo[]>([]);
   const [loading, setLoading] = useState(false);
-
-  const {
-    searchQuery,
-    setSearchQuery,
-    isSearching,
-    searchInputRef,
-    filteredItems: filteredDatabases,
-    closeSearch,
-  } = useSearch(databases, (db, query) =>
-    db.name.toLowerCase().includes(query) ||
-    db.ipAddresses?.some(ip => ip.includes(query)) ||
-    db.tags?.some(tag => tag.toLowerCase().includes(query)) ||
-    db.id.includes(query)
-  );
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog | null>(null);
+  const [pendingDatabases, setPendingDatabases] = useState<Map<string, 'powerOn' | 'powerOff' | 'reset'>>(new Map());
+  const pollingIntervalRef = useRef<Record<string, number>>({});
 
   const loadDatabases = useCallback(async () => {
     if (!profile || !zone) {
@@ -49,20 +47,136 @@ export function DatabaseList({ profile, zone, zones, onZoneChange }: DatabaseLis
 
   useGlobalReload(loadDatabases);
 
+  // ドロップダウンを閉じるためのクリックリスナー
+  useEffect(() => {
+    const handleClickOutside = () => setOpenDropdown(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  // コンポーネントのアンマウント時にポーリングをクリア
+  useEffect(() => {
+    return () => {
+      Object.values(pollingIntervalRef.current).forEach(clearInterval);
+    };
+  }, []);
+
+  // データベースのステータスをポーリングする
+  const startPolling = useCallback((databaseZone: string, databaseId: string, expectedStatus: string) => {
+    if (pollingIntervalRef.current[databaseId]) {
+      clearInterval(pollingIntervalRef.current[databaseId]);
+    }
+
+    const pollInterval = window.setInterval(async () => {
+      try {
+        const status = await GetDatabaseStatus(profile, databaseZone, databaseId);
+        if (status === expectedStatus) {
+          clearInterval(pollingIntervalRef.current[databaseId]);
+          delete pollingIntervalRef.current[databaseId];
+          setPendingDatabases(prev => {
+            const next = new Map(prev);
+            next.delete(databaseId);
+            return next;
+          });
+          loadDatabases();
+        }
+      } catch (err) {
+        console.error('[DatabaseList] Polling error:', err);
+      }
+    }, 2000);
+
+    pollingIntervalRef.current[databaseId] = pollInterval;
+  }, [profile, loadDatabases]);
+
+  // 確認ダイアログを表示
+  const showConfirmDialog = (e: React.MouseEvent, databaseZone: string, databaseId: string, databaseName: string, action: 'powerOn' | 'powerOff' | 'reset' | 'delete') => {
+    e.stopPropagation();
+    setOpenDropdown(null);
+    setConfirmDialog({
+      show: true,
+      databaseName,
+      databaseId,
+      databaseZone,
+      action,
+    });
+  };
+
+  // 確認ダイアログでの操作実行
+  const executeAction = async () => {
+    if (!confirmDialog) return;
+
+    const { databaseZone, databaseId, action } = confirmDialog;
+    setConfirmDialog(null);
+
+    if (action !== 'delete') {
+      setPendingDatabases(prev => new Map(prev).set(databaseId, action));
+    }
+
+    try {
+      if (action === 'powerOn') {
+        await PowerOnDatabase(profile, databaseZone, databaseId);
+        startPolling(databaseZone, databaseId, 'up');
+      } else if (action === 'powerOff') {
+        await PowerOffDatabase(profile, databaseZone, databaseId);
+        startPolling(databaseZone, databaseId, 'down');
+      } else if (action === 'reset') {
+        await ResetDatabase(profile, databaseZone, databaseId);
+        // Resetはステータスが変化しないため、一定時間後にスピナーを解除する
+        window.setTimeout(() => {
+          setPendingDatabases(prev => {
+            const next = new Map(prev);
+            next.delete(databaseId);
+            return next;
+          });
+          loadDatabases();
+        }, 5000);
+      } else if (action === 'delete') {
+        await DeleteDatabase(profile, databaseZone, databaseId);
+        loadDatabases();
+      }
+    } catch (err) {
+      console.error('[DatabaseList] Action error:', err);
+      setPendingDatabases(prev => {
+        const next = new Map(prev);
+        next.delete(databaseId);
+        return next;
+      });
+    }
+  };
+
+  const {
+    searchQuery,
+    setSearchQuery,
+    isSearching,
+    searchInputRef,
+    filteredItems: filteredDatabases,
+    closeSearch,
+  } = useSearch(databases, (db, query) =>
+    db.name.toLowerCase().includes(query) ||
+    db.ipAddresses?.some(ip => ip.includes(query)) ||
+    db.tags?.some(tag => tag.toLowerCase().includes(query)) ||
+    db.id.includes(query)
+  );
+
   useEffect(() => {
     loadDatabases();
   }, [loadDatabases]);
 
+  const toggleDropdown = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setOpenDropdown(openDropdown === id ? null : id);
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return 'Invalid Date';
-    
+
     const Y = date.getFullYear();
     const M = String(date.getMonth() + 1).padStart(2, '0');
     const D = String(date.getDate()).padStart(2, '0');
     const h = String(date.getHours()).padStart(2, '0');
     const m = String(date.getMinutes()).padStart(2, '0');
-    
+
     return `${Y}/${M}/${D} ${h}:${m}`;
   };
 
@@ -118,9 +232,23 @@ export function DatabaseList({ profile, zone, zones, onZoneChange }: DatabaseLis
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <div className="card-title">{db.name}</div>
-                  <span className={`status ${db.status === 'up' ? 'up' : 'down'}`} style={{ padding: '2px 6px', fontSize: '0.65rem' }}>
-                    {db.status}
-                  </span>
+                  {pendingDatabases.has(db.id) ? (
+                    <span className="status pending" style={{ padding: '2px 6px', fontSize: '0.65rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span className="spinner" style={{
+                        width: '10px',
+                        height: '10px',
+                        border: '2px solid #ccc',
+                        borderTop: '2px solid #666',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite',
+                      }}></span>
+                      {pendingDatabases.get(db.id) === 'reset' ? '再起動中...' : db.status.toLowerCase() === 'up' ? '停止中...' : '起動中...'}
+                    </span>
+                  ) : (
+                    <span className={`status ${db.status.toLowerCase() === 'up' ? 'up' : 'down'}`} style={{ padding: '2px 6px', fontSize: '0.65rem' }}>
+                      {db.status}
+                    </span>
+                  )}
                 </div>
                 <div className="card-subtitle" style={{ marginTop: '2px', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <span>プラン: {getPlanName(db.planId)}</span>
@@ -148,13 +276,133 @@ export function DatabaseList({ profile, zone, zones, onZoneChange }: DatabaseLis
                   </div>
                 )}
               </div>
-              <div style={{ fontSize: '0.7rem', color: '#666' }}>
-                ID: {db.id}
+
+              <div className="dropdown">
+                <button
+                  className="btn-icon"
+                  onClick={(e) => toggleDropdown(e, db.id)}
+                >
+                  ⋮
+                </button>
+                <div className={`dropdown-menu ${openDropdown === db.id ? 'show' : ''}`}>
+                  <button
+                    className="dropdown-item"
+                    onClick={(e) => showConfirmDialog(e, db.zone, db.id, db.name, 'powerOn')}
+                    disabled={db.status.toLowerCase() === 'up' || pendingDatabases.has(db.id)}
+                  >
+                    起動
+                  </button>
+                  <button
+                    className="dropdown-item"
+                    onClick={(e) => showConfirmDialog(e, db.zone, db.id, db.name, 'powerOff')}
+                    disabled={db.status.toLowerCase() === 'down' || pendingDatabases.has(db.id)}
+                  >
+                    停止
+                  </button>
+                  <button
+                    className="dropdown-item"
+                    onClick={(e) => showConfirmDialog(e, db.zone, db.id, db.name, 'reset')}
+                    disabled={db.status.toLowerCase() !== 'up' || pendingDatabases.has(db.id)}
+                  >
+                    再起動
+                  </button>
+                  <div style={{ borderTop: '1px solid #333', margin: '4px 0' }}></div>
+                  <button
+                    className="dropdown-item"
+                    onClick={(e) => showConfirmDialog(e, db.zone, db.id, db.name, 'delete')}
+                    disabled={pendingDatabases.has(db.id)}
+                    style={{ color: '#f87171' }}
+                  >
+                    削除
+                  </button>
+                  <div style={{ borderTop: '1px solid #333', margin: '4px 0' }}></div>
+                  <div className="dropdown-item" style={{ fontSize: '0.7rem', color: '#666', cursor: 'default' }}>
+                    ID: {db.id}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         ))
       )}
+
+      {/* 確認ダイアログ */}
+      {confirmDialog && (
+        <div className="modal-overlay" onClick={() => setConfirmDialog(null)} style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+            backgroundColor: '#1a1a1a',
+            border: '1px solid #333',
+            borderRadius: '8px',
+            padding: '20px',
+            minWidth: '300px',
+            maxWidth: '400px',
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>
+              {confirmDialog.action === 'powerOn' ? 'データベース起動' : confirmDialog.action === 'powerOff' ? 'データベース停止' : confirmDialog.action === 'reset' ? 'データベース再起動' : 'データベース削除'}
+            </h3>
+            <p style={{ margin: '0 0 20px 0', color: '#aaa' }}>
+              <strong style={{ color: '#fff' }}>{confirmDialog.databaseName}</strong> を
+              {confirmDialog.action === 'powerOn' ? '起動' : confirmDialog.action === 'powerOff' ? '停止' : confirmDialog.action === 'reset' ? '再起動' : '削除'}しますか？
+              {confirmDialog.action === 'delete' && (
+                <span style={{ display: 'block', marginTop: '8px', color: '#f87171', fontSize: '0.85rem' }}>
+                  この操作は取り消せません。
+                </span>
+              )}
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setConfirmDialog(null)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#333',
+                  border: '1px solid #444',
+                  borderRadius: '4px',
+                  color: '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={executeAction}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: confirmDialog.action === 'powerOn' ? '#22c55e' : confirmDialog.action === 'powerOff' ? '#ef4444' : confirmDialog.action === 'reset' ? '#f59e0b' : '#c62828',
+                  border: 'none',
+                  borderRadius: '4px',
+                  color: '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                {confirmDialog.action === 'powerOn' ? '起動する' : confirmDialog.action === 'powerOff' ? '停止する' : confirmDialog.action === 'reset' ? '再起動する' : '削除する'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* スピナーアニメーション用CSS */}
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        .status.pending {
+          background-color: #f59e0b;
+          color: #000;
+        }
+      `}</style>
     </>
   );
 }

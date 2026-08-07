@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
+	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 )
 
 type DatabaseInfo struct {
@@ -52,4 +53,44 @@ func (s *DatabaseService) List(ctx context.Context, zone string) ([]DatabaseInfo
 		})
 	}
 	return databases, nil
+}
+
+func (s *DatabaseService) PowerOn(ctx context.Context, zone string, databaseID string) error {
+	dbOp := iaas.NewDatabaseOp(s.client.Caller())
+	id := types.StringID(databaseID)
+	return dbOp.Boot(ctx, zone, id)
+}
+
+func (s *DatabaseService) PowerOff(ctx context.Context, zone string, databaseID string) error {
+	dbOp := iaas.NewDatabaseOp(s.client.Caller())
+	id := types.StringID(databaseID)
+	return dbOp.Shutdown(ctx, zone, id, &iaas.ShutdownOption{Force: false})
+}
+
+func (s *DatabaseService) ForceStop(ctx context.Context, zone string, databaseID string) error {
+	dbOp := iaas.NewDatabaseOp(s.client.Caller())
+	id := types.StringID(databaseID)
+	return dbOp.Shutdown(ctx, zone, id, &iaas.ShutdownOption{Force: true})
+}
+
+func (s *DatabaseService) Reset(ctx context.Context, zone string, databaseID string) error {
+	dbOp := iaas.NewDatabaseOp(s.client.Caller())
+	id := types.StringID(databaseID)
+	return dbOp.Reset(ctx, zone, id)
+}
+
+func (s *DatabaseService) Delete(ctx context.Context, zone string, databaseID string) error {
+	dbOp := iaas.NewDatabaseOp(s.client.Caller())
+	id := types.StringID(databaseID)
+	return dbOp.Delete(ctx, zone, id)
+}
+
+func (s *DatabaseService) GetStatus(ctx context.Context, zone string, databaseID string) (string, error) {
+	dbOp := iaas.NewDatabaseOp(s.client.Caller())
+	id := types.StringID(databaseID)
+	db, err := dbOp.Read(ctx, zone, id)
+	if err != nil {
+		return "", err
+	}
+	return string(db.InstanceStatus), nil
 }
