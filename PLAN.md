@@ -15,8 +15,8 @@
 | リソース | FEテスト | 削除機能 | 電源操作 | 総評 |
 |---|---|---|---|---|
 | Server | ✅ あり | ✅ | ✅ | 完備。Resetも追加済み（PR #80） |
-| Disk | ❌ なし | ✅ | (対象外) | Create/Update/接続変更が未実装。FEテストが積み残し（未着手） |
-| Archive | ❌ なし | ✅ | (対象外) | Create/共有/FTP転送が未実装。FEテストが積み残し（未着手） |
+| Disk | ✅ あり | ✅ | (対象外) | 削除フローのFEテストを追加済み。Create/Update/接続変更は引き続き未実装 |
+| Archive | ✅ あり | ✅ | (対象外) | 削除フロー・busy状態のFEテストを追加済み。Create/共有/FTP転送は引き続き未実装 |
 | Switch | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #82）。共有スコープは削除不可でボタン無効化 |
 | PacketFilter | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #83） |
 | KMS | ✅ あり | ✅（Delete） | (対象外) | 削除機能+FEテストを追加済み（PR #90）。Get/Rotate/ChangeStatus/暗号化は引き続き未実装 |
@@ -32,7 +32,7 @@
 | AppRun (専有/共用) | ❌ なし | ❌ **なし** | (対象外) | 閲覧＋アクティブバージョン切替のみ（未着手、方針判断待ち） |
 | Bill | ❌ なし | (対象外) | (対象外) | 読み取り専用リソースなので概ね妥当 |
 
-**17リソース中、FEテストが未着手なのは Disk / Archive / ObjectStorage / AppRun / Bill、および ContainerRegistryDetail（Listは対応済み）。**
+**17リソース中、FEテストが未着手なのは ObjectStorage / AppRun / Bill、および ContainerRegistryDetail（Listは対応済み）。**
 
 ---
 
@@ -46,16 +46,16 @@
 - 備考: `server.go` に `println` デバッグ文が複数残存（要クリーンアップ、別issue化推奨）
 
 ### Disk
-- テスト: なし。`DiskList.tsx` は削除確認ダイアログ＋削除中のボタン無効化という状態遷移ロジックを持ち、**テストを書く価値が高い**
+- テスト: `DiskList.test.tsx` あり（一覧表示・削除確認フロー・キャンセル・未接続表示をカバー）
 - バックエンド: List/Delete のみ。Get/Create/Update、サーバーへの接続/切断（ConnectToServer/DisconnectFromServer）は未実装
-- SDK比較で不足: Create/CreateWithConfig/Update/Config（OSインストール設定）/ConnectToServer/DisconnectFromServer/ResizePartition/Monitor系
-- **TODO**: `DiskList.test.tsx` を追加（削除フロー）。サーバー接続変更機能は将来検討
+- ✅ **対応済み**: `DiskList.test.tsx` を追加
+- SDK比較で残る不足: Create/CreateWithConfig/Update/Config（OSインストール設定）/ConnectToServer/DisconnectFromServer/ResizePartition/Monitor系（未着手）
 
 ### Archive
-- テスト: なし。`ArchiveList.tsx` は削除確認ダイアログ＋`availability`(uploading/migrating)に応じたボタン活性制御があり、**テストを書く価値が高い**
+- テスト: `ArchiveList.test.tsx` あり（一覧表示・削除確認フロー・キャンセル・`availability`(uploading/migrating)に応じたボタン活性制御をカバー）
 - バックエンド: List（ユーザースコープのみ）/Delete のみ
-- SDK比較で不足: Create/CreateBlank/CreateFromShared/Update/Transfer/Share/OpenFTP/CloseFTP
-- **TODO**: `ArchiveList.test.tsx` を追加（削除フロー、busy状態でのボタン無効化）
+- ✅ **対応済み**: `ArchiveList.test.tsx` を追加
+- SDK比較で残る不足: Create/CreateBlank/CreateFromShared/Update/Transfer/Share/OpenFTP/CloseFTP（未着手）
 
 ### Switch
 - テスト: `SwitchList.test.tsx` あり（一覧表示・詳細遷移・削除確認フローをカバー）
@@ -175,12 +175,14 @@
 - 削除機能: Switch, PacketFilter, KMS(Delete), DNS, GSLB, ProxyLB, SimpleMonitor, Database, EnhancedDB, ContainerRegistry
 - FEテスト新規追加: `NFSList.test.tsx`（最優先項目）, `DatabaseList.test.tsx`, `SwitchList.test.tsx`, `PacketFilterList.test.tsx`, `DNSList.test.tsx`, `GSLBList.test.tsx`, `MonitorList.test.tsx`, `EnhancedDBList.test.tsx`, `ProxyLBList.test.tsx`, `ContainerRegistryList.test.tsx`
 
+### ✅ 完了（2026-08-07 追加セッション）
+- FEテスト新規追加: `DiskList.test.tsx`（削除フロー・キャンセル・未接続表示）, `ArchiveList.test.tsx`（削除フロー・キャンセル・busy状態のボタン無効化）
+
 ### 次セッションの優先順位
 
 **A. 低コストですぐ着手できるもの**
-1. `DiskList.test.tsx` / `ArchiveList.test.tsx` — バックエンド(削除)は実装済み。既存の削除確認ダイアログパターンをそのままテスト化するだけ
-2. SimpleMonitorのGet（詳細取得）実装 — Listのみで詳細ページが作れない状態を解消
-3. `ContainerRegistryDetail.test.tsx` — パスワード保存/削除フロー、資格情報自動アクティブ化のテスト
+1. SimpleMonitorのGet（詳細取得）実装 — Listのみで詳細ページが作れない状態を解消
+2. `ContainerRegistryDetail.test.tsx` — パスワード保存/削除フロー、資格情報自動アクティブ化のテスト
 
 **B. 中規模（実装パターンは確立済み）**
 4. KMSの残り機能: Get（詳細）/Rotate（ローテーション）/ChangeStatus（有効化・無効化）— Delete実装（`internal/kms/service.go`）と同じパターン
