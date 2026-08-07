@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
+	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 )
 
 type DiskInfo struct {
@@ -53,4 +54,9 @@ func (s *DiskService) List(ctx context.Context, zone string) ([]DiskInfo, error)
 		})
 	}
 	return disks, nil
+}
+
+func (s *DiskService) Delete(ctx context.Context, zone string, diskID string) error {
+	diskOp := iaas.NewDiskOp(s.client.Caller())
+	return diskOp.Delete(ctx, zone, types.StringID(diskID))
 }

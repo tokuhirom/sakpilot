@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetDisks } from '../../wailsjs/go/main/App';
+import { GetDisks, DeleteDisk } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -15,6 +15,8 @@ interface DiskListProps {
 export function DiskList({ profile, zone, zones, onZoneChange }: DiskListProps) {
   const [disks, setDisks] = useState<sakura.DiskInfo[]>([]);
   const [loading, setLoading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<sakura.DiskInfo | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const {
     searchQuery,
@@ -52,6 +54,29 @@ export function DiskList({ profile, zone, zones, onZoneChange }: DiskListProps) 
   useEffect(() => {
     loadDisks();
   }, [loadDisks]);
+
+  const handleDeleteClick = (disk: sakura.DiskInfo) => {
+    setConfirmDelete(disk);
+  };
+
+  const handleDeleteCancel = () => {
+    setConfirmDelete(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!confirmDelete) return;
+    const disk = confirmDelete;
+    setConfirmDelete(null);
+    setDeleting(disk.id);
+    try {
+      await DeleteDisk(profile, zone, disk.id);
+      await loadDisks();
+    } catch (e) {
+      alert(`削除に失敗しました: ${e}`);
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -136,12 +161,33 @@ export function DiskList({ profile, zone, zones, onZoneChange }: DiskListProps) 
                   </div>
                 )}
               </div>
-              <div style={{ fontSize: '0.7rem', color: '#666' }}>
+              <div style={{ fontSize: '0.7rem', color: '#666', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 ID: {disk.id}
+                <button
+                  className="btn btn-danger btn-small"
+                  onClick={() => handleDeleteClick(disk)}
+                  disabled={deleting === disk.id}
+                  title="削除"
+                >
+                  {deleting === disk.id ? '削除中...' : '削除'}
+                </button>
               </div>
             </div>
           </div>
         ))
+      )}
+
+      {confirmDelete && (
+        <div className="confirm-overlay" onClick={handleDeleteCancel}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <p>ディスク「{confirmDelete.name}」を削除しますか？</p>
+            <p className="confirm-warning">この操作は取り消せません。</p>
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleDeleteCancel}>キャンセル</button>
+              <button className="btn btn-danger" onClick={handleDeleteConfirm}>削除する</button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
