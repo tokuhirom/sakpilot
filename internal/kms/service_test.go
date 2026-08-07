@@ -86,3 +86,45 @@ func TestService_ListKeys(t *testing.T) {
 		t.Error("CreatedAt is empty, want a formatted timestamp")
 	}
 }
+
+func TestService_DeleteKey(t *testing.T) {
+	srv := mockkms.NewTestServer(mockkms.Config{})
+	defer srv.Close()
+
+	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy")
+	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_KMS", srv.TestURL())
+
+	sc := newTestSaclient(t, srv.TestURL())
+	rawClient, err := sdkkms.NewClient(sc)
+	if err != nil {
+		t.Fatalf("sdkkms.NewClient: %v", err)
+	}
+	keyOp := sdkkms.NewKeyOp(rawClient)
+	created, err := keyOp.Create(context.Background(), v1.CreateKey{
+		Name:      "test-key",
+		KeyOrigin: v1.KeyOriginEnumGenerated,
+	})
+	if err != nil {
+		t.Fatalf("seed Create: %v", err)
+	}
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+
+	service, err := kms.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	if err := service.DeleteKey(context.Background(), created.ID); err != nil {
+		t.Fatalf("DeleteKey: %v", err)
+	}
+
+	keys, err := service.ListKeys(context.Background())
+	if err != nil {
+		t.Fatalf("ListKeys: %v", err)
+	}
+	if len(keys) != 0 {
+		t.Fatalf("got %d keys after delete, want 0: %+v", len(keys), keys)
+	}
+}

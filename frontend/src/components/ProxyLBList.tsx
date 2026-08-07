@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetProxyLBs, GetProxyLBDetail, GetProxyLBHealth } from '../../wailsjs/go/main/App';
+import { GetProxyLBs, GetProxyLBDetail, GetProxyLBHealth, DeleteProxyLB } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -18,6 +18,8 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
   const [selectedProxyLB, setSelectedProxyLB] = useState<sakura.ProxyLBInfo | null>(null);
   const [health, setHealth] = useState<sakura.ProxyLBHealthInfo | null>(null);
   const [loadingHealth, setLoadingHealth] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const {
     searchQuery,
@@ -104,6 +106,29 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
     setHealth(null);
   };
 
+  const handleDeleteClick = () => {
+    setConfirmDelete(true);
+  };
+
+  const handleDeleteCancel = () => {
+    setConfirmDelete(false);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedProxyLB) return;
+    setConfirmDelete(false);
+    setDeleting(true);
+    try {
+      await DeleteProxyLB(profile, selectedProxyLB.id);
+      handleBackToList();
+      await loadProxyLBs();
+    } catch (e) {
+      alert(`削除に失敗しました: ${e}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return 'Invalid Date';
@@ -162,7 +187,27 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
             </button>
             <h2>{selectedProxyLB.name}</h2>
           </div>
+          <button
+            className="btn btn-danger btn-small"
+            onClick={handleDeleteClick}
+            disabled={deleting}
+          >
+            {deleting ? '削除中...' : '削除'}
+          </button>
         </div>
+
+        {confirmDelete && (
+          <div className="confirm-overlay" onClick={handleDeleteCancel}>
+            <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+              <p>ELB「{selectedProxyLB.name}」を削除しますか？</p>
+              <p className="confirm-warning">この操作は取り消せません。</p>
+              <div className="confirm-actions">
+                <button className="btn btn-secondary" onClick={handleDeleteCancel}>キャンセル</button>
+                <button className="btn btn-danger" onClick={handleDeleteConfirm}>削除する</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Basic Info */}
         <div className="card" style={{ marginBottom: '1rem', padding: '1rem', background: '#2a2a2a', borderRadius: '8px' }}>

@@ -162,6 +162,15 @@ func (a *App) DeleteServer(profileName, zone, serverID string) error {
 	return service.Delete(a.ctx, zone, serverID)
 }
 
+func (a *App) ResetServer(profileName, zone, serverID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewServerService(client)
+	return service.Reset(a.ctx, zone, serverID)
+}
+
 func (a *App) GetServerStatus(profileName, zone, serverID string) (string, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
 	if err != nil {
@@ -199,6 +208,15 @@ func (a *App) GetSimpleMonitors(profileName string) ([]sakura.SimpleMonitorInfo,
 	return service.ListSimpleMonitors(a.ctx)
 }
 
+func (a *App) DeleteSimpleMonitor(profileName, monitorId string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.DeleteSimpleMonitor(a.ctx, monitorId)
+}
+
 func (a *App) GetGSLBList(profileName string) ([]sakura.GSLBInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
 	if err != nil {
@@ -224,6 +242,15 @@ func (a *App) GetContainerRegistryUsers(profileName, registryId string) ([]sakur
 	}
 	service := sakura.NewGlobalService(client)
 	return service.ListContainerRegistryUsers(a.ctx, registryId)
+}
+
+func (a *App) DeleteContainerRegistry(profileName, registryId string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.DeleteContainerRegistry(a.ctx, registryId)
 }
 
 // GSLB Detail
@@ -264,6 +291,15 @@ func (a *App) GetSwitchDetail(profileName, zone, switchId string) (*sakura.Switc
 	return service.Get(a.ctx, zone, switchId)
 }
 
+func (a *App) DeleteSwitch(profileName, zone, switchId string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewSwitchService(client)
+	return service.Delete(a.ctx, zone, switchId)
+}
+
 // PacketFilters
 func (a *App) GetPacketFilters(profileName, zone string) ([]sakura.PacketFilterInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
@@ -281,6 +317,15 @@ func (a *App) GetPacketFilterDetail(profileName, zone, pfId string) (*sakura.Pac
 	}
 	service := sakura.NewPacketFilterService(client)
 	return service.Get(a.ctx, zone, pfId)
+}
+
+func (a *App) DeletePacketFilter(profileName, zone, pfId string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewPacketFilterService(client)
+	return service.Delete(a.ctx, zone, pfId)
 }
 
 // Disks
@@ -331,6 +376,60 @@ func (a *App) GetDatabases(profileName, zone string) ([]sakura.DatabaseInfo, err
 	return service.List(a.ctx, zone)
 }
 
+func (a *App) PowerOnDatabase(profileName, zone, databaseID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewDatabaseService(client)
+	return service.PowerOn(a.ctx, zone, databaseID)
+}
+
+func (a *App) PowerOffDatabase(profileName, zone, databaseID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewDatabaseService(client)
+	return service.PowerOff(a.ctx, zone, databaseID)
+}
+
+func (a *App) ForceStopDatabase(profileName, zone, databaseID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewDatabaseService(client)
+	return service.ForceStop(a.ctx, zone, databaseID)
+}
+
+func (a *App) ResetDatabase(profileName, zone, databaseID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewDatabaseService(client)
+	return service.Reset(a.ctx, zone, databaseID)
+}
+
+func (a *App) DeleteDatabase(profileName, zone, databaseID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewDatabaseService(client)
+	return service.Delete(a.ctx, zone, databaseID)
+}
+
+func (a *App) GetDatabaseStatus(profileName, zone, databaseID string) (string, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return "", err
+	}
+	service := sakura.NewDatabaseService(client)
+	return service.GetStatus(a.ctx, zone, databaseID)
+}
+
 // NFS
 func (a *App) GetNFSList(profileName, zone string) ([]sakura.NFSInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
@@ -377,6 +476,15 @@ func (a *App) DeleteNFS(profileName, zone, nfsID string) error {
 	return service.Delete(a.ctx, zone, nfsID)
 }
 
+func (a *App) ResetNFS(profileName, zone, nfsID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewNFSService(client)
+	return service.Reset(a.ctx, zone, nfsID)
+}
+
 func (a *App) GetNFSStatus(profileName, zone, nfsID string) (string, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
 	if err != nil {
@@ -394,6 +502,15 @@ func (a *App) GetDNSDetail(profileName, dnsId string) (*sakura.DNSInfo, error) {
 	}
 	service := sakura.NewGlobalService(client)
 	return service.GetDNS(a.ctx, dnsId)
+}
+
+func (a *App) DeleteDNS(profileName, dnsId string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.DeleteDNS(a.ctx, dnsId)
 }
 
 // Monitoring Suite
@@ -848,6 +965,15 @@ func (a *App) GetEnhancedDBs(profileName string) ([]sakura.EnhancedDBInfo, error
 	return service.List(a.ctx)
 }
 
+func (a *App) DeleteEnhancedDB(profileName, enhancedDBId string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewEnhancedDBService(client)
+	return service.Delete(a.ctx, enhancedDBId)
+}
+
 // KMS
 func (a *App) GetKMSKeys(profileName string) ([]kms.KeyInfo, error) {
 	service, err := kms.NewService(profileName)
@@ -855,6 +981,14 @@ func (a *App) GetKMSKeys(profileName string) ([]kms.KeyInfo, error) {
 		return nil, err
 	}
 	return service.ListKeys(a.ctx)
+}
+
+func (a *App) DeleteKMSKey(profileName, keyId string) error {
+	service, err := kms.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteKey(a.ctx, keyId)
 }
 
 // ProxyLB (Enhanced Load Balancer)
@@ -883,4 +1017,13 @@ func (a *App) GetProxyLBHealth(profileName, proxyLBId string) (*sakura.ProxyLBHe
 	}
 	service := sakura.NewProxyLBService(client)
 	return service.GetHealth(a.ctx, proxyLBId)
+}
+
+func (a *App) DeleteProxyLB(profileName, proxyLBId string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewProxyLBService(client)
+	return service.Delete(a.ctx, proxyLBId)
 }

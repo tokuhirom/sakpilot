@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetEnhancedDBs } from '../../wailsjs/go/main/App';
+import { GetEnhancedDBs, DeleteEnhancedDB } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -12,6 +12,8 @@ interface EnhancedDBListProps {
 export function EnhancedDBList({ profile }: EnhancedDBListProps) {
   const [databases, setDatabases] = useState<sakura.EnhancedDBInfo[]>([]);
   const [loading, setLoading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<sakura.EnhancedDBInfo | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const {
     searchQuery,
@@ -48,6 +50,29 @@ export function EnhancedDBList({ profile }: EnhancedDBListProps) {
   useEffect(() => {
     loadDatabases();
   }, [loadDatabases]);
+
+  const handleDeleteClick = (db: sakura.EnhancedDBInfo) => {
+    setConfirmDelete(db);
+  };
+
+  const handleDeleteCancel = () => {
+    setConfirmDelete(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!confirmDelete) return;
+    const db = confirmDelete;
+    setConfirmDelete(null);
+    setDeleting(db.id);
+    try {
+      await DeleteEnhancedDB(profile, db.id);
+      await loadDatabases();
+    } catch (e) {
+      alert(`削除に失敗しました: ${e}`);
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -138,12 +163,33 @@ export function EnhancedDBList({ profile }: EnhancedDBListProps) {
                   </div>
                 )}
               </div>
-              <div style={{ fontSize: '0.7rem', color: '#666' }}>
+              <div style={{ fontSize: '0.7rem', color: '#666', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 ID: {db.id}
+                <button
+                  className="btn btn-danger btn-small"
+                  onClick={() => handleDeleteClick(db)}
+                  disabled={deleting === db.id}
+                  title="削除"
+                >
+                  {deleting === db.id ? '削除中...' : '削除'}
+                </button>
               </div>
             </div>
           </div>
         ))
+      )}
+
+      {confirmDelete && (
+        <div className="confirm-overlay" onClick={handleDeleteCancel}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <p>エンハンスドDB「{confirmDelete.name}」を削除しますか？</p>
+            <p className="confirm-warning">この操作は取り消せません。</p>
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleDeleteCancel}>キャンセル</button>
+              <button className="btn btn-danger" onClick={handleDeleteConfirm}>削除する</button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

@@ -140,6 +140,11 @@ func (s *GlobalService) GetDNS(ctx context.Context, id string) (*DNSInfo, error)
 	}, nil
 }
 
+func (s *GlobalService) DeleteDNS(ctx context.Context, id string) error {
+	dnsOp := iaas.NewDNSOp(s.client.Caller())
+	return dnsOp.Delete(ctx, types.StringID(id))
+}
+
 func (s *GlobalService) ListCertificates(ctx context.Context) ([]CertificateInfo, error) {
 	certOp := iaas.NewCertificateAuthorityOp(s.client.Caller())
 	result, err := certOp.Find(ctx, &iaas.FindCondition{})
@@ -177,6 +182,11 @@ func (s *GlobalService) ListSimpleMonitors(ctx context.Context) ([]SimpleMonitor
 		})
 	}
 	return list, nil
+}
+
+func (s *GlobalService) DeleteSimpleMonitor(ctx context.Context, id string) error {
+	smOp := iaas.NewSimpleMonitorOp(s.client.Caller())
+	return smOp.Delete(ctx, types.StringID(id))
 }
 
 func (s *GlobalService) ListGSLB(ctx context.Context) ([]GSLBInfo, error) {
@@ -304,4 +314,9 @@ func (s *GlobalService) ListContainerRegistryUsers(ctx context.Context, id strin
 		})
 	}
 	return list, nil
+}
+
+func (s *GlobalService) DeleteContainerRegistry(ctx context.Context, id string) error {
+	crOp := iaas.NewContainerRegistryOp(s.client.Caller())
+	return crOp.Delete(ctx, types.StringID(id))
 }

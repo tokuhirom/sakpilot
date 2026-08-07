@@ -75,3 +75,8 @@ func (s *PacketFilterService) Get(ctx context.Context, zone string, id string) (
 		Rules:       rules,
 	}, nil
 }
+
+func (s *PacketFilterService) Delete(ctx context.Context, zone string, id string) error {
+	pfOp := iaas.NewPacketFilterOp(s.client.Caller())
+	return pfOp.Delete(ctx, zone, types.StringID(id))
+}

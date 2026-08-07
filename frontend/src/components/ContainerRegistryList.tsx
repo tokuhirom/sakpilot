@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetContainerRegistries } from '../../wailsjs/go/main/App';
+import { GetContainerRegistries, DeleteContainerRegistry } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -13,6 +13,8 @@ interface ContainerRegistryListProps {
 export function ContainerRegistryList({ profile, onSelectRegistry }: ContainerRegistryListProps) {
   const [registries, setRegistries] = useState<sakura.ContainerRegistryInfo[]>([]);
   const [loading, setLoading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<sakura.ContainerRegistryInfo | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const {
     searchQuery,
@@ -49,6 +51,30 @@ export function ContainerRegistryList({ profile, onSelectRegistry }: ContainerRe
     loadRegistries();
   }, [loadRegistries]);
 
+  const handleDeleteClick = (e: React.MouseEvent, r: sakura.ContainerRegistryInfo) => {
+    e.stopPropagation();
+    setConfirmDelete(r);
+  };
+
+  const handleDeleteCancel = () => {
+    setConfirmDelete(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!confirmDelete) return;
+    const r = confirmDelete;
+    setConfirmDelete(null);
+    setDeleting(r.id);
+    try {
+      await DeleteContainerRegistry(profile, r.id);
+      await loadRegistries();
+    } catch (e) {
+      alert(`削除に失敗しました: ${e}`);
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   return (
     <>
       <div className="header">
@@ -78,6 +104,7 @@ export function ContainerRegistryList({ profile, onSelectRegistry }: ContainerRe
               <th>FQDN</th>
               <th>アクセスレベル</th>
               <th>仮想ドメイン</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -97,10 +124,33 @@ export function ContainerRegistryList({ profile, onSelectRegistry }: ContainerRe
                   </span>
                 </td>
                 <td>{r.virtualDomain || '-'}</td>
+                <td style={{ textAlign: 'left' }}>
+                  <button
+                    className="btn btn-danger btn-small"
+                    onClick={(e) => handleDeleteClick(e, r)}
+                    disabled={deleting === r.id}
+                    title="削除"
+                  >
+                    {deleting === r.id ? '削除中...' : '削除'}
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+      )}
+
+      {confirmDelete && (
+        <div className="confirm-overlay" onClick={handleDeleteCancel}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <p>コンテナレジストリ「{confirmDelete.name}」を削除しますか？</p>
+            <p className="confirm-warning">この操作は取り消せません。登録されているイメージもすべて削除されます。</p>
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleDeleteCancel}>キャンセル</button>
+              <button className="btn btn-danger" onClick={handleDeleteConfirm}>削除する</button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
