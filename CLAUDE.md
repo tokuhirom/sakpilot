@@ -73,6 +73,8 @@ golangci-lint run
 cd frontend && npx tsc --noEmit
 ```
 
+frontendのコードに変更がある場合は、`cd frontend && npm run test` も通すこと(方針は下記「Frontend Tests」参照)。
+
 ## Frontend Tests
 
 Reactコンポーネント/フックのテストにはVitest + React Testing Libraryを使用する。
@@ -85,10 +87,29 @@ cd frontend && npm run test
 cd frontend && npm run test:watch
 ```
 
-- 設定は `frontend/vite.config.ts` の `test` フィールド、共通セットアップは `frontend/src/test/setup.ts`
-- テストファイルはテスト対象と同じディレクトリに `*.test.ts` / `*.test.tsx` として置く(例: `src/components/NFSList.test.tsx`)
+- 設定は `frontend/vite.config.ts` の `test` フィールド(環境: jsdom)、共通セットアップは `frontend/src/test/setup.ts`(jest-domマッチャーの登録と各テスト後の自動`cleanup()`)
+- 実例: `src/hooks/useSearch.test.ts`(純粋なフックロジック)、`src/components/ServerList.test.tsx`(一覧表示・確認ダイアログ・ポーリングを伴うコンポーネント)
+
+### 何をテストするか
+
+- 状態遷移や分岐がある箇所を優先する: 一覧+アクション系コンポーネント(起動/停止/削除の確認ダイアログ、ステータスによるボタンの活性制御、ポーリング)、`hooks/`配下のロジック(`useSearch`など)
+- 単純な表示専用コンポーネント(APIの結果をそのままカード表示するだけのもの)は、ロジックが増えるまで無理にテストを書かなくてよい。カバレッジ100%は目標にしない
+- スナップショットテストは使わない。DOM構造の変更に脆く、差分を見ても壊れた理由が分からないため、`getByRole` / `getByText` などセマンティックなクエリでの動作検証を優先する
+
+### ファイル配置・命名
+
+- テストファイルはテスト対象と同じディレクトリに `*.test.ts` / `*.test.tsx` として置く(例: `src/components/ServerList.tsx` → `src/components/ServerList.test.tsx`)
+- テスト用のダミーデータは `makeXxx(overrides: Partial<sakura.XxxInfo> = {}) => sakura.XxxInfo` の形のファクトリ関数をテストファイル内に用意し、各テストでは差分だけ`overrides`で渡す(`ServerList.test.tsx`の`makeServer`を参照)。DTOにフィールドが増えても1箇所の修正で済む
+
+### Goバインディングのモック
+
 - `frontend/wailsjs/go/main/App` のような生成済みGoバインディングは `vi.mock('../../wailsjs/go/main/App')` で自動モックし、`vi.mocked(FnName).mockResolvedValueOnce(...)` で戻り値を差し替える
-- ポーリングなど`setInterval`を使う処理をテストする場合、`userEvent`はfakeTimers下で内部delayが解決せず固まるため、クリックには`fireEvent`を使い、待機には(testing-libraryの`waitFor`ではなく)fakeTimers対応の`vi.waitFor`を使うこと。実例は `src/components/NFSList.test.tsx` を参照
+- モックの呼び出し履歴(`beforeEach`での`mockReset()`)はテスト間で必ずリセットすること。順序に依存するテストの原因になる
+
+### ユーザー操作のシミュレート
+
+- 基本は `@testing-library/user-event` を使う(実際のブラウザ操作に近いイベントシーケンスを発行する)
+- 例外: `setInterval`によるポーリングを伴う処理(起動/停止後のステータス監視など)をテストする場合、`userEvent`はfakeTimers下では内部delayが解決せず固まる。この場合はクリックに`fireEvent`を使い、待機には(testing-libraryの`waitFor`ではなく、fakeTimers対応の)`vi.waitFor`を使うこと。実例は `src/components/ServerList.test.tsx` の「ポーリング」テストを参照
 
 ## Git Workflow
 
