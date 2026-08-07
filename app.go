@@ -284,6 +284,15 @@ func (a *App) GetDisks(profileName, zone string) ([]sakura.DiskInfo, error) {
 	return service.List(a.ctx, zone)
 }
 
+func (a *App) DeleteDisk(profileName, zone, diskID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewDiskService(client)
+	return service.Delete(a.ctx, zone, diskID)
+}
+
 // Archives
 func (a *App) GetArchives(profileName, zone string) ([]sakura.ArchiveInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
