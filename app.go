@@ -264,6 +264,15 @@ func (a *App) GetSwitchDetail(profileName, zone, switchId string) (*sakura.Switc
 	return service.Get(a.ctx, zone, switchId)
 }
 
+func (a *App) DeleteSwitch(profileName, zone, switchId string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewSwitchService(client)
+	return service.Delete(a.ctx, zone, switchId)
+}
+
 // PacketFilters
 func (a *App) GetPacketFilters(profileName, zone string) ([]sakura.PacketFilterInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
