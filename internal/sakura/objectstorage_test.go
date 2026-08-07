@@ -80,3 +80,83 @@ func TestObjectStorageService_ListAccessKeys_Empty(t *testing.T) {
 		t.Errorf("got %d keys, want 0: %+v", len(keys), keys)
 	}
 }
+
+func TestObjectStorageService_CreateAccessKey(t *testing.T) {
+	srv := mockobjectstorage.NewTestServer(mockobjectstorage.Config{})
+	defer srv.Close()
+
+	t.Setenv("SAKURA_ENDPOINTS_OBJECT_STORAGE", srv.TestURL())
+
+	client := &Client{accessToken: "dummy", accessTokenSecret: "dummy"}
+	service := NewObjectStorageService(client)
+
+	// No account exists yet for this site; CreateAccessKey must create one
+	// implicitly before creating the key.
+	created, err := service.CreateAccessKey(context.Background(), "isk01")
+	if err != nil {
+		t.Fatalf("CreateAccessKey: %v", err)
+	}
+	if created.ID == "" {
+		t.Errorf("ID is empty: %+v", created)
+	}
+	if created.Secret == "" {
+		t.Errorf("Secret is empty: %+v", created)
+	}
+
+	keys, err := service.ListAccessKeys(context.Background(), "isk01")
+	if err != nil {
+		t.Fatalf("ListAccessKeys: %v", err)
+	}
+	if len(keys) != 1 {
+		t.Fatalf("got %d keys, want 1: %+v", len(keys), keys)
+	}
+	if keys[0].ID != created.ID {
+		t.Errorf("ID = %q, want %q", keys[0].ID, created.ID)
+	}
+}
+
+func TestObjectStorageService_DeleteAccessKey(t *testing.T) {
+	srv := mockobjectstorage.NewTestServer(mockobjectstorage.Config{})
+	defer srv.Close()
+
+	t.Setenv("SAKURA_ENDPOINTS_OBJECT_STORAGE", srv.TestURL())
+
+	client := &Client{accessToken: "dummy", accessTokenSecret: "dummy"}
+	service := NewObjectStorageService(client)
+
+	created, err := service.CreateAccessKey(context.Background(), "isk01")
+	if err != nil {
+		t.Fatalf("CreateAccessKey: %v", err)
+	}
+
+	if err := service.DeleteAccessKey(context.Background(), "isk01", created.ID); err != nil {
+		t.Fatalf("DeleteAccessKey: %v", err)
+	}
+
+	keys, err := service.ListAccessKeys(context.Background(), "isk01")
+	if err != nil {
+		t.Fatalf("ListAccessKeys: %v", err)
+	}
+	if len(keys) != 0 {
+		t.Errorf("got %d keys, want 0 after delete: %+v", len(keys), keys)
+	}
+}
+
+func TestObjectStorageService_CreateBucket_And_Delete(t *testing.T) {
+	srv := mockobjectstorage.NewTestServer(mockobjectstorage.Config{})
+	defer srv.Close()
+
+	t.Setenv("SAKURA_ENDPOINTS_OBJECT_STORAGE", srv.TestURL())
+
+	client := &Client{accessToken: "dummy", accessTokenSecret: "dummy"}
+	service := NewObjectStorageService(client)
+
+	bucketName := "sakpilot-test-bucket"
+	if err := service.CreateBucket(context.Background(), "isk01", bucketName, ""); err != nil {
+		t.Fatalf("CreateBucket: %v", err)
+	}
+
+	if err := service.DeleteBucket(context.Background(), "isk01", bucketName); err != nil {
+		t.Fatalf("DeleteBucket: %v", err)
+	}
+}

@@ -9,6 +9,10 @@ import {
   HasObjectStorageSecretKey,
   ListObjectStorageObjects,
   DownloadObjectStorageObject,
+  CreateObjectStorageBucket,
+  DeleteObjectStorageBucket,
+  CreateObjectStorageAccessKey,
+  DeleteObjectStorageAccessKey,
 } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
@@ -54,6 +58,22 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
   const [secretKey, setSecretKey] = useState('');
   const [secretSaved, setSecretSaved] = useState(false);
   const [bucketsError, setBucketsError] = useState<string | null>(null);
+
+  // Bucket create/delete state
+  const [showCreateBucket, setShowCreateBucket] = useState(false);
+  const [newBucketName, setNewBucketName] = useState('');
+  const [newBucketPlan, setNewBucketPlan] = useState('');
+  const [creatingBucket, setCreatingBucket] = useState(false);
+  const [createBucketError, setCreateBucketError] = useState<string | null>(null);
+  const [confirmDeleteBucket, setConfirmDeleteBucket] = useState<sakura.BucketInfo | null>(null);
+  const [deletingBucket, setDeletingBucket] = useState<string | null>(null);
+
+  // Access key create/delete state
+  const [creatingAccessKey, setCreatingAccessKey] = useState(false);
+  const [accessKeyError, setAccessKeyError] = useState<string | null>(null);
+  const [newAccessKey, setNewAccessKey] = useState<sakura.AccessKeyCreated | null>(null);
+  const [confirmDeleteAccessKey, setConfirmDeleteAccessKey] = useState(false);
+  const [deletingAccessKey, setDeletingAccessKey] = useState(false);
 
   // Object list state
   const [selectedBucket, setSelectedBucket] = useState<sakura.BucketInfo | null>(null);
@@ -318,6 +338,122 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
       );
     } catch (err) {
       console.error('[ObjectStorageList] delete secret error:', err);
+    }
+  };
+
+  const handleCreateBucketOpen = () => {
+    setNewBucketName('');
+    setNewBucketPlan('');
+    setCreateBucketError(null);
+    setShowCreateBucket(true);
+  };
+
+  const handleCreateBucketCancel = () => {
+    setShowCreateBucket(false);
+  };
+
+  const handleCreateBucketSubmit = async () => {
+    if (!profile || !selectedSite || !newBucketName) return;
+
+    setCreatingBucket(true);
+    setCreateBucketError(null);
+    try {
+      await CreateObjectStorageBucket(profile, selectedSite.id, newBucketName, newBucketPlan);
+      setShowCreateBucket(false);
+      await loadBuckets();
+    } catch (err) {
+      console.error('[ObjectStorageList] create bucket error:', err);
+      setCreateBucketError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCreatingBucket(false);
+    }
+  };
+
+  const handleDeleteBucketClick = (e: React.MouseEvent, bucket: sakura.BucketInfo) => {
+    e.stopPropagation();
+    setConfirmDeleteBucket(bucket);
+  };
+
+  const handleDeleteBucketCancel = () => {
+    setConfirmDeleteBucket(null);
+  };
+
+  const handleDeleteBucketConfirm = async () => {
+    if (!profile || !selectedSite || !confirmDeleteBucket) return;
+    const bucket = confirmDeleteBucket;
+    setConfirmDeleteBucket(null);
+    setDeletingBucket(bucket.name);
+    try {
+      await DeleteObjectStorageBucket(profile, selectedSite.id, bucket.name);
+      await loadBuckets();
+    } catch (e) {
+      alert(`削除に失敗しました: ${e}`);
+    } finally {
+      setDeletingBucket(null);
+    }
+  };
+
+  const handleCreateAccessKey = async () => {
+    if (!profile || !selectedSite) return;
+
+    setCreatingAccessKey(true);
+    setAccessKeyError(null);
+    try {
+      const created = await CreateObjectStorageAccessKey(profile, selectedSite.id);
+      setNewAccessKey(created);
+      await loadAccessKeys(selectedSite.id);
+    } catch (err) {
+      console.error('[ObjectStorageList] create access key error:', err);
+      setAccessKeyError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCreatingAccessKey(false);
+    }
+  };
+
+  const handleSaveNewAccessKey = async () => {
+    if (!selectedSite || !newAccessKey) return;
+
+    await SaveObjectStorageSecretKey(selectedSite.id, newAccessKey.id, newAccessKey.secret);
+    setSelectedAccessKeyId(newAccessKey.id);
+    setSecretKey(newAccessKey.secret);
+    setSecretSaved(true);
+    setNewAccessKey(null);
+    await loadAccessKeys(selectedSite.id);
+  };
+
+  const handleCloseNewAccessKey = () => {
+    setNewAccessKey(null);
+  };
+
+  const handleDeleteAccessKeyClick = () => {
+    setConfirmDeleteAccessKey(true);
+  };
+
+  const handleDeleteAccessKeyCancel = () => {
+    setConfirmDeleteAccessKey(false);
+  };
+
+  const handleDeleteAccessKeyConfirm = async () => {
+    if (!profile || !selectedSite || !selectedAccessKeyId) return;
+    const keyId = selectedAccessKeyId;
+    setConfirmDeleteAccessKey(false);
+    setDeletingAccessKey(true);
+    try {
+      await DeleteObjectStorageAccessKey(profile, selectedSite.id, keyId);
+      try {
+        await DeleteObjectStorageSecretKey(selectedSite.id, keyId);
+      } catch {
+        // no saved secret to clean up, that's fine
+      }
+      setSelectedAccessKeyId('');
+      setSecretKey('');
+      setSecretSaved(false);
+      setBuckets([]);
+      await loadAccessKeys(selectedSite.id);
+    } catch (e) {
+      alert(`削除に失敗しました: ${e}`);
+    } finally {
+      setDeletingAccessKey(false);
     }
   };
 
@@ -644,6 +780,12 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
             </button>
             <h2>{selectedSite.displayName}</h2>
           </div>
+          <button
+            className="btn btn-primary"
+            onClick={handleCreateBucketOpen}
+          >
+            + バケット作成
+          </button>
         </div>
 
         <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#1a1a2e', borderRadius: '8px' }}>
@@ -687,6 +829,15 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
                 </select>
               )}
             </div>
+
+            <button
+              className="btn btn-secondary"
+              onClick={handleCreateAccessKey}
+              disabled={creatingAccessKey}
+              style={{ padding: '0.5rem 1rem' }}
+            >
+              {creatingAccessKey ? '作成中...' : '+ 新規作成'}
+            </button>
 
             {selectedAccessKeyId && (
               <>
@@ -742,9 +893,24 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
                     </button>
                   </>
                 )}
+                <button
+                  className="btn btn-danger"
+                  onClick={handleDeleteAccessKeyClick}
+                  disabled={deletingAccessKey}
+                  style={{ padding: '0.5rem 0.75rem' }}
+                  title="このアクセスキーを削除"
+                >
+                  {deletingAccessKey ? '削除中...' : 'アクセスキーを削除'}
+                </button>
               </>
             )}
           </div>
+
+          {accessKeyError && (
+            <div style={{ marginTop: '0.75rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+              エラー: {accessKeyError}
+            </div>
+          )}
         </div>
 
         {bucketsError && (
@@ -789,6 +955,7 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
               <tr>
                 <th>バケット名</th>
                 <th>作成日時</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -800,10 +967,126 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
                 >
                   <td style={{ color: '#00adb5', fontWeight: 'bold' }}>{bucket.name}</td>
                   <td>{bucket.creationDate ? formatDate(bucket.creationDate) : '-'}</td>
+                  <td style={{ textAlign: 'left' }}>
+                    <button
+                      className="btn btn-danger btn-small"
+                      onClick={(e) => handleDeleteBucketClick(e, bucket)}
+                      disabled={deletingBucket === bucket.name}
+                    >
+                      {deletingBucket === bucket.name ? '削除中...' : '削除'}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        )}
+
+        {showCreateBucket && (
+          <div className="modal-overlay" onClick={handleCreateBucketCancel} style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+          }}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+              backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+              padding: '20px', minWidth: '320px', maxWidth: '420px',
+            }}>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>バケット作成</h3>
+              <div className="form-group">
+                <label>バケット名</label>
+                <input
+                  type="text"
+                  value={newBucketName}
+                  onChange={(e) => setNewBucketName(e.target.value)}
+                  placeholder="my-bucket"
+                  autoFocus
+                />
+              </div>
+              {selectedSite.id === 'arc02' && (
+                <div className="form-group">
+                  <label>プラン（アーカイブサイト）</label>
+                  <input
+                    type="text"
+                    value={newBucketPlan}
+                    onChange={(e) => setNewBucketPlan(e.target.value)}
+                    placeholder="プラン名"
+                  />
+                </div>
+              )}
+              {createBucketError && (
+                <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                  エラー: {createBucketError}
+                </div>
+              )}
+              <div className="confirm-actions">
+                <button className="btn btn-secondary" onClick={handleCreateBucketCancel}>キャンセル</button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleCreateBucketSubmit}
+                  disabled={creatingBucket || !newBucketName}
+                >
+                  {creatingBucket ? '作成中...' : '作成する'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {confirmDeleteBucket && (
+          <div className="confirm-overlay" onClick={handleDeleteBucketCancel}>
+            <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+              <p>バケット「{confirmDeleteBucket.name}」を削除しますか？</p>
+              <p className="confirm-warning">この操作は取り消せません。バケット内にオブジェクトが残っている場合は削除できません。</p>
+              <div className="confirm-actions">
+                <button className="btn btn-secondary" onClick={handleDeleteBucketCancel}>キャンセル</button>
+                <button className="btn btn-danger" onClick={handleDeleteBucketConfirm}>削除する</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {newAccessKey && (
+          <div className="modal-overlay" onClick={handleCloseNewAccessKey} style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+          }}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+              backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+              padding: '20px', minWidth: '320px', maxWidth: '480px',
+            }}>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>アクセスキーを作成しました</h3>
+              <p style={{ color: '#ff6b6b', fontSize: '0.85rem' }}>
+                シークレットキーはこの画面を閉じると二度と表示されません。必要であれば今すぐ保存してください。
+              </p>
+              <div className="form-group">
+                <label>アクセスキーID</label>
+                <input type="text" readOnly value={newAccessKey.id} />
+              </div>
+              <div className="form-group">
+                <label>シークレットキー</label>
+                <input type="text" readOnly value={newAccessKey.secret} />
+              </div>
+              <div className="confirm-actions">
+                <button className="btn btn-secondary" onClick={handleCloseNewAccessKey}>閉じる</button>
+                <button className="btn btn-primary" onClick={handleSaveNewAccessKey}>保存して選択する</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {confirmDeleteAccessKey && (
+          <div className="confirm-overlay" onClick={handleDeleteAccessKeyCancel}>
+            <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+              <p>アクセスキー「{selectedAccessKeyId}」を削除しますか？</p>
+              <p className="confirm-warning">この操作は取り消せません。保存済みのシークレットキーも合わせて削除されます。</p>
+              <div className="confirm-actions">
+                <button className="btn btn-secondary" onClick={handleDeleteAccessKeyCancel}>キャンセル</button>
+                <button className="btn btn-danger" onClick={handleDeleteAccessKeyConfirm}>削除する</button>
+              </div>
+            </div>
+          </div>
         )}
       </>
     );
