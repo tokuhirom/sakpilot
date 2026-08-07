@@ -5,7 +5,7 @@ interface SearchBarProps {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   closeSearch: () => void;
-  searchInputRef: RefObject<HTMLInputElement>;
+  searchInputRef: RefObject<HTMLInputElement | null>;
   placeholder?: string;
 }
 
