@@ -87,3 +87,8 @@ func (s *SwitchService) Get(ctx context.Context, zone string, id string) (*Switc
 		Subnets:        subnets,
 	}, nil
 }
+
+func (s *SwitchService) Delete(ctx context.Context, zone string, id string) error {
+	swOp := iaas.NewSwitchOp(s.client.Caller())
+	return swOp.Delete(ctx, zone, types.StringID(id))
+}
