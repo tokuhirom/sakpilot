@@ -273,6 +273,11 @@ func (s *GlobalService) GetGSLB(ctx context.Context, id string) (*GSLBInfo, erro
 	}, nil
 }
 
+func (s *GlobalService) DeleteGSLB(ctx context.Context, id string) error {
+	gslbOp := iaas.NewGSLBOp(s.client.Caller())
+	return gslbOp.Delete(ctx, types.StringID(id))
+}
+
 func (s *GlobalService) ListContainerRegistries(ctx context.Context) ([]ContainerRegistryInfo, error) {
 	crOp := iaas.NewContainerRegistryOp(s.client.Caller())
 	result, err := crOp.Find(ctx, &iaas.FindCondition{})

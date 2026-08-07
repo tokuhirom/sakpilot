@@ -263,6 +263,15 @@ func (a *App) GetGSLBDetail(profileName, gslbId string) (*sakura.GSLBInfo, error
 	return service.GetGSLB(a.ctx, gslbId)
 }
 
+func (a *App) DeleteGSLB(profileName, gslbId string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.DeleteGSLB(a.ctx, gslbId)
+}
+
 // Switches
 func (a *App) GetSwitches(profileName, zone string) ([]sakura.SwitchInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
