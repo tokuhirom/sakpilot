@@ -1,5 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetProxyLBs, GetProxyLBDetail, GetProxyLBHealth, DeleteProxyLB } from '../../wailsjs/go/main/App';
+import {
+  GetProxyLBs,
+  GetProxyLBDetail,
+  GetProxyLBHealth,
+  DeleteProxyLB,
+  GetProxyLBCertificates,
+  SetProxyLBCertificates,
+  DeleteProxyLBCertificates,
+  RenewProxyLBLetsEncryptCert,
+} from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -11,6 +20,28 @@ interface ProxyLBListProps {
 
 type ViewMode = 'list' | 'detail';
 
+interface CertFormEntry {
+  serverCertificate: string;
+  intermediateCertificate: string;
+  privateKey: string;
+}
+
+interface CertForm {
+  primaryCert: CertFormEntry;
+  additionalCerts: CertFormEntry[];
+}
+
+const emptyCertEntry = (): CertFormEntry => ({
+  serverCertificate: '',
+  intermediateCertificate: '',
+  privateKey: '',
+});
+
+const emptyCertForm = (): CertForm => ({
+  primaryCert: emptyCertEntry(),
+  additionalCerts: [],
+});
+
 export function ProxyLBList({ profile }: ProxyLBListProps) {
   const [proxyLBs, setProxyLBs] = useState<sakura.ProxyLBInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -20,6 +51,15 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
   const [loadingHealth, setLoadingHealth] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [certificates, setCertificates] = useState<sakura.ProxyLBCertificatesInfo | null>(null);
+  const [loadingCertificates, setLoadingCertificates] = useState(false);
+  const [showCertForm, setShowCertForm] = useState(false);
+  const [certForm, setCertForm] = useState<CertForm>(emptyCertForm());
+  const [savingCert, setSavingCert] = useState(false);
+  const [confirmDeleteCert, setConfirmDeleteCert] = useState(false);
+  const [deletingCert, setDeletingCert] = useState(false);
+  const [confirmRenewCert, setConfirmRenewCert] = useState(false);
+  const [renewingCert, setRenewingCert] = useState(false);
 
   const {
     searchQuery,
@@ -77,14 +117,30 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
     }
   }, [profile]);
 
+  const loadCertificates = useCallback(async (id: string) => {
+    if (!profile) return;
+
+    setLoadingCertificates(true);
+    try {
+      const certs = await GetProxyLBCertificates(profile, id);
+      setCertificates(certs);
+    } catch (err) {
+      console.error('[ProxyLBList] loadCertificates error:', err);
+      setCertificates(null);
+    } finally {
+      setLoadingCertificates(false);
+    }
+  }, [profile]);
+
   const handleGlobalReload = useCallback(() => {
     if (viewMode === 'list') {
       loadProxyLBs();
     } else if (selectedProxyLB) {
       loadDetail(selectedProxyLB.id);
       loadHealth(selectedProxyLB.id);
+      loadCertificates(selectedProxyLB.id);
     }
-  }, [viewMode, selectedProxyLB, loadProxyLBs, loadDetail, loadHealth]);
+  }, [viewMode, selectedProxyLB, loadProxyLBs, loadDetail, loadHealth, loadCertificates]);
 
   useGlobalReload(handleGlobalReload);
 
@@ -95,15 +151,20 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
   const handleSelectProxyLB = (lb: sakura.ProxyLBInfo) => {
     setSelectedProxyLB(lb);
     setHealth(null);
+    setCertificates(null);
+    setShowCertForm(false);
     setViewMode('detail');
     loadDetail(lb.id);
     loadHealth(lb.id);
+    loadCertificates(lb.id);
   };
 
   const handleBackToList = () => {
     setViewMode('list');
     setSelectedProxyLB(null);
     setHealth(null);
+    setCertificates(null);
+    setShowCertForm(false);
   };
 
   const handleDeleteClick = () => {
@@ -127,6 +188,102 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
     } finally {
       setDeleting(false);
     }
+  };
+
+  const handleOpenCertForm = () => {
+    setCertForm(
+      certificates?.primaryCert
+        ? {
+            primaryCert: {
+              serverCertificate: certificates.primaryCert.serverCertificate,
+              intermediateCertificate: certificates.primaryCert.intermediateCertificate,
+              privateKey: '',
+            },
+            additionalCerts: (certificates.additionalCerts || []).map((c) => ({
+              serverCertificate: c.serverCertificate,
+              intermediateCertificate: c.intermediateCertificate,
+              privateKey: '',
+            })),
+          }
+        : emptyCertForm()
+    );
+    setShowCertForm(true);
+  };
+
+  const handleCancelCertForm = () => {
+    setShowCertForm(false);
+  };
+
+  const handleAddAdditionalCert = () => {
+    setCertForm((prev) => ({ ...prev, additionalCerts: [...prev.additionalCerts, emptyCertEntry()] }));
+  };
+
+  const handleRemoveAdditionalCert = (idx: number) => {
+    setCertForm((prev) => ({ ...prev, additionalCerts: prev.additionalCerts.filter((_, i) => i !== idx) }));
+  };
+
+  const updatePrimaryCertField = (field: keyof CertFormEntry, value: string) => {
+    setCertForm((prev) => ({ ...prev, primaryCert: { ...prev.primaryCert, [field]: value } }));
+  };
+
+  const updateAdditionalCertField = (idx: number, field: keyof CertFormEntry, value: string) => {
+    setCertForm((prev) => ({
+      ...prev,
+      additionalCerts: prev.additionalCerts.map((c, i) => (i === idx ? { ...c, [field]: value } : c)),
+    }));
+  };
+
+  const handleSaveCertificates = async () => {
+    if (!selectedProxyLB) return;
+    setSavingCert(true);
+    try {
+      const result = await SetProxyLBCertificates(profile, selectedProxyLB.id, certForm as sakura.ProxyLBSetCertificatesInput);
+      setCertificates(result);
+      setShowCertForm(false);
+    } catch (e) {
+      alert(`証明書の設定に失敗しました: ${e}`);
+    } finally {
+      setSavingCert(false);
+    }
+  };
+
+  const handleDeleteCertClick = () => setConfirmDeleteCert(true);
+  const handleDeleteCertCancel = () => setConfirmDeleteCert(false);
+
+  const handleDeleteCertConfirm = async () => {
+    if (!selectedProxyLB) return;
+    setConfirmDeleteCert(false);
+    setDeletingCert(true);
+    try {
+      await DeleteProxyLBCertificates(profile, selectedProxyLB.id);
+      setCertificates(null);
+    } catch (e) {
+      alert(`証明書の削除に失敗しました: ${e}`);
+    } finally {
+      setDeletingCert(false);
+    }
+  };
+
+  const handleRenewCertClick = () => setConfirmRenewCert(true);
+  const handleRenewCertCancel = () => setConfirmRenewCert(false);
+
+  const handleRenewCertConfirm = async () => {
+    if (!selectedProxyLB) return;
+    setConfirmRenewCert(false);
+    setRenewingCert(true);
+    try {
+      await RenewProxyLBLetsEncryptCert(profile, selectedProxyLB.id);
+      await loadCertificates(selectedProxyLB.id);
+    } catch (e) {
+      alert(`Let's Encrypt証明書の更新に失敗しました: ${e}`);
+    } finally {
+      setRenewingCert(false);
+    }
+  };
+
+  const formatCertDate = (dateString?: string) => {
+    if (!dateString) return '-';
+    return formatDate(dateString);
   };
 
   const formatDate = (dateString: string) => {
@@ -362,6 +519,191 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
             </>
           ) : (
             <div style={{ color: '#666' }}>ヘルスステータスを取得できませんでした</div>
+          )}
+        </div>
+
+        {/* Certificates */}
+        <div className="card" style={{ marginBottom: '1rem', padding: '1rem', background: '#2a2a2a', borderRadius: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h4 style={{ color: '#00adb5', margin: 0 }}>SSL証明書</h4>
+            {!showCertForm && (
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button className="btn btn-secondary btn-small" onClick={handleOpenCertForm}>
+                  {certificates?.primaryCert ? '証明書を更新' : '証明書を設定'}
+                </button>
+                {certificates?.primaryCert && (
+                  <>
+                    <button
+                      className="btn btn-secondary btn-small"
+                      onClick={handleRenewCertClick}
+                      disabled={renewingCert}
+                    >
+                      {renewingCert ? '更新中...' : "Let's Encryptで更新"}
+                    </button>
+                    <button
+                      className="btn btn-danger btn-small"
+                      onClick={handleDeleteCertClick}
+                      disabled={deletingCert}
+                    >
+                      {deletingCert ? '削除中...' : '証明書を削除'}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          {confirmDeleteCert && (
+            <div className="confirm-overlay" onClick={handleDeleteCertCancel}>
+              <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+                <p>SSL証明書を削除しますか？</p>
+                <p className="confirm-warning">この操作は取り消せません。</p>
+                <div className="confirm-actions">
+                  <button className="btn btn-secondary" onClick={handleDeleteCertCancel}>キャンセル</button>
+                  <button className="btn btn-danger" onClick={handleDeleteCertConfirm}>削除する</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {confirmRenewCert && (
+            <div className="confirm-overlay" onClick={handleRenewCertCancel}>
+              <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+                <p>Let's Encrypt証明書を更新しますか？</p>
+                <div className="confirm-actions">
+                  <button className="btn btn-secondary" onClick={handleRenewCertCancel}>キャンセル</button>
+                  <button className="btn btn-primary" onClick={handleRenewCertConfirm}>更新する</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {loadingCertificates ? (
+            <div className="loading">読み込み中...</div>
+          ) : showCertForm ? (
+            <div>
+              <div style={{ marginBottom: '1rem' }}>
+                <h5 style={{ color: '#ccc', marginBottom: '0.5rem' }}>プライマリ証明書</h5>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: '#888', marginBottom: '0.25rem' }}>サーバー証明書 (PEM)</label>
+                <textarea
+                  aria-label="プライマリ証明書 サーバー証明書 (PEM)"
+                  value={certForm.primaryCert.serverCertificate}
+                  onChange={(e) => updatePrimaryCertField('serverCertificate', e.target.value)}
+                  rows={4}
+                  style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.75rem', marginBottom: '0.5rem' }}
+                />
+                <label style={{ display: 'block', fontSize: '0.75rem', color: '#888', marginBottom: '0.25rem' }}>中間証明書 (PEM)</label>
+                <textarea
+                  aria-label="プライマリ証明書 中間証明書 (PEM)"
+                  value={certForm.primaryCert.intermediateCertificate}
+                  onChange={(e) => updatePrimaryCertField('intermediateCertificate', e.target.value)}
+                  rows={4}
+                  style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.75rem', marginBottom: '0.5rem' }}
+                />
+                <label style={{ display: 'block', fontSize: '0.75rem', color: '#888', marginBottom: '0.25rem' }}>秘密鍵 (PEM)</label>
+                <textarea
+                  aria-label="プライマリ証明書 秘密鍵 (PEM)"
+                  value={certForm.primaryCert.privateKey}
+                  onChange={(e) => updatePrimaryCertField('privateKey', e.target.value)}
+                  rows={4}
+                  style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.75rem' }}
+                />
+              </div>
+
+              {certForm.additionalCerts.map((cert, idx) => (
+                <div key={idx} style={{ marginBottom: '1rem', paddingTop: '0.5rem', borderTop: '1px solid #444' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <h5 style={{ color: '#ccc', margin: 0 }}>追加証明書 {idx + 1}</h5>
+                    <button className="btn btn-secondary btn-small" onClick={() => handleRemoveAdditionalCert(idx)}>
+                      削除
+                    </button>
+                  </div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#888', marginBottom: '0.25rem' }}>サーバー証明書 (PEM)</label>
+                  <textarea
+                    aria-label={`追加証明書 ${idx + 1} サーバー証明書 (PEM)`}
+                    value={cert.serverCertificate}
+                    onChange={(e) => updateAdditionalCertField(idx, 'serverCertificate', e.target.value)}
+                    rows={4}
+                    style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.75rem', marginBottom: '0.5rem' }}
+                  />
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#888', marginBottom: '0.25rem' }}>中間証明書 (PEM)</label>
+                  <textarea
+                    aria-label={`追加証明書 ${idx + 1} 中間証明書 (PEM)`}
+                    value={cert.intermediateCertificate}
+                    onChange={(e) => updateAdditionalCertField(idx, 'intermediateCertificate', e.target.value)}
+                    rows={4}
+                    style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.75rem', marginBottom: '0.5rem' }}
+                  />
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#888', marginBottom: '0.25rem' }}>秘密鍵 (PEM)</label>
+                  <textarea
+                    aria-label={`追加証明書 ${idx + 1} 秘密鍵 (PEM)`}
+                    value={cert.privateKey}
+                    onChange={(e) => updateAdditionalCertField(idx, 'privateKey', e.target.value)}
+                    rows={4}
+                    style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.75rem' }}
+                  />
+                </div>
+              ))}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
+                <button className="btn btn-secondary btn-small" onClick={handleAddAdditionalCert}>
+                  + 追加証明書を追加
+                </button>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button className="btn btn-secondary" onClick={handleCancelCertForm} disabled={savingCert}>
+                    キャンセル
+                  </button>
+                  <button className="btn btn-primary" onClick={handleSaveCertificates} disabled={savingCert}>
+                    {savingCert ? '保存中...' : '保存'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : certificates?.primaryCert ? (
+            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+              <tbody>
+                <tr>
+                  <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', width: '150px', textAlign: 'left' }}>コモンネーム</td>
+                  <td style={{ padding: '0.5rem 0', fontFamily: 'monospace', textAlign: 'left' }}>{certificates.primaryCert.certificateCommonName}</td>
+                </tr>
+                {certificates.primaryCert.certificateAltNames && (
+                  <tr>
+                    <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>SAN</td>
+                    <td style={{ padding: '0.5rem 0', fontFamily: 'monospace', textAlign: 'left' }}>{certificates.primaryCert.certificateAltNames}</td>
+                  </tr>
+                )}
+                <tr>
+                  <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>有効期限</td>
+                  <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{formatCertDate(certificates.primaryCert.certificateEndDate)}</td>
+                </tr>
+              </tbody>
+            </table>
+          ) : (
+            <div style={{ color: '#666' }}>証明書が設定されていません</div>
+          )}
+
+          {!showCertForm && certificates?.additionalCerts && certificates.additionalCerts.length > 0 && (
+            <div style={{ marginTop: '1rem' }}>
+              <h5 style={{ color: '#ccc', marginBottom: '0.5rem' }}>追加証明書</h5>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>コモンネーム</th>
+                    <th>SAN</th>
+                    <th>有効期限</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {certificates.additionalCerts.map((cert, idx) => (
+                    <tr key={idx}>
+                      <td style={{ fontFamily: 'monospace' }}>{cert.certificateCommonName}</td>
+                      <td style={{ fontFamily: 'monospace' }}>{cert.certificateAltNames}</td>
+                      <td>{formatCertDate(cert.certificateEndDate)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </>

@@ -22,7 +22,7 @@
 | KMS | ✅ あり | ✅（Delete） | (対象外) | 削除機能+FEテストを追加済み（PR #90）。Get/Rotate/ChangeStatus/暗号化は引き続き未実装 |
 | DNS | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #84） |
 | GSLB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #85、CI待ちでauto-merge設定済み） |
-| ProxyLB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #88）。証明書管理は引き続き未実装 |
+| ProxyLB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #88）。証明書管理（Get/Set/Delete/RenewLetsEncrypt）を追加済み |
 | SimpleMonitor | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #86）。Get(詳細)・詳細ページを追加済み |
 | Database | ✅ あり | ✅ | ✅ | 起動/停止/再起動+削除+FEテストを追加済み（PR #81） |
 | EnhancedDB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #87） |
@@ -94,11 +94,12 @@
 - SDK比較で残る不足: Create/Update/UpdateSettings（未着手）
 
 ### ProxyLB（エンハンスドロードバランサ）
-- テスト: `ProxyLBList.test.tsx` あり（一覧表示・詳細遷移・ヘルス取得・削除フローをカバー）
-- バックエンド: List/Get/GetHealth/**Delete** 実装済み
+- テスト: `ProxyLBList.test.tsx` あり（一覧表示・詳細遷移・ヘルス取得・削除フロー・証明書表示/設定/削除/Let's Encrypt更新フローをカバー）
+- バックエンド: List/Get/GetHealth/**Delete**/**GetCertificates**/**SetCertificates**/**DeleteCertificates**/**RenewLetsEncryptCert** 実装済み
 - ✅ **対応済み（PR #88）**: 削除機能とFEテストを追加。詳細画面ヘッダーに削除ボタンを配置
-- SDK比較で残る不足: Create/Update/UpdateSettings/ChangePlan/**証明書管理**（GetCertificates/SetCertificates/DeleteCertificates/RenewLetsEncryptCert）/MonitorConnection（トラフィックグラフ）
-- **TODO**: 証明書管理・トラフィック監視はHTTPS運用上重要なため次点で優先度高め
+- ✅ **対応済み**: 証明書管理（GetCertificates/SetCertificates/DeleteCertificates/RenewLetsEncryptCert）を追加。詳細画面に「SSL証明書」カードを新設し、プライマリ証明書＋追加証明書（複数可）の設定フォーム、削除確認、Let's Encrypt更新確認ダイアログを実装。取得したPrivateKeyはUIに表示しない（`ProxyLBCertInfo`から除外）方針とした
+- SDK比較で残る不足: Create/Update/UpdateSettings/ChangePlan/MonitorConnection（トラフィックグラフ、未着手）
+- **TODO**: トラフィック監視（MonitorConnection）は次点で検討
 
 ### SimpleMonitor
 - テスト: `MonitorList.test.tsx` あり（一覧表示・詳細遷移・削除確認フローをカバー）
@@ -182,15 +183,17 @@
 - `ContainerRegistryDetail.test.tsx` を追加（基本情報表示、ユーザー一覧の権限別表示、パスワード保存/取消/削除フロー、保存済み資格情報での自動アクティブ化とイメージ一覧取得、イメージ→タグ一覧遷移と戻る操作をカバー）
 - KMSの残り機能（Get/Rotate/ChangeStatus）を実装。`KMSDetail.tsx`と`KMSDetail.test.tsx`を新規追加し、`KMSList.tsx`のステータス表示バグ（実際のAPI値と不一致）も修正
 
+### ✅ 完了（2026-08-07 追加セッション2）
+- ProxyLBの証明書管理（GetCertificates/SetCertificates/DeleteCertificates/RenewLetsEncryptCert）を実装。`internal/sakura/proxylb.go`にサービスメソッドを追加、`app.go`に4つのRPCを公開、`ProxyLBList.tsx`にSSL証明書カード（表示/設定フォーム/削除確認/Let's Encrypt更新確認）を追加し`ProxyLBList.test.tsx`にテストを追加
+
 ### 次セッションの優先順位
 
 **B. 中規模（実装パターンは確立済み）**
-1. ProxyLBの証明書管理（GetCertificates/SetCertificates/DeleteCertificates/RenewLetsEncryptCert）— HTTPS運用上重要度高
-2. `AppRunSharedList.test.tsx` / `MonitoringMetricDetail.test.tsx` のFEテスト
+1. `AppRunSharedList.test.tsx` / `MonitoringMetricDetail.test.tsx` のFEテスト
 
 **C. 大物・要方針決定（着手前にスコープを確認）**
-3. ObjectStorage: バケット/アクセスキーのCreate/Delete、`ObjectStorageList.test.tsx`（ロジック濃度最大・実装コストも高い）
-4. AppRun（専有/共用）: 削除・デプロイ操作。Version Create（新バージョンのデプロイ）は「閲覧中心」という現状スコープを超えるため、実装するか自体を判断してから着手
+2. ObjectStorage: バケット/アクセスキーのCreate/Delete、`ObjectStorageList.test.tsx`（ロジック濃度最大・実装コストも高い）
+3. AppRun（専有/共用）: 削除・デプロイ操作。Version Create（新バージョンのデプロイ）は「閲覧中心」という現状スコープを超えるため、実装するか自体を判断してから着手
 
 ### その他
 - `internal/sakura/server.go` の `println` デバッグ文の削除（別issueとして切り出し推奨、未着手）
