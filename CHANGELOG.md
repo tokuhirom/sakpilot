@@ -1,5 +1,24 @@
 # Changelog
 
+## [v0.0.15](https://github.com/tokuhirom/sakpilot/compare/v0.0.14...v0.0.15) - 2026-08-07
+- オブジェクトストレージAPIをsacloud-sdk-go/api/object-storageへ移行 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/58
+- chore(deps-dev): bump vite and @vitejs/plugin-react in /frontend by @dependabot[bot] in https://github.com/tokuhirom/sakpilot/pull/57
+- chore(deps): bump github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream from 1.7.4 to 1.7.8 by @dependabot[bot] in https://github.com/tokuhirom/sakpilot/pull/48
+- chore(deps): bump react-router and react-router-dom in /frontend by @dependabot[bot] in https://github.com/tokuhirom/sakpilot/pull/53
+- chore(deps): bump postcss from 8.5.6 to 8.5.16 in /frontend by @dependabot[bot] in https://github.com/tokuhirom/sakpilot/pull/56
+- chore(deps): bump github.com/docker/cli from 29.0.3+incompatible to 29.2.0+incompatible by @dependabot[bot] in https://github.com/tokuhirom/sakpilot/pull/45
+- chore(deps): bump postcss from 8.5.16 to 8.5.25 in /frontend by @dependabot[bot] in https://github.com/tokuhirom/sakpilot/pull/61
+- iaas-api-go等をsacloud-sdk-goへ統合移行 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/60
+- internal/apprunをsacloud-sdk-goのapprun-dedicatedへ移行 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/62
+- READMEを現在のコードベースに合わせて更新 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/63
+- devboxからmiseへ開発環境管理を移行 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/64
+- Go/npm依存関係を更新（マイナー更新+React19/TS7メジャー更新） by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/65
+- CI/リリースをUbuntu 24.04ベースに更新 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/67
+- README: Ubuntu 24.04以降向けのwebkit2gtk-4.1対応を追記 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/66
+- アーカイブの削除機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/68
+- fix: mask accessToken in logs by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/69
+- feat: サーバー削除機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/70
+
 ## [v0.0.14](https://github.com/tokuhirom/sakpilot/compare/v0.0.13...v0.0.14) - 2026-01-28
 - feat: add global reload button to top bar by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/41
 
