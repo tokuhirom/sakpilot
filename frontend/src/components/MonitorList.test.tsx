@@ -27,7 +27,7 @@ describe('MonitorList', () => {
   it('lists monitors returned by GetSimpleMonitors', async () => {
     vi.mocked(GetSimpleMonitors).mockResolvedValueOnce([makeMonitor()]);
 
-    render(<MonitorList profile="default" />);
+    render(<MonitorList profile="default" onSelectMonitor={() => {}} />);
 
     expect(await screen.findByText('my-monitor')).toBeInTheDocument();
     expect(GetSimpleMonitors).toHaveBeenCalledWith('default');
@@ -36,23 +36,38 @@ describe('MonitorList', () => {
   it('shows an empty state when there are no monitors', async () => {
     vi.mocked(GetSimpleMonitors).mockResolvedValueOnce([]);
 
-    render(<MonitorList profile="default" />);
+    render(<MonitorList profile="default" onSelectMonitor={() => {}} />);
 
     expect(await screen.findByText('シンプル監視がありません')).toBeInTheDocument();
   });
 
-  it('deletes a monitor after confirmation and reloads the list', async () => {
+  it('navigates to monitor detail when a row is clicked', async () => {
+    vi.mocked(GetSimpleMonitors).mockResolvedValueOnce([makeMonitor()]);
+    const onSelectMonitor = vi.fn();
+    const user = userEvent.setup();
+
+    render(<MonitorList profile="default" onSelectMonitor={onSelectMonitor} />);
+    await screen.findByText('my-monitor');
+
+    await user.click(screen.getByText('my-monitor'));
+
+    expect(onSelectMonitor).toHaveBeenCalledWith('123456789012');
+  });
+
+  it('deletes a monitor after confirmation without triggering row navigation', async () => {
     vi.mocked(GetSimpleMonitors)
       .mockResolvedValueOnce([makeMonitor()])
       .mockResolvedValueOnce([]);
     vi.mocked(DeleteSimpleMonitor).mockResolvedValueOnce(undefined);
+    const onSelectMonitor = vi.fn();
     const user = userEvent.setup();
 
-    render(<MonitorList profile="default" />);
+    render(<MonitorList profile="default" onSelectMonitor={onSelectMonitor} />);
     await screen.findByText('my-monitor');
 
     await user.click(screen.getByRole('button', { name: '削除' }));
 
+    expect(onSelectMonitor).not.toHaveBeenCalled();
     expect(await screen.findByText('シンプル監視「my-monitor」を削除しますか？')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '削除する' }));
