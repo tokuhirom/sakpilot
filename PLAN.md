@@ -28,11 +28,11 @@
 | EnhancedDB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #87） |
 | NFS | ✅ あり | ✅ | ✅ | 完備。FEテストとResetを追加済み（PR #80） |
 | ObjectStorage | ❌ なし | ❌ **なし** | (対象外) | 閲覧・DLのみ。バケット/キー作成削除が丸ごと未実装（未着手） |
-| ContainerRegistry | ✅ あり(List) | ✅ | (対象外) | 削除機能+FEテスト(List)を追加済み（PR #89）。Detail(パスワード管理等)のテストは未着手 |
+| ContainerRegistry | ✅ あり | ✅ | (対象外) | 削除機能+FEテスト(List/Detail)を追加済み（PR #89、#95） |
 | AppRun (専有/共用) | ❌ なし | ❌ **なし** | (対象外) | 閲覧＋アクティブバージョン切替のみ（未着手、方針判断待ち） |
 | Bill | ❌ なし | (対象外) | (対象外) | 読み取り専用リソースなので概ね妥当 |
 
-**17リソース中、FEテストが未着手なのは ObjectStorage / AppRun / Bill、および ContainerRegistryDetail（Listは対応済み）。**
+**17リソース中、FEテストが未着手なのは ObjectStorage / AppRun / Bill。**
 
 ---
 
@@ -146,11 +146,12 @@
 ## 4. ContainerRegistry / AppRun / Bill
 
 ### ContainerRegistry（コンテナレジストリ）
-- テスト: `ContainerRegistryList.test.tsx` あり（一覧表示・詳細遷移・削除確認フローをカバー）。`ContainerRegistryDetail.tsx` はview切り替え・パスワード保存/削除フロー・資格情報保存後の自動アクティブ化など状態遷移が多く**テストを書く価値が高い**が未着手のまま
+- テスト: `ContainerRegistryList.test.tsx`（一覧表示・詳細遷移・削除確認フロー）、`ContainerRegistryDetail.test.tsx`（基本情報表示・ユーザー一覧・パスワード保存/削除フロー・自動アクティブ化・イメージ/タグ一覧遷移）ともに整備済み
 - バックエンド: List（レジストリ本体・ユーザー）/**Delete** 実装済み。イメージ/タグ取得はOCI Registry APIを直叩きする別実装
 - ✅ **対応済み（PR #89）**: レジストリ削除機能とListのFEテストを追加
+- ✅ **対応済み（PR #95）**: `ContainerRegistryDetail.test.tsx` を追加
 - SDK比較で残る不足: Create/Read（単体）/Update/UpdateSettings/AddUser/UpdateUser/DeleteUser（ユーザー管理、未着手）
-- **TODO**: `ContainerRegistryDetail.test.tsx` を追加。ユーザー管理機能の追加を検討
+- **TODO**: ユーザー管理機能の追加を検討
 
 ### AppRun（専有型 / 共用型）
 - テスト: なし。`AppRunDedicatedList.tsx` は6種のview＋パンくず生成＋アクティブバージョン切替と**調査対象中もっとも分岐が複雑**でテスト価値が高い。`AppRunSharedList.tsx` も一定のロジックがありテスト価値がある
@@ -178,20 +179,18 @@
 ### ✅ 完了（2026-08-07 追加セッション）
 - FEテスト新規追加: `DiskList.test.tsx`（削除フロー・キャンセル・未接続表示）, `ArchiveList.test.tsx`（削除フロー・キャンセル・busy状態のボタン無効化）
 - SimpleMonitorのGet（詳細取得）を実装。`internal/sakura/global.go` に `GetSimpleMonitor`、`app.go` に `GetSimpleMonitorDetail` を追加し、`MonitorDetail.tsx`（基本情報・ヘルスチェック設定表示）と一覧からの行クリック遷移を追加
+- `ContainerRegistryDetail.test.tsx` を追加（基本情報表示、ユーザー一覧の権限別表示、パスワード保存/取消/削除フロー、保存済み資格情報での自動アクティブ化とイメージ一覧取得、イメージ→タグ一覧遷移と戻る操作をカバー）
 
 ### 次セッションの優先順位
 
-**A. 低コストですぐ着手できるもの**
-1. `ContainerRegistryDetail.test.tsx` — パスワード保存/削除フロー、資格情報自動アクティブ化のテスト
-
 **B. 中規模（実装パターンは確立済み）**
-4. KMSの残り機能: Get（詳細）/Rotate（ローテーション）/ChangeStatus（有効化・無効化）— Delete実装（`internal/kms/service.go`）と同じパターン
-5. ProxyLBの証明書管理（GetCertificates/SetCertificates/DeleteCertificates/RenewLetsEncryptCert）— HTTPS運用上重要度高
-6. `AppRunSharedList.test.tsx` / `MonitoringMetricDetail.test.tsx` のFEテスト
+1. KMSの残り機能: Get（詳細）/Rotate（ローテーション）/ChangeStatus（有効化・無効化）— Delete実装（`internal/kms/service.go`）と同じパターン
+2. ProxyLBの証明書管理（GetCertificates/SetCertificates/DeleteCertificates/RenewLetsEncryptCert）— HTTPS運用上重要度高
+3. `AppRunSharedList.test.tsx` / `MonitoringMetricDetail.test.tsx` のFEテスト
 
 **C. 大物・要方針決定（着手前にスコープを確認）**
-7. ObjectStorage: バケット/アクセスキーのCreate/Delete、`ObjectStorageList.test.tsx`（ロジック濃度最大・実装コストも高い）
-8. AppRun（専有/共用）: 削除・デプロイ操作。Version Create（新バージョンのデプロイ）は「閲覧中心」という現状スコープを超えるため、実装するか自体を判断してから着手
+4. ObjectStorage: バケット/アクセスキーのCreate/Delete、`ObjectStorageList.test.tsx`（ロジック濃度最大・実装コストも高い）
+5. AppRun（専有/共用）: 削除・デプロイ操作。Version Create（新バージョンのデプロイ）は「閲覧中心」という現状スコープを超えるため、実装するか自体を判断してから着手
 
 ### その他
 - `internal/sakura/server.go` の `println` デバッグ文の削除（別issueとして切り出し推奨、未着手）
