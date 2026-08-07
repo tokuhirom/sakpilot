@@ -292,6 +292,15 @@ func (a *App) GetPacketFilterDetail(profileName, zone, pfId string) (*sakura.Pac
 	return service.Get(a.ctx, zone, pfId)
 }
 
+func (a *App) DeletePacketFilter(profileName, zone, pfId string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewPacketFilterService(client)
+	return service.Delete(a.ctx, zone, pfId)
+}
+
 // Disks
 func (a *App) GetDisks(profileName, zone string) ([]sakura.DiskInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
