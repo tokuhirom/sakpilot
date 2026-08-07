@@ -1060,3 +1060,39 @@ func (a *App) DeleteProxyLB(profileName, proxyLBId string) error {
 	service := sakura.NewProxyLBService(client)
 	return service.Delete(a.ctx, proxyLBId)
 }
+
+func (a *App) GetProxyLBCertificates(profileName, proxyLBId string) (*sakura.ProxyLBCertificatesInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewProxyLBService(client)
+	return service.GetCertificates(a.ctx, proxyLBId)
+}
+
+func (a *App) SetProxyLBCertificates(profileName, proxyLBId string, input sakura.ProxyLBSetCertificatesInput) (*sakura.ProxyLBCertificatesInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewProxyLBService(client)
+	return service.SetCertificates(a.ctx, proxyLBId, &input)
+}
+
+func (a *App) DeleteProxyLBCertificates(profileName, proxyLBId string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewProxyLBService(client)
+	return service.DeleteCertificates(a.ctx, proxyLBId)
+}
+
+func (a *App) RenewProxyLBLetsEncryptCert(profileName, proxyLBId string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewProxyLBService(client)
+	return service.RenewLetsEncryptCert(a.ctx, proxyLBId)
+}
