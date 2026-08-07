@@ -8,40 +8,42 @@
 
 調査時点: 2026-08-07。SDKは `github.com/sacloud/sacloud-sdk-go v0.0.1`（`api/iaas`, `api/object-storage`, `api/apprun*`, `api/kms` 等を内包する統合モジュール）。
 
+> **2026-08-07 追記**: 電源操作・削除機能の欠落解消を目的に PR #80〜#90 を実施済み（#85 のみ CI 待ちで auto-merge 設定）。以下の表・各節は実施結果を反映済み。詳細は各節の「対応状況」を参照。
+
 ## サマリ表
 
 | リソース | FEテスト | 削除機能 | 電源操作 | 総評 |
 |---|---|---|---|---|
-| Server | ✅ あり | ✅ | ✅（Reset欠） | ほぼ完備。Resetのみ欠落 |
-| Disk | ❌ なし | ✅ | (対象外) | Create/Update/接続変更が未実装 |
-| Archive | ❌ なし | ✅ | (対象外) | Create/共有/FTP転送が未実装 |
-| Switch | ❌ なし | ❌ **なし** | (対象外) | 完全に読み取り専用 |
-| PacketFilter | ❌ なし | ❌ **なし** | (対象外) | 完全に読み取り専用 |
-| KMS | ❌ なし | ❌ **なし** | (対象外) | List専用。Get/Rotate/暗号化等すべて未実装 |
-| DNS | ❌ なし | ❌ **なし** | (対象外) | List/Getのみ |
-| GSLB | ❌ なし | ❌ **なし** | (対象外) | List/Getのみ |
-| ProxyLB | ❌ なし | ❌ **なし** | (対象外) | List/Get/Healthのみ、証明書管理も欠落 |
-| SimpleMonitor | ❌ なし | ❌ **なし** | (対象外) | List専用。Get(詳細)すら未実装 |
-| Database | ❌ なし | ❌ **なし** | ❌ **なし** | List専用 |
-| EnhancedDB | ❌ なし | ❌ **なし** | (対象外) | List専用 |
-| NFS | ❌ なし | ✅ | ✅（Reset欠） | バックエンドは充実、FEテストが穴 |
-| ObjectStorage | ❌ なし | ❌ **なし** | (対象外) | 閲覧・DLのみ。バケット/キー作成削除が丸ごと未実装 |
-| ContainerRegistry | ❌ なし | ❌ **なし** | (対象外) | Listのみ。イメージ/タグ取得は別実装 |
-| AppRun (専有/共用) | ❌ なし | ❌ **なし** | (対象外) | 閲覧＋アクティブバージョン切替のみ |
+| Server | ✅ あり | ✅ | ✅ | 完備。Resetも追加済み（PR #80） |
+| Disk | ❌ なし | ✅ | (対象外) | Create/Update/接続変更が未実装。FEテストが積み残し（未着手） |
+| Archive | ❌ なし | ✅ | (対象外) | Create/共有/FTP転送が未実装。FEテストが積み残し（未着手） |
+| Switch | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #82）。共有スコープは削除不可でボタン無効化 |
+| PacketFilter | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #83） |
+| KMS | ✅ あり | ✅（Delete） | (対象外) | 削除機能+FEテストを追加済み（PR #90）。Get/Rotate/ChangeStatus/暗号化は引き続き未実装 |
+| DNS | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #84） |
+| GSLB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #85、CI待ちでauto-merge設定済み） |
+| ProxyLB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #88）。証明書管理は引き続き未実装 |
+| SimpleMonitor | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #86）。Get(詳細)は引き続き未実装 |
+| Database | ✅ あり | ✅ | ✅ | 起動/停止/再起動+削除+FEテストを追加済み（PR #81） |
+| EnhancedDB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #87） |
+| NFS | ✅ あり | ✅ | ✅ | 完備。FEテストとResetを追加済み（PR #80） |
+| ObjectStorage | ❌ なし | ❌ **なし** | (対象外) | 閲覧・DLのみ。バケット/キー作成削除が丸ごと未実装（未着手） |
+| ContainerRegistry | ✅ あり(List) | ✅ | (対象外) | 削除機能+FEテスト(List)を追加済み（PR #89）。Detail(パスワード管理等)のテストは未着手 |
+| AppRun (専有/共用) | ❌ なし | ❌ **なし** | (対象外) | 閲覧＋アクティブバージョン切替のみ（未着手、方針判断待ち） |
 | Bill | ❌ なし | (対象外) | (対象外) | 読み取り専用リソースなので概ね妥当 |
 
-**全17リソース中、フロントエンドテストが存在するのは Server のみ。**
+**17リソース中、FEテストが未着手なのは Disk / Archive / ObjectStorage / AppRun / Bill、および ContainerRegistryDetail（Listは対応済み）。**
 
 ---
 
 ## 1. Compute / Network 系
 
 ### Server
-- テスト: `ServerList.test.tsx` あり（確認ダイアログ・ポーリング等カバー済み）
-- バックエンド: List/PowerOn(Boot)/PowerOff(Shutdown)/ForceStop/Delete/GetStatus 実装済み、app.goで全て公開
-- SDK比較で不足: **Reset（再起動）**、ChangePlan、Monitor/MonitorCPU、InsertCDROM/EjectCDROM、SendKey/SendNMI、GetVNCProxy、Create、Update、DeleteWithDisks
-- 備考: `server.go` に `println` デバッグ文が複数残存（要クリーンアップ）
-- **TODO**: Reset（再起動）ボタンの追加を優先検討
+- テスト: `ServerList.test.tsx` あり（確認ダイアログ・ポーリング・再起動等カバー済み）
+- バックエンド: List/PowerOn(Boot)/PowerOff(Shutdown)/ForceStop/**Reset**/Delete/GetStatus 実装済み、app.goで全て公開
+- ✅ **対応済み（PR #80）**: Reset（再起動）ボタンを追加
+- SDK比較で残る不足: ChangePlan、Monitor/MonitorCPU、InsertCDROM/EjectCDROM、SendKey/SendNMI、GetVNCProxy、Create、Update、DeleteWithDisks（いずれもパワーユーザー向け機能で現状スコープ外と判断）
+- 備考: `server.go` に `println` デバッグ文が複数残存（要クリーンアップ、別issue化推奨）
 
 ### Disk
 - テスト: なし。`DiskList.tsx` は削除確認ダイアログ＋削除中のボタン無効化という状態遷移ロジックを持ち、**テストを書く価値が高い**
@@ -56,50 +58,53 @@
 - **TODO**: `ArchiveList.test.tsx` を追加（削除フロー、busy状態でのボタン無効化）
 
 ### Switch
-- テスト: なし。読み取り専用コンポーネントで状態遷移がなく、現状は無理にテスト不要
-- バックエンド: List/Get のみ。**Create/Update/Delete が丸ごと未実装**
-- SDK比較で不足: Create/Update/Delete/ConnectToBridge/DisconnectFromBridge/GetServers
-- **TODO**: 削除機能の追加を検討（追加時はDiskList相当のテストも必要）
+- テスト: `SwitchList.test.tsx` あり（一覧表示・詳細遷移・削除確認フローをカバー）
+- バックエンド: List/Get/**Delete** 実装済み
+- ✅ **対応済み（PR #82）**: 削除機能を追加。共有スコープ（`scope === 'shared'`）は削除できないためボタンを無効化
+- SDK比較で残る不足: Create/Update/ConnectToBridge/DisconnectFromBridge/GetServers（未着手）
 
 ### PacketFilter
-- テスト: なし。読み取り専用で現状は無理にテスト不要
-- バックエンド: List/Get のみ。**Create/Update/Delete が丸ごと未実装**
-- SDK比較で不足: Create/Update/Delete（ルール追加・編集も不可）
-- **TODO**: 削除機能の追加を検討
+- テスト: `PacketFilterList.test.tsx` あり（一覧表示・詳細遷移・削除確認フローをカバー）
+- バックエンド: List/Get/**Delete** 実装済み
+- ✅ **対応済み（PR #83）**: 削除機能を追加
+- SDK比較で残る不足: Create/Update（ルール追加・編集、未着手）
 
 ### KMS
-- テスト: なし。現状List表示のみのため無理にテスト不要
-- バックエンド: `internal/kms/service.go` に分離実装（Goテスト `service_test.go`/`helpers_test.go` は整備済み）。**List のみ**実装
-- app.go: `GetKMSKeys` のみ公開
-- SDK比較で不足: Read（Get）/Create/Update/**Delete**/Rotate（ローテーション）/ChangeStatus（有効化・無効化）/ScheduleDestruction（削除予約）/Encrypt/Decrypt
-- **TODO**: 少なくとも詳細取得（Get）と削除（Delete/ScheduleDestruction）の実装を検討。フロントにテストがないので追加実装時にあわせて整備
+- テスト: `KMSList.test.tsx` あり（一覧表示・削除確認フローをカバー）
+- バックエンド: `internal/kms/service.go` に分離実装。List/**Delete** 実装済み（Goテスト `service_test.go` に `TestService_DeleteKey` 追加済み）
+- app.go: `GetKMSKeys`/`DeleteKMSKey` を公開
+- ✅ **対応済み（PR #90）**: 削除機能を追加
+- SDK比較で残る不足: Read（Get）/Create/Update/Rotate（ローテーション）/ChangeStatus（有効化・無効化）/ScheduleDestruction（削除予約）/Encrypt/Decrypt
+- **TODO**: 次点でGet（詳細取得）/Rotate/ChangeStatusの実装を検討。Delete実装（`internal/kms/service.go` + `service_test.go`）と同じパターンで追加しやすい
 
 ---
 
 ## 2. DNS / GSLB / ProxyLB / 監視系
 
 ### DNS
-- テスト: なし。読み取り専用ビューアーとして完結しており現状は無理にテスト不要
-- バックエンド: List/Get のみ。**Create/Update/Delete が丸ごと未実装**
-- SDK比較で不足: Create/Update/UpdateSettings/**Delete**（レコード追加・編集、ゾーン削除ができない）
-- **TODO**: DNS管理はさくらのクラウドの中心機能の一つ。削除機能の追加を優先検討
+- テスト: `DNSList.test.tsx` あり（一覧表示・詳細遷移・削除確認フローをカバー）
+- バックエンド: List/Get/**Delete** 実装済み
+- ✅ **対応済み（PR #84）**: 削除機能を追加
+- SDK比較で残る不足: Create/Update/UpdateSettings（レコード追加・編集、未着手）
 
 ### GSLB
-- テスト: なし。現状は無理にテスト不要
-- バックエンド: List/Get のみ。**Create/Update/Delete が丸ごと未実装**
-- SDK比較で不足: Create/Update/UpdateSettings/**Delete**
-- **TODO**: 削除機能の追加を検討
+- テスト: `GSLBList.test.tsx` あり（一覧表示・詳細遷移・削除確認フローをカバー）
+- バックエンド: List/Get/**Delete** 実装済み
+- ✅ **対応済み（PR #85、CI待ちでauto-merge設定済み）**: 削除機能を追加
+- SDK比較で残る不足: Create/Update/UpdateSettings（未着手）
 
 ### ProxyLB（エンハンスドロードバランサ）
-- テスト: なし。`ProxyLBList.tsx` は list/detail のビュー切り替え、ヘルス情報の非同期読み込み、`useGlobalReload` のビュー別分岐など状態遷移・分岐ロジックが多く、**テストを書く価値が高い**
-- バックエンド: List/Get/GetHealth のみ。**Create/Update/Delete が丸ごと未実装**
-- SDK比較で不足: Create/Update/UpdateSettings/**Delete**/ChangePlan/**証明書管理**（GetCertificates/SetCertificates/DeleteCertificates/RenewLetsEncryptCert）/MonitorConnection（トラフィックグラフ）
-- **TODO**: `ProxyLBList.test.tsx` を追加。証明書管理・トラフィック監視はHTTPS運用上重要なため優先度高め
+- テスト: `ProxyLBList.test.tsx` あり（一覧表示・詳細遷移・ヘルス取得・削除フローをカバー）
+- バックエンド: List/Get/GetHealth/**Delete** 実装済み
+- ✅ **対応済み（PR #88）**: 削除機能とFEテストを追加。詳細画面ヘッダーに削除ボタンを配置
+- SDK比較で残る不足: Create/Update/UpdateSettings/ChangePlan/**証明書管理**（GetCertificates/SetCertificates/DeleteCertificates/RenewLetsEncryptCert）/MonitorConnection（トラフィックグラフ）
+- **TODO**: 証明書管理・トラフィック監視はHTTPS運用上重要なため次点で優先度高め
 
 ### SimpleMonitor
-- テスト: なし。詳細ビュー自体が未実装で分岐も薄く、現状は無理にテスト不要
-- バックエンド: **List のみ**（詳細取得＝Getすら未実装）
-- SDK比較で不足: Create/Read/Update/UpdateSettings/**Delete**/MonitorResponseTime（応答時間グラフ）/HealthStatus
+- テスト: `MonitorList.test.tsx` あり（一覧表示・削除確認フローをカバー）
+- バックエンド: List/**Delete** 実装済み（詳細取得＝Getは引き続き未実装）
+- ✅ **対応済み（PR #86）**: 削除機能を追加
+- SDK比較で残る不足: Create/Read（Get）/Update/UpdateSettings/MonitorResponseTime（応答時間グラフ）/HealthStatus
 - **TODO**: 詳細ページ（Get）の追加を優先検討。監視対象の設定内容・応答時間グラフが見えないのは運用上の穴
 
 ### Monitoring Suite（Monitoring.tsx / MonitoringMetricDetail.tsx / MetricGraph.tsx）
@@ -113,22 +118,22 @@
 ## 3. Database / EnhancedDB / NFS / ObjectStorage
 
 ### Database（データベースアプライアンス）
-- テスト: なし。表示専用のため現状は無理にテスト不要
-- バックエンド: **List のみ**。Get/Create/Update/Delete/電源操作（Boot/Shutdown/Reset）すべて未実装
-- SDK比較で不足: Create/Read/Update/UpdateSettings/**Delete**/Config/**Boot/Shutdown/Reset**/Monitor系/Status/GetParameter/SetParameter
-- **TODO**: NFSと同水準（電源操作＋削除）の機能追加を検討。管理UIとして最も手薄なリソースの一つ
+- テスト: `DatabaseList.test.tsx` あり（一覧表示・ボタン活性制御・起動ポーリング・再起動・削除フローをカバー）
+- バックエンド: List/PowerOn(Boot)/PowerOff(Shutdown)/ForceStop/**Reset**/**Delete**/GetStatus 実装済み、app.goで全て公開
+- ✅ **対応済み（PR #81）**: NFS/Server相当の電源操作（起動/停止/再起動）と削除機能、FEテストを追加
+- SDK比較で残る不足: Create/Read（単体Get）/Update/UpdateSettings/Config/Monitor系/Status/GetParameter/SetParameter（未着手）
 
 ### EnhancedDB（強化版DB）
-- テスト: なし。表示専用のため現状は無理にテスト不要。電源操作は仕様上そもそも不要
-- バックエンド: **List のみ**
-- SDK比較で不足: Create/Read/Update/**Delete**/SetPassword（パスワード変更）/GetConfig/SetConfig
-- **TODO**: 削除・パスワード変更機能の追加を検討
+- テスト: `EnhancedDBList.test.tsx` あり（一覧表示・削除確認フローをカバー）
+- バックエンド: List/**Delete** 実装済み。電源操作は仕様上そもそも不要
+- ✅ **対応済み（PR #87）**: 削除機能を追加
+- SDK比較で残る不足: Create/Read/Update/SetPassword（パスワード変更）/GetConfig/SetConfig（未着手）
 
 ### NFS
-- テスト: なし。`NFSList.tsx` は確認ダイアログ（起動/停止/削除）、ボタン活性制御、ポーリング、`pendingNFS` による楽観的UI更新など `ServerList.tsx` と同水準のロジックを持ち、**方針が名指しする「一覧+アクション系」の典型例。最優先でテストを追加すべき**
-- バックエンド: List/PowerOn/PowerOff/ForceStop/Delete/GetStatus 実装済み、app.goで全て公開
-- SDK比較で不足: Create/Update/**Reset**（Serverと同様、再起動のみ欠落）
-- **TODO**: `NFSList.test.tsx` を追加（最優先）。Resetボタンの追加も検討
+- テスト: `NFSList.test.tsx` あり（確認ダイアログ・ボタン活性制御・ポーリング・再起動・削除フローをカバー）
+- バックエンド: List/PowerOn/PowerOff/ForceStop/**Reset**/Delete/GetStatus 実装済み、app.goで全て公開
+- ✅ **対応済み（PR #80）**: `NFSList.test.tsx`（最優先項目）とResetボタンを追加
+- SDK比較で残る不足: Create/Update（未着手）
 
 ### ObjectStorage（オブジェクトストレージ）
 - テスト: なし。sites→buckets→objects の3段階遷移、パンくずナビゲーション、アクセスキー/シークレットキー管理、ページネーション、検索の遅延ロードなど**4リソース中もっともロジック濃度が高く、テストを書く価値が非常に高い**
@@ -141,10 +146,11 @@
 ## 4. ContainerRegistry / AppRun / Bill
 
 ### ContainerRegistry（コンテナレジストリ）
-- テスト: なし。`ContainerRegistryList.tsx` は分岐が薄く優先度低いが、`ContainerRegistryDetail.tsx` はview切り替え・パスワード保存/削除フロー・資格情報保存後の自動アクティブ化など状態遷移が多く**テストを書く価値が高い**
-- バックエンド: List（レジストリ本体・ユーザー）のみ。イメージ/タグ取得はOCI Registry APIを直叩きする別実装
-- SDK比較で不足: Create/Read（単体）/Update/UpdateSettings/**Delete**/AddUser/UpdateUser/DeleteUser（レジストリ自体の作成・削除・ユーザー管理が丸ごと不可）
-- **TODO**: `ContainerRegistryDetail.test.tsx` を追加。削除・ユーザー管理機能の追加を検討
+- テスト: `ContainerRegistryList.test.tsx` あり（一覧表示・詳細遷移・削除確認フローをカバー）。`ContainerRegistryDetail.tsx` はview切り替え・パスワード保存/削除フロー・資格情報保存後の自動アクティブ化など状態遷移が多く**テストを書く価値が高い**が未着手のまま
+- バックエンド: List（レジストリ本体・ユーザー）/**Delete** 実装済み。イメージ/タグ取得はOCI Registry APIを直叩きする別実装
+- ✅ **対応済み（PR #89）**: レジストリ削除機能とListのFEテストを追加
+- SDK比較で残る不足: Create/Read（単体）/Update/UpdateSettings/AddUser/UpdateUser/DeleteUser（ユーザー管理、未着手）
+- **TODO**: `ContainerRegistryDetail.test.tsx` を追加。ユーザー管理機能の追加を検討
 
 ### AppRun（専有型 / 共用型）
 - テスト: なし。`AppRunDedicatedList.tsx` は6種のview＋パンくず生成＋アクティブバージョン切替と**調査対象中もっとも分岐が複雑**でテスト価値が高い。`AppRunSharedList.tsx` も一定のロジックがありテスト価値がある
@@ -162,20 +168,29 @@
 
 ---
 
-## 優先度まとめ
+## 優先度まとめ（2026-08-07更新）
 
-### フロントエンドテスト追加（優先度順）
-1. `NFSList.test.tsx` — ServerListとほぼ同構造で、方針が最も強く推奨するパターンなのに未着手
-2. `ObjectStorageList.test.tsx` — ロジック濃度最大
-3. `AppRunDedicatedList.test.tsx` — 分岐の複雑さが最大
-4. `DiskList.test.tsx` / `ArchiveList.test.tsx` — 削除確認+ボタン活性制御
-5. `ProxyLBList.test.tsx` / `ContainerRegistryDetail.test.tsx` / `AppRunSharedList.test.tsx` / `MonitoringMetricDetail.test.tsx`
+### ✅ 完了（PR #80〜#90）
+- 電源操作: Server Reset / NFS Reset / Database 起動・停止・再起動
+- 削除機能: Switch, PacketFilter, KMS(Delete), DNS, GSLB, ProxyLB, SimpleMonitor, Database, EnhancedDB, ContainerRegistry
+- FEテスト新規追加: `NFSList.test.tsx`（最優先項目）, `DatabaseList.test.tsx`, `SwitchList.test.tsx`, `PacketFilterList.test.tsx`, `DNSList.test.tsx`, `GSLBList.test.tsx`, `MonitorList.test.tsx`, `EnhancedDBList.test.tsx`, `ProxyLBList.test.tsx`, `ContainerRegistryList.test.tsx`
 
-### バックエンド機能追加（優先度順）
-1. **削除機能が丸ごと欠落**しているリソース: Switch, PacketFilter, KMS, DNS, GSLB, ProxyLB, SimpleMonitor, Database, EnhancedDB, ObjectStorage(バケット/キー), ContainerRegistry, AppRun
-2. **電源操作（Reset/再起動）**が欠落: Server, NFS
-3. **電源操作が丸ごと欠落**: Database（Boot/Shutdown/Reset）
-4. その他: SimpleMonitorの詳細取得（Get）、ProxyLBの証明書管理、KMSのRotate/ChangeStatus/暗号化
+### 次セッションの優先順位
+
+**A. 低コストですぐ着手できるもの**
+1. `DiskList.test.tsx` / `ArchiveList.test.tsx` — バックエンド(削除)は実装済み。既存の削除確認ダイアログパターンをそのままテスト化するだけ
+2. SimpleMonitorのGet（詳細取得）実装 — Listのみで詳細ページが作れない状態を解消
+3. `ContainerRegistryDetail.test.tsx` — パスワード保存/削除フロー、資格情報自動アクティブ化のテスト
+
+**B. 中規模（実装パターンは確立済み）**
+4. KMSの残り機能: Get（詳細）/Rotate（ローテーション）/ChangeStatus（有効化・無効化）— Delete実装（`internal/kms/service.go`）と同じパターン
+5. ProxyLBの証明書管理（GetCertificates/SetCertificates/DeleteCertificates/RenewLetsEncryptCert）— HTTPS運用上重要度高
+6. `AppRunSharedList.test.tsx` / `MonitoringMetricDetail.test.tsx` のFEテスト
+
+**C. 大物・要方針決定（着手前にスコープを確認）**
+7. ObjectStorage: バケット/アクセスキーのCreate/Delete、`ObjectStorageList.test.tsx`（ロジック濃度最大・実装コストも高い）
+8. AppRun（専有/共用）: 削除・デプロイ操作。Version Create（新バージョンのデプロイ）は「閲覧中心」という現状スコープを超えるため、実装するか自体を判断してから着手
 
 ### その他
-- `internal/sakura/server.go` の `println` デバッグ文の削除（別issueとして切り出し推奨）
+- `internal/sakura/server.go` の `println` デバッグ文の削除（別issueとして切り出し推奨、未着手）
+- Server/NFSのChangePlan・CDROM・VNC・SendKey等は現状スコープ外と判断し据え置き
