@@ -104,6 +104,11 @@ func (s *Service) ListKeys(ctx context.Context) ([]KeyInfo, error) {
 	return result, nil
 }
 
+// DeleteKey KMSキーを削除
+func (s *Service) DeleteKey(ctx context.Context, id string) error {
+	return s.keyOp.Delete(ctx, id)
+}
+
 // parseDateTime v1.DateTimeを time.Time に変換
 func parseDateTime(dt v1.DateTime) time.Time {
 	t, err := time.Parse(time.RFC3339, string(dt))

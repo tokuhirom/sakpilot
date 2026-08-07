@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetKMSKeys } from '../../wailsjs/go/main/App';
+import { GetKMSKeys, DeleteKMSKey } from '../../wailsjs/go/main/App';
 import { kms } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -12,6 +12,8 @@ interface KMSListProps {
 export function KMSList({ profile }: KMSListProps) {
   const [keys, setKeys] = useState<kms.KeyInfo[]>([]);
   const [loading, setLoading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<kms.KeyInfo | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const {
     searchQuery,
@@ -47,6 +49,29 @@ export function KMSList({ profile }: KMSListProps) {
   useEffect(() => {
     loadKeys();
   }, [loadKeys]);
+
+  const handleDeleteClick = (key: kms.KeyInfo) => {
+    setConfirmDelete(key);
+  };
+
+  const handleDeleteCancel = () => {
+    setConfirmDelete(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!confirmDelete) return;
+    const key = confirmDelete;
+    setConfirmDelete(null);
+    setDeleting(key.id);
+    try {
+      await DeleteKMSKey(profile, key.id);
+      await loadKeys();
+    } catch (e) {
+      alert(`削除に失敗しました: ${e}`);
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -150,12 +175,33 @@ export function KMSList({ profile }: KMSListProps) {
                   </div>
                 )}
               </div>
-              <div style={{ fontSize: '0.7rem', color: '#666' }}>
+              <div style={{ fontSize: '0.7rem', color: '#666', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 ID: {key.id}
+                <button
+                  className="btn btn-danger btn-small"
+                  onClick={() => handleDeleteClick(key)}
+                  disabled={deleting === key.id}
+                  title="削除"
+                >
+                  {deleting === key.id ? '削除中...' : '削除'}
+                </button>
               </div>
             </div>
           </div>
         ))
+      )}
+
+      {confirmDelete && (
+        <div className="confirm-overlay" onClick={handleDeleteCancel}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <p>KMSキー「{confirmDelete.name}」を削除しますか？</p>
+            <p className="confirm-warning">この操作は取り消せません。このキーで暗号化されたデータは復号できなくなります。</p>
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleDeleteCancel}>キャンセル</button>
+              <button className="btn btn-danger" onClick={handleDeleteConfirm}>削除する</button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
