@@ -4,11 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
+	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 )
 
 type Client struct {
@@ -44,9 +48,19 @@ func NewClientFromProfile(profileName string) (*Client, error) {
 	}
 	println("NewClientFromProfile:", profileName, "token prefix:", tokenPrefix)
 
-	// クライアントを作成
-	//nolint:staticcheck // deprecated but works, migration to saclient is complex
-	caller := iaas.NewClient(cfg.AccessToken, cfg.AccessTokenSecret)
+	// クライアントを作成(HTTPアクセスログ出力用のミドルウェアを追加するため、
+	// deprecatedなiaas.NewClientではなくsaclient.Client経由で構築する)
+	sa := &saclient.Client{}
+	if err := sa.SetEnviron([]string{
+		"SAKURACLOUD_ACCESS_TOKEN=" + cfg.AccessToken,
+		"SAKURACLOUD_ACCESS_TOKEN_SECRET=" + cfg.AccessTokenSecret,
+	}); err != nil {
+		return nil, err
+	}
+	if err := sa.SetWith(saclient.WithMiddleware(httpAccessLogMiddleware)); err != nil {
+		return nil, err
+	}
+	caller := iaas.NewClientFromSaclient(sa)
 	op := iaas.NewAuthStatusOp(caller)
 	read, err := op.Read(context.Background())
 	if err != nil {
@@ -85,6 +99,33 @@ func loadProfileConfig(profileName string) (*profileConfig, error) {
 	}
 	fmt.Printf("Loading profile %s, accessTokenPrefix=%s...\n", profileName, tokenPrefix)
 	return &cfg, nil
+}
+
+// httpAccessLogMiddleware はSakura Cloud APIへのHTTPリクエストのアクセス履歴を
+// wailsのログ(標準出力)に出力する。Authorizationヘッダやボディは機密情報(トークン等)を
+// 含み得るため出力せず、メソッド・パス・ステータスコード・所要時間のみ記録する。
+func httpAccessLogMiddleware(req *http.Request, pull func() (saclient.Middleware, bool)) (*http.Response, error) {
+	next, ok := pull()
+	if !ok {
+		return nil, fmt.Errorf("sakura: no next middleware to pull")
+	}
+
+	start := time.Now()
+	resp, err := next(req, pull)
+	elapsed := time.Since(start).Round(time.Millisecond)
+
+	if err != nil {
+		log.Printf("[sakura-api] %s %s -> error: %v (%s)", req.Method, req.URL.Path, err, elapsed)
+		return resp, err
+	}
+
+	status := 0
+	if resp != nil {
+		status = resp.StatusCode
+	}
+	log.Printf("[sakura-api] %s %s -> %d (%s)", req.Method, req.URL.Path, status, elapsed)
+
+	return resp, err
 }
 
 func (c *Client) Caller() iaas.APICaller {
