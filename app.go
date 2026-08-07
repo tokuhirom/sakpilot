@@ -895,6 +895,42 @@ func (a *App) GetObjectStorageAccessKeys(profileName, siteID string) ([]sakura.A
 	return service.ListAccessKeys(a.ctx, siteID)
 }
 
+func (a *App) CreateObjectStorageAccessKey(profileName, siteID string) (*sakura.AccessKeyCreated, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.CreateAccessKey(a.ctx, siteID)
+}
+
+func (a *App) DeleteObjectStorageAccessKey(profileName, siteID, keyID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.DeleteAccessKey(a.ctx, siteID, keyID)
+}
+
+func (a *App) CreateObjectStorageBucket(profileName, siteID, bucketName, plan string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.CreateBucket(a.ctx, siteID, bucketName, plan)
+}
+
+func (a *App) DeleteObjectStorageBucket(profileName, siteID, bucketName string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.DeleteBucket(a.ctx, siteID, bucketName)
+}
+
 // Object Storage Secret Key management (Keychain)
 func (a *App) SaveObjectStorageSecretKey(siteID, accessKeyID, secretKey string) error {
 	return sakura.SaveObjectStorageSecret(siteID, accessKeyID, secretKey)

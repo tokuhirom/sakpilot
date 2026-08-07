@@ -41,6 +41,15 @@ type AccessKeyInfo struct {
 	CreatedAt string `json:"createdAt"`
 }
 
+// AccessKeyCreated holds the result of creating an access key. Secret is only
+// ever populated here - subsequent reads of the key always return an empty
+// secret, so callers must persist it immediately (see keyring.go).
+type AccessKeyCreated struct {
+	ID        string `json:"id"`
+	Secret    string `json:"secret"`
+	CreatedAt string `json:"createdAt"`
+}
+
 type ObjectInfo struct {
 	Key          string `json:"key"`
 	Size         int64  `json:"size"`
@@ -144,6 +153,85 @@ func (s *ObjectStorageService) ListAccessKeys(ctx context.Context, siteID string
 		})
 	}
 	return result, nil
+}
+
+// CreateAccessKey creates a new Object Storage access key for the site's
+// account, creating the account first if it doesn't exist yet.
+func (s *ObjectStorageService) CreateAccessKey(ctx context.Context, siteID string) (*AccessKeyCreated, error) {
+	siteClient, err := s.siteClient(siteID)
+	if err != nil {
+		return nil, err
+	}
+	accountOp := objectstorage.NewAccountOp(siteClient)
+
+	if _, err := accountOp.Read(ctx); err != nil {
+		// Account doesn't exist yet - create it. If this also fails, the
+		// error surfaces below via CreateAccessKey instead.
+		_, _ = accountOp.Create(ctx)
+	}
+
+	key, err := accountOp.CreateAccessKey(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	createdAt := ""
+	if v, ok := key.CreatedAt.Get(); ok {
+		t := time.Time(v)
+		if !t.IsZero() {
+			createdAt = t.Format(time.RFC3339)
+		}
+	}
+
+	return &AccessKeyCreated{
+		ID:        string(key.ID.Or("")),
+		Secret:    string(key.Secret.Or("")),
+		CreatedAt: createdAt,
+	}, nil
+}
+
+// DeleteAccessKey deletes an Object Storage access key.
+func (s *ObjectStorageService) DeleteAccessKey(ctx context.Context, siteID, keyID string) error {
+	siteClient, err := s.siteClient(siteID)
+	if err != nil {
+		return err
+	}
+	accountOp := objectstorage.NewAccountOp(siteClient)
+	return accountOp.DeleteAccessKey(ctx, keyID)
+}
+
+// CreateBucket creates a new bucket on the given site. plan is only
+// meaningful for the "arc02" archive site; pass an empty string otherwise.
+func (s *ObjectStorageService) CreateBucket(ctx context.Context, siteID, bucketName, plan string) error {
+	fedClient, err := s.fedClient()
+	if err != nil {
+		return err
+	}
+	siteClient, err := s.siteClient(siteID)
+	if err != nil {
+		return err
+	}
+	bucketOp := objectstorage.NewBucketOp(fedClient, siteClient)
+	_, err = bucketOp.Create(ctx, &objectstorage.BucketCreateParams{
+		Bucket: bucketName,
+		SiteId: siteID,
+		Plan:   plan,
+	})
+	return err
+}
+
+// DeleteBucket deletes a bucket on the given site.
+func (s *ObjectStorageService) DeleteBucket(ctx context.Context, siteID, bucketName string) error {
+	fedClient, err := s.fedClient()
+	if err != nil {
+		return err
+	}
+	siteClient, err := s.siteClient(siteID)
+	if err != nil {
+		return err
+	}
+	bucketOp := objectstorage.NewBucketOp(fedClient, siteClient)
+	return bucketOp.Delete(ctx, bucketName)
 }
 
 // ListBuckets requires Object Storage access key (not API token)

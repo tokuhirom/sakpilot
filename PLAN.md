@@ -27,12 +27,12 @@
 | Database | ✅ あり | ✅ | ✅ | 起動/停止/再起動+削除+FEテストを追加済み（PR #81） |
 | EnhancedDB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #87） |
 | NFS | ✅ あり | ✅ | ✅ | 完備。FEテストとResetを追加済み（PR #80） |
-| ObjectStorage | ❌ なし | ❌ **なし** | (対象外) | 閲覧・DLのみ。バケット/キー作成削除が丸ごと未実装（未着手） |
+| ObjectStorage | ✅ あり | ✅（バケット・アクセスキー） | (対象外) | バケット作成/削除、アクセスキー作成/削除+FEテストを追加済み |
 | ContainerRegistry | ✅ あり | ✅ | (対象外) | 削除機能+FEテスト(List/Detail)を追加済み（PR #89、#95） |
 | AppRun (専有/共用) | ✅ あり | ❌ **なし** | (対象外) | 専有型・共用型ともFEテスト追加済み。閲覧＋アクティブバージョン切替のみ（デプロイ・削除は方針判断待ち） |
 | Bill | ❌ なし | (対象外) | (対象外) | 読み取り専用リソースなので概ね妥当 |
 
-**17リソース中、FEテストが未着手なのは ObjectStorage / Bill。**
+**17リソース中、FEテストが未着手なのは Bill のみ。**
 
 ---
 
@@ -137,10 +137,10 @@
 - SDK比較で残る不足: Create/Update（未着手）
 
 ### ObjectStorage（オブジェクトストレージ）
-- テスト: なし。sites→buckets→objects の3段階遷移、パンくずナビゲーション、アクセスキー/シークレットキー管理、ページネーション、検索の遅延ロードなど**4リソース中もっともロジック濃度が高く、テストを書く価値が非常に高い**
-- バックエンド: ListSites/ListAccessKeys/ListBuckets/ListObjects/DownloadObject/Preview系 実装済み。**Create/Update/Delete は丸ごと未実装**（バケット作成/削除、アクセスキー作成/削除、オブジェクトアップロード/削除なし）
-- SDK比較で不足: BucketAPIのCreate/**Delete**、AccountAPIのCreate/Read/Delete、AccessKeyのCreate/Read/**Delete**、PermissionsAPI全般、暗号化/レプリケーション/クォータ設定、S3側のPutObject/DeleteObject
-- **TODO**: `ObjectStorageList.test.tsx` を追加（優先度高、実装コストも高い）。バケット・アクセスキーの削除機能は次点で検討
+- テスト: `ObjectStorageList.test.tsx` あり（sites→bucketsビュー遷移、シークレットキー保存とバケット自動取得、バケット作成/削除、アクセスキー作成〜Secret一度きり表示〜保存、アクセスキー削除の各フローをカバー。objectsビューの検索/ページネーション/プレビューは対象外）
+- バックエンド: ListSites/ListAccessKeys/ListBuckets/ListObjects/DownloadObject/Preview系に加え、**CreateBucket/DeleteBucket/CreateAccessKey/DeleteAccessKey** を実装
+- ✅ **対応済み**: バケット作成/削除（`internal/sakura/objectstorage.go`の`CreateBucket`/`DeleteBucket`、`BucketAPI`経由）、アクセスキー作成/削除（`CreateAccessKey`/`DeleteAccessKey`、`AccountAPI`経由。アカウント未作成時は`CreateAccessKey`内で自動的にアカウント作成）。アクセスキーのSecretは作成レスポンスでしか取得できないため、フロントに一度きりの表示モーダルを追加し、`SaveObjectStorageSecretKey`（既存のキーチェーン保存）へ誘導するUXとした
+- SDK比較で残る不足: AccountのRead/Delete、PermissionsAPI全般、暗号化/レプリケーション/クォータ設定、S3側のPutObject/DeleteObject（オブジェクト単位の作成/削除は未着手）
 
 ---
 
@@ -193,11 +193,13 @@
 ### ✅ 完了（2026-08-07 追加セッション4）
 - `AppRunDedicatedList.test.tsx` を追加（クラスタ一覧の空状態、cluster→app→versionの遷移とパンくずでの戻り、ドロップダウンからのアクティブバージョン設定（成功/失敗）、非アクティブ化ボタン（成功/失敗）、ASG詳細でのLB・ワーカーノード表示とLBごとの`GetAppRunLBNodes`呼び出しをカバー）。`lb` view（ロードバランサー単体詳細）はUIからクリックで到達するトリガーが実装内に無く、テスト対象外とした
 
+### ✅ 完了（2026-08-08 追加セッション5）
+- ObjectStorageのバケット・アクセスキーCreate/Delete機能一式を実装。バックエンドに`CreateBucket`/`DeleteBucket`/`CreateAccessKey`/`DeleteAccessKey`（`internal/sakura/objectstorage.go`）とそれぞれのapp.go RPCを追加し、`ObjectStorageList.tsx`にバケット作成モーダル・削除確認・アクセスキー作成時のSecret一度きり表示モーダル・アクセスキー削除確認を追加。`ObjectStorageList.test.tsx`を新規作成
+
 ### 次セッションの優先順位
 
 **C. 大物・要方針決定（着手前にスコープを確認）**
-1. ObjectStorage: バケット/アクセスキーのCreate/Delete、`ObjectStorageList.test.tsx`（ロジック濃度最大・実装コストも高い）
-2. AppRun（専有型）: 削除・デプロイ操作はSDK比較で不足あり。Version Create（新バージョンのデプロイ）は「閲覧中心」という現状スコープを超えるため、実装するか自体を判断してから着手。`lb` viewへの遷移導線が無い点も要確認（意図的な未実装か、実装漏れか）
+1. AppRun（専有型）: 削除・デプロイ操作はSDK比較で不足あり。Version Create（新バージョンのデプロイ）は「閲覧中心」という現状スコープを超えるため、実装するか自体を判断してから着手。`lb` viewへの遷移導線が無い点も要確認（意図的な未実装か、実装漏れか）
 
 ### その他
 - `internal/sakura/server.go` の `println` デバッグ文の削除（別issueとして切り出し推奨、未着手）
