@@ -105,13 +105,7 @@ xattr -cr /Applications/SakPilot.app
 
 Linux でビルドする場合は GTK/WebKit の開発パッケージが必要です。
 
-**Ubuntu 22.04 系 (CI (`ci.yml`) はこちら)**
-
-```bash
-sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
-```
-
-**Ubuntu 24.04 / Debian 13 以降**
+**Ubuntu 24.04 / Debian 13 以降 (CI (`ci.yml`) はこちら)**
 
 `libwebkit2gtk-4.0-dev` が廃止され `libwebkit2gtk-4.1-dev` に置き換わっています。パッケージ名だけでなく、`wails dev` / `wails build` 実行時にも `-tags webkit2_41` の指定が必要です（[wailsapp/wails#3581](https://github.com/wailsapp/wails/issues/3581)）。
 
@@ -122,6 +116,12 @@ sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
 ```bash
 wails dev -tags webkit2_41
 wails build -tags webkit2_41
+```
+
+**Ubuntu 22.04 系以前**
+
+```bash
+sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
 ```
 
 ### セットアップ
