@@ -184,6 +184,11 @@ func (s *GlobalService) ListSimpleMonitors(ctx context.Context) ([]SimpleMonitor
 	return list, nil
 }
 
+func (s *GlobalService) DeleteSimpleMonitor(ctx context.Context, id string) error {
+	smOp := iaas.NewSimpleMonitorOp(s.client.Caller())
+	return smOp.Delete(ctx, types.StringID(id))
+}
+
 func (s *GlobalService) ListGSLB(ctx context.Context) ([]GSLBInfo, error) {
 	gslbOp := iaas.NewGSLBOp(s.client.Caller())
 	result, err := gslbOp.Find(ctx, &iaas.FindCondition{})

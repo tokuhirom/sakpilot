@@ -208,6 +208,15 @@ func (a *App) GetSimpleMonitors(profileName string) ([]sakura.SimpleMonitorInfo,
 	return service.ListSimpleMonitors(a.ctx)
 }
 
+func (a *App) DeleteSimpleMonitor(profileName, monitorId string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.DeleteSimpleMonitor(a.ctx, monitorId)
+}
+
 func (a *App) GetGSLBList(profileName string) ([]sakura.GSLBInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
 	if err != nil {
