@@ -226,6 +226,15 @@ func (a *App) GetContainerRegistryUsers(profileName, registryId string) ([]sakur
 	return service.ListContainerRegistryUsers(a.ctx, registryId)
 }
 
+func (a *App) DeleteContainerRegistry(profileName, registryId string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.DeleteContainerRegistry(a.ctx, registryId)
+}
+
 // GSLB Detail
 func (a *App) GetGSLBDetail(profileName, gslbId string) (*sakura.GSLBInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
