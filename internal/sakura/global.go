@@ -114,6 +114,31 @@ type GSLBInfo struct {
 	Weighted    bool                 `json:"weighted"`
 }
 
+// GSLBServerInput はCreate/UpdateSettings時に指定する振り分け先サーバー。
+type GSLBServerInput struct {
+	IPAddress string `json:"ipAddress"`
+	Enabled   bool   `json:"enabled"`
+	Weight    int    `json:"weight"`
+}
+
+// GSLBHealthCheckInput はCreate/UpdateSettings時に指定するヘルスチェック設定。
+type GSLBHealthCheckInput struct {
+	Protocol     string `json:"protocol"`
+	HostHeader   string `json:"hostHeader"`
+	Path         string `json:"path"`
+	ResponseCode int    `json:"responseCode"`
+	Port         int    `json:"port"`
+}
+
+// GSLBSettingsInput はCreate/UpdateSettings時に指定する監視設定一式。
+type GSLBSettingsInput struct {
+	SorryServer string               `json:"sorryServer"`
+	DelayLoop   int                  `json:"delayLoop"`
+	Weighted    bool                 `json:"weighted"`
+	HealthCheck GSLBHealthCheckInput `json:"healthCheck"`
+	Servers     []GSLBServerInput    `json:"servers"`
+}
+
 type ContainerRegistryInfo struct {
 	ID            string `json:"id"`
 	Name          string `json:"name"`
@@ -424,57 +449,7 @@ func (s *GlobalService) DeleteSimpleMonitor(ctx context.Context, id string) erro
 	return smOp.Delete(ctx, types.StringID(id))
 }
 
-func (s *GlobalService) ListGSLB(ctx context.Context) ([]GSLBInfo, error) {
-	gslbOp := iaas.NewGSLBOp(s.client.Caller())
-	result, err := gslbOp.Find(ctx, &iaas.FindCondition{})
-	if err != nil {
-		return nil, err
-	}
-
-	list := make([]GSLBInfo, 0, len(result.GSLBs))
-	for _, g := range result.GSLBs {
-		servers := make([]GSLBServerInfo, 0, len(g.DestinationServers))
-		for _, srv := range g.DestinationServers {
-			servers = append(servers, GSLBServerInfo{
-				IPAddress: srv.IPAddress,
-				Enabled:   srv.Enabled.Bool(),
-				Weight:    int(srv.Weight),
-			})
-		}
-
-		var healthCheck *GSLBHealthCheckInfo
-		if g.HealthCheck != nil {
-			healthCheck = &GSLBHealthCheckInfo{
-				Protocol:     string(g.HealthCheck.Protocol),
-				HostHeader:   g.HealthCheck.HostHeader,
-				Path:         g.HealthCheck.Path,
-				ResponseCode: int(g.HealthCheck.ResponseCode),
-				Port:         int(g.HealthCheck.Port),
-			}
-		}
-
-		list = append(list, GSLBInfo{
-			ID:          g.ID.String(),
-			Name:        g.Name,
-			Description: g.Description,
-			FQDN:        g.FQDN,
-			SorryServer: g.SorryServer,
-			Servers:     servers,
-			HealthCheck: healthCheck,
-			DelayLoop:   g.DelayLoop,
-			Weighted:    g.Weighted.Bool(),
-		})
-	}
-	return list, nil
-}
-
-func (s *GlobalService) GetGSLB(ctx context.Context, id string) (*GSLBInfo, error) {
-	gslbOp := iaas.NewGSLBOp(s.client.Caller())
-	g, err := gslbOp.Read(ctx, types.StringID(id))
-	if err != nil {
-		return nil, err
-	}
-
+func toGSLBInfo(g *iaas.GSLB) *GSLBInfo {
 	servers := make([]GSLBServerInfo, 0, len(g.DestinationServers))
 	for _, srv := range g.DestinationServers {
 		servers = append(servers, GSLBServerInfo{
@@ -505,7 +480,115 @@ func (s *GlobalService) GetGSLB(ctx context.Context, id string) (*GSLBInfo, erro
 		HealthCheck: healthCheck,
 		DelayLoop:   g.DelayLoop,
 		Weighted:    g.Weighted.Bool(),
-	}, nil
+	}
+}
+
+func toSDKGSLBHealthCheck(hc GSLBHealthCheckInput) *iaas.GSLBHealthCheck {
+	return &iaas.GSLBHealthCheck{
+		Protocol:     types.EGSLBHealthCheckProtocol(hc.Protocol),
+		HostHeader:   hc.HostHeader,
+		Path:         hc.Path,
+		ResponseCode: types.StringNumber(hc.ResponseCode),
+		Port:         types.StringNumber(hc.Port),
+	}
+}
+
+func toSDKGSLBServers(servers []GSLBServerInput) iaas.GSLBServers {
+	result := make(iaas.GSLBServers, 0, len(servers))
+	for _, srv := range servers {
+		result = append(result, &iaas.GSLBServer{
+			IPAddress: srv.IPAddress,
+			Enabled:   types.StringFlag(srv.Enabled),
+			Weight:    types.StringNumber(srv.Weight),
+		})
+	}
+	return result
+}
+
+func (s *GlobalService) ListGSLB(ctx context.Context) ([]GSLBInfo, error) {
+	gslbOp := iaas.NewGSLBOp(s.client.Caller())
+	result, err := gslbOp.Find(ctx, &iaas.FindCondition{})
+	if err != nil {
+		return nil, err
+	}
+
+	list := make([]GSLBInfo, 0, len(result.GSLBs))
+	for _, g := range result.GSLBs {
+		list = append(list, *toGSLBInfo(g))
+	}
+	return list, nil
+}
+
+func (s *GlobalService) GetGSLB(ctx context.Context, id string) (*GSLBInfo, error) {
+	gslbOp := iaas.NewGSLBOp(s.client.Caller())
+	g, err := gslbOp.Read(ctx, types.StringID(id))
+	if err != nil {
+		return nil, err
+	}
+	return toGSLBInfo(g), nil
+}
+
+// CreateGSLB はGSLBを新規作成する。
+func (s *GlobalService) CreateGSLB(ctx context.Context, name, description string, settings GSLBSettingsInput) (*GSLBInfo, error) {
+	gslbOp := iaas.NewGSLBOp(s.client.Caller())
+	g, err := gslbOp.Create(ctx, &iaas.GSLBCreateRequest{
+		Name:               name,
+		Description:        description,
+		HealthCheck:        toSDKGSLBHealthCheck(settings.HealthCheck),
+		DelayLoop:          settings.DelayLoop,
+		Weighted:           types.StringFlag(settings.Weighted),
+		SorryServer:        settings.SorryServer,
+		DestinationServers: toSDKGSLBServers(settings.Servers),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return toGSLBInfo(g), nil
+}
+
+// UpdateGSLB はGSLBの名前・説明を更新する。監視設定は既存のものを維持したまま送信する
+// (Update APIはSettingsも含むリクエスト構造のため、空で送ると設定が失われる)。
+func (s *GlobalService) UpdateGSLB(ctx context.Context, id, name, description string) (*GSLBInfo, error) {
+	gslbOp := iaas.NewGSLBOp(s.client.Caller())
+	current, err := gslbOp.Read(ctx, types.StringID(id))
+	if err != nil {
+		return nil, err
+	}
+	g, err := gslbOp.Update(ctx, types.StringID(id), &iaas.GSLBUpdateRequest{
+		Name:               name,
+		Description:        description,
+		HealthCheck:        current.HealthCheck,
+		DelayLoop:          current.DelayLoop,
+		Weighted:           current.Weighted,
+		SorryServer:        current.SorryServer,
+		DestinationServers: current.DestinationServers,
+		SettingsHash:       current.SettingsHash,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return toGSLBInfo(g), nil
+}
+
+// UpdateGSLBSettings はGSLBの監視設定(ヘルスチェック・振り分け先サーバー等)を更新する。名前・説明は変更しない。
+func (s *GlobalService) UpdateGSLBSettings(ctx context.Context, id string, settings GSLBSettingsInput) (*GSLBInfo, error) {
+	gslbOp := iaas.NewGSLBOp(s.client.Caller())
+	current, err := gslbOp.Read(ctx, types.StringID(id))
+	if err != nil {
+		return nil, err
+	}
+	g, err := gslbOp.UpdateSettings(ctx, types.StringID(id), &iaas.GSLBUpdateSettingsRequest{
+		HealthCheck:        toSDKGSLBHealthCheck(settings.HealthCheck),
+		DelayLoop:          settings.DelayLoop,
+		Weighted:           types.StringFlag(settings.Weighted),
+		SorryServer:        settings.SorryServer,
+		DestinationServers: toSDKGSLBServers(settings.Servers),
+		SettingsHash:       current.SettingsHash,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return toGSLBInfo(g), nil
 }
 
 func (s *GlobalService) DeleteGSLB(ctx context.Context, id string) error {

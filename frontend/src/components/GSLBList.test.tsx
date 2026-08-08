@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { GSLBList } from './GSLBList';
 import { sakura } from '../../wailsjs/go/models';
-import { GetGSLBList, DeleteGSLB } from '../../wailsjs/go/main/App';
+import { GetGSLBList, DeleteGSLB, CreateGSLB } from '../../wailsjs/go/main/App';
 
 vi.mock('../../wailsjs/go/main/App');
 
@@ -25,6 +25,7 @@ describe('GSLBList', () => {
   beforeEach(() => {
     vi.mocked(GetGSLBList).mockReset();
     vi.mocked(DeleteGSLB).mockReset();
+    vi.mocked(CreateGSLB).mockReset();
   });
 
   it('lists GSLBs returned by GetGSLBList', async () => {
@@ -81,5 +82,30 @@ describe('GSLBList', () => {
     await waitFor(() => {
       expect(GetGSLBList).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it('creates a GSLB', async () => {
+    vi.mocked(GetGSLBList)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([makeGSLB({ name: 'new-gslb' })]);
+    vi.mocked(CreateGSLB).mockResolvedValueOnce(makeGSLB({ name: 'new-gslb' }));
+    const user = userEvent.setup();
+
+    render(<GSLBList profile="default" onSelectGSLB={() => {}} />);
+    await screen.findByText('GSLBがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ GSLB作成' }));
+    await user.type(screen.getByPlaceholderText('my-gslb'), 'new-gslb');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    await waitFor(() => {
+      expect(CreateGSLB).toHaveBeenCalledWith(
+        'default',
+        'new-gslb',
+        '',
+        expect.objectContaining({ healthCheck: expect.objectContaining({ protocol: 'ping' }) }),
+      );
+    });
+    expect(await screen.findByText('new-gslb')).toBeInTheDocument();
   });
 });

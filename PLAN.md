@@ -23,7 +23,7 @@
 | PacketFilter | ✅ あり | ✅ | (対象外) | 削除機能に加えCreate/Update（ルール管理）まで対応済み。読み書き一式が完備 |
 | KMS | ✅ あり | ✅（Delete） | (対象外) | 削除機能+FEテストを追加済み（PR #90）。Get/Rotate/ChangeStatus/暗号化は引き続き未実装 |
 | DNS | ✅ あり | ✅ | (対象外) | Create/Update/UpdateSettings（レコード管理）まで対応済み。読み書き一式が完備 |
-| GSLB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #85、CI待ちでauto-merge設定済み） |
+| GSLB | ✅ あり | ✅ | (対象外) | 削除機能に加えCreate/Update/UpdateSettings（振り分け先サーバー管理）まで対応済み。読み書き一式が完備 |
 | ProxyLB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #88）。証明書管理（Get/Set/Delete/RenewLetsEncrypt）を追加済み |
 | SimpleMonitor | ✅ あり | ✅ | (対象外) | 削除機能に加えCreate/Update（監視設定管理）まで対応済み。読み書き一式が完備 |
 | Database | ✅ あり | ✅ | ✅ | 起動/停止/再起動+削除+FEテストを追加済み（PR #81） |
@@ -209,6 +209,9 @@
 ### ✅ 完了（2026-08-08 追加セッション7、Tier1 #2）
 - PacketFilterのCreate/Update（ルール管理）を実装。`internal/sakura/packetfilter.go`に`Create`/`Update`を追加（UpdateはExpressionHashによる楽観ロックのため事前Read必須）、`app.go`に`CreatePacketFilter`/`UpdatePacketFilter`のRPCを公開。`PacketFilterList.tsx`に作成モーダル、`PacketFilterDetail.tsx`に名前・説明のインライン編集とルール（プロトコル/送信元/ポート/アクション/説明）の追加・編集・削除UIを実装。`PacketFilterDetail.test.tsx`を新規作成し、`frontend/e2e/packetfilter.spec.ts`でE2Eシナリオも追加
 
+### ✅ 完了（2026-08-08 追加セッション9、Tier1 #4）
+- GSLBのCreate/Update/UpdateSettings（振り分け先サーバー・ヘルスチェック管理）を実装。`internal/sakura/global.go`に`CreateGSLB`/`UpdateGSLB`/`UpdateGSLBSettings`を追加（SettingsHashによる楽観ロックのため事前Read必須、`toGSLBInfo`ヘルパーでList/Get/Create/Update間の変換ロジックを共通化）、`app.go`に対応するRPCを公開。`GSLBList.tsx`に作成モーダル、`GSLBDetail.tsx`に名前・説明のインライン編集と監視設定編集モーダル（Sorry Server/監視間隔/重み付け/ヘルスチェック/振り分け先サーバーの追加・編集・削除、UpdateSettings APIが全件置換のためサーバー一覧もフォーム内で一括編集）を実装。`GSLBDetail.test.tsx`を新規作成し、`frontend/e2e/gslb.spec.ts`でE2Eシナリオも追加
+
 ### 実装順序（2026-08-08 方針転換後の書き込み系機能ロードマップ）
 
 「閲覧中心」制約の撤廃を受け、各節「SDK比較で残る不足」に列挙された未実装機能（主にCreate/Update系）を、(a) 利用頻度・実用価値、(b) 実装複雑度、(c) 誤操作時のリスク（実インフラ作成・課金発生の有無）で並べ替えたロードマップ。上から順に着手することを推奨するが、各Tier内の順序はユーザーの関心に応じて入れ替えてよい。
@@ -231,8 +234,8 @@
 1. ✅ DNS: Create/Update/UpdateSettings（レコード追加・編集は最頻出の日常操作） — 2026-08-08対応済み
 2. ✅ PacketFilter: Create/Update（ルール追加・編集） — 2026-08-08対応済み
 3. ✅ SimpleMonitor: Create/Update/UpdateSettings（監視対象の追加・設定変更） — 2026-08-08対応済み
-4. GSLB: Create/Update/UpdateSettings — 次に着手すべき候補
-5. ContainerRegistry: Create、ユーザー管理（AddUser/UpdateUser/DeleteUser）
+4. ✅ GSLB: Create/Update/UpdateSettings — 2026-08-08対応済み
+5. ContainerRegistry: Create、ユーザー管理（AddUser/UpdateUser/DeleteUser） — 次に着手すべき候補
 6. AppRun専有型: Version Create（デプロイ）— 着手する場合はフルデプロイフォーム（image/CPU/メモリ/スケーリング/公開ポート/環境変数）として対応する方針（2026-08-08ユーザーに確認済み）
 
 **Tier 2: リソース新規作成系（入力項目・依存関係が多くフォーム設計コストが高い、または実インフラ作成を伴い課金・削除確認等の設計が必要）**
