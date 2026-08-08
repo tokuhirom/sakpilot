@@ -102,6 +102,9 @@ func runE2EServer(addr, dist string) error {
 	if err := seedContainerRegistries(); err != nil {
 		return fmt.Errorf("failed to seed container registries: %w", err)
 	}
+	if err := seedProxyLBs(); err != nil {
+		return fmt.Errorf("failed to seed ELB/ProxyLBs: %w", err)
+	}
 
 	kmsSrv := mockkms.NewTestServer(mockkms.Config{})
 	if err := os.Setenv("SAKURA_ENDPOINTS_KMS", kmsSrv.TestURL()); err != nil {
@@ -686,6 +689,35 @@ func seedContainerRegistries() error {
 		Name:        "e2e-doomed-registry",
 		Description: "E2E: 削除シナリオ用",
 		AccessLevel: types.ContainerRegistryAccessLevels.None,
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+// seedProxyLBs はIaaS fakeドライバのデータストアにE2Eシナリオ用のELB(ProxyLB)を投入する。
+func seedProxyLBs() error {
+	ctx := context.Background()
+	lbOp := iaas.NewProxyLBOp(nil)
+
+	if _, err := lbOp.Create(ctx, &iaas.ProxyLBCreateRequest{
+		Name:        "e2e-elb",
+		Description: "E2E: 証明書管理シナリオ用",
+		Plan:        types.ProxyLBPlans.CPS100,
+		BindPorts: []*iaas.ProxyLBBindPort{
+			{ProxyMode: types.ProxyLBProxyModes.HTTPS, Port: 443},
+		},
+		Servers: []*iaas.ProxyLBServer{
+			{IPAddress: "192.0.2.30", Port: 80, Enabled: true},
+		},
+	}); err != nil {
+		return err
+	}
+
+	if _, err := lbOp.Create(ctx, &iaas.ProxyLBCreateRequest{
+		Name:        "e2e-doomed-elb",
+		Description: "E2E: 削除シナリオ用",
+		Plan:        types.ProxyLBPlans.CPS100,
 	}); err != nil {
 		return err
 	}
