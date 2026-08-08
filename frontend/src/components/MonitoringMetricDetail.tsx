@@ -1,5 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { GetMSMetricsStorageDetail, GetMSMetricsAccessKeys, QueryMSPrometheusPublishers, QueryMSPrometheusMetricsByPublisher, QueryMSPrometheusMetricsWithoutPublisher } from '../../wailsjs/go/main/App';
+import { useNavigate } from 'react-router-dom';
+import {
+  GetMSMetricsStorageDetail, GetMSMetricsAccessKeys,
+  QueryMSPrometheusPublishers, QueryMSPrometheusMetricsByPublisher, QueryMSPrometheusMetricsWithoutPublisher,
+  UpdateMSMetricsStorage, DeleteMSMetricsStorage,
+  CreateMSMetricsAccessKey, DeleteMSMetricsAccessKey,
+} from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useGlobalReload } from '../hooks/useGlobalReload';
 import { MetricGraph } from './MetricGraph';
@@ -17,6 +23,7 @@ interface MonitoringMetricDetailProps {
 }
 
 export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricDetailProps) {
+  const navigate = useNavigate();
   const [detail, setDetail] = useState<sakura.MSMetricsStorageDetail | null>(null);
   const [accessKeys, setAccessKeys] = useState<sakura.MSMetricsAccessKey[]>([]);
   const [publishers, setPublishers] = useState<string[]>([]);
@@ -25,6 +32,24 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
   const [loading, setLoading] = useState(false);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [editingBasic, setEditingBasic] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [descriptionInput, setDescriptionInput] = useState('');
+  const [savingBasic, setSavingBasic] = useState(false);
+  const [basicError, setBasicError] = useState<string | null>(null);
+
+  const [confirmDeleteStorage, setConfirmDeleteStorage] = useState(false);
+  const [deletingStorage, setDeletingStorage] = useState(false);
+
+  const [showCreateKey, setShowCreateKey] = useState(false);
+  const [newKeyDescription, setNewKeyDescription] = useState('');
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [createKeyError, setCreateKeyError] = useState<string | null>(null);
+  const [newAccessKey, setNewAccessKey] = useState<sakura.MSMetricsAccessKeyCreated | null>(null);
+
+  const [confirmDeleteKey, setConfirmDeleteKey] = useState<sakura.MSMetricsAccessKey | null>(null);
+  const [deletingKeyUid, setDeletingKeyUid] = useState<string | null>(null);
 
   // Group metrics by variant
   const groupedMetrics = useMemo(() => {
@@ -118,6 +143,93 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
     loadData();
   }, [loadData]);
 
+  const handleBasicEditStart = () => {
+    if (!detail) return;
+    setNameInput(detail.name);
+    setDescriptionInput(detail.description || '');
+    setBasicError(null);
+    setEditingBasic(true);
+  };
+
+  const handleBasicEditCancel = () => {
+    setEditingBasic(false);
+    setBasicError(null);
+  };
+
+  const handleBasicSave = async () => {
+    setSavingBasic(true);
+    setBasicError(null);
+    try {
+      const updated = await UpdateMSMetricsStorage(profile, storageId, nameInput, descriptionInput);
+      setDetail({ ...detail!, name: updated.name, description: updated.description });
+      setEditingBasic(false);
+    } catch (e) {
+      setBasicError(String(e));
+    } finally {
+      setSavingBasic(false);
+    }
+  };
+
+  const handleDeleteStorageConfirm = async () => {
+    setConfirmDeleteStorage(false);
+    setDeletingStorage(true);
+    try {
+      await DeleteMSMetricsStorage(profile, storageId);
+      navigate(`/${profile}/monitoring`);
+    } catch (e) {
+      alert(`削除に失敗しました: ${e}`);
+      setDeletingStorage(false);
+    }
+  };
+
+  const handleCreateKeyOpen = () => {
+    setNewKeyDescription('');
+    setCreateKeyError(null);
+    setShowCreateKey(true);
+  };
+
+  const handleCreateKeyCancel = () => {
+    setShowCreateKey(false);
+  };
+
+  const handleCreateKeySubmit = async () => {
+    setCreatingKey(true);
+    setCreateKeyError(null);
+    try {
+      const created = await CreateMSMetricsAccessKey(profile, storageId, newKeyDescription);
+      setShowCreateKey(false);
+      setNewAccessKey(created);
+      await loadData();
+    } catch (e) {
+      setCreateKeyError(String(e));
+    } finally {
+      setCreatingKey(false);
+    }
+  };
+
+  const handleDeleteKeyClick = (key: sakura.MSMetricsAccessKey) => {
+    setConfirmDeleteKey(key);
+  };
+
+  const handleDeleteKeyCancel = () => {
+    setConfirmDeleteKey(null);
+  };
+
+  const handleDeleteKeyConfirm = async () => {
+    if (!confirmDeleteKey) return;
+    const key = confirmDeleteKey;
+    setConfirmDeleteKey(null);
+    setDeletingKeyUid(key.uid);
+    try {
+      await DeleteMSMetricsAccessKey(profile, storageId, key.uid);
+      await loadData();
+    } catch (e) {
+      alert(`削除に失敗しました: ${e}`);
+    } finally {
+      setDeletingKeyUid(null);
+    }
+  };
+
   if (loading && !detail) {
     return <div className="loading">読み込み中...</div>;
   }
@@ -134,41 +246,93 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
     <>
       <div className="header">
         <h2>メトリクスストレージ: {detail.name}</h2>
+        <button
+          className="btn btn-danger btn-small"
+          onClick={() => setConfirmDeleteStorage(true)}
+          disabled={deletingStorage}
+        >
+          {deletingStorage ? '削除中...' : '削除'}
+        </button>
       </div>
 
       <div style={{ marginBottom: '2rem' }}>
-        <h3>ストレージ情報</h3>
-        <table className="table">
-          <tbody>
-            <tr>
-              <td style={{ fontWeight: 'bold', width: '200px' }}>ID</td>
-              <td>{detail.id}</td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: 'bold' }}>名前</td>
-              <td>{detail.name}</td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: 'bold' }}>説明</td>
-              <td>{detail.description || '-'}</td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: 'bold' }}>エンドポイント</td>
-              <td><code>{detail.endpoint}</code></td>
-            </tr>
-          </tbody>
-        </table>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3>ストレージ情報</h3>
+          {!editingBasic && (
+            <button className="btn btn-secondary btn-small" onClick={handleBasicEditStart}>編集</button>
+          )}
+        </div>
+        {editingBasic ? (
+          <div>
+            <div className="form-group">
+              <label htmlFor="ms-storage-edit-name">名前</label>
+              <input
+                id="ms-storage-edit-name"
+                type="text"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="ms-storage-edit-description">説明</label>
+              <input
+                id="ms-storage-edit-description"
+                type="text"
+                value={descriptionInput}
+                onChange={(e) => setDescriptionInput(e.target.value)}
+                placeholder="任意"
+              />
+            </div>
+            {basicError && (
+              <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                エラー: {basicError}
+              </div>
+            )}
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleBasicEditCancel} disabled={savingBasic}>キャンセル</button>
+              <button className="btn btn-primary" onClick={handleBasicSave} disabled={savingBasic || !nameInput}>
+                {savingBasic ? '保存中...' : '保存する'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <table className="table">
+            <tbody>
+              <tr>
+                <td style={{ fontWeight: 'bold', width: '200px' }}>ID</td>
+                <td>{detail.id}</td>
+              </tr>
+              <tr>
+                <td style={{ fontWeight: 'bold' }}>名前</td>
+                <td>{detail.name}</td>
+              </tr>
+              <tr>
+                <td style={{ fontWeight: 'bold' }}>説明</td>
+                <td>{detail.description || '-'}</td>
+              </tr>
+              <tr>
+                <td style={{ fontWeight: 'bold' }}>エンドポイント</td>
+                <td><code>{detail.endpoint}</code></td>
+              </tr>
+            </tbody>
+          </table>
+        )}
       </div>
 
-      {accessKeys.length > 0 && (
-        <div style={{ marginBottom: '2rem' }}>
+      <div style={{ marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3>アクセスキー</h3>
+          <button className="btn btn-primary btn-small" onClick={handleCreateKeyOpen}>+ アクセスキー作成</button>
+        </div>
+        {accessKeys.length > 0 && (
           <table className="table">
             <thead>
               <tr>
                 <th>UID</th>
                 <th>説明</th>
                 <th>トークン（プレフィックス）</th>
+                <th style={{ width: '100px' }}></th>
               </tr>
             </thead>
             <tbody>
@@ -177,12 +341,21 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
                   <td><code>{key.uid}</code></td>
                   <td>{key.description || '-'}</td>
                   <td><code>{key.token.substring(0, 20)}...</code></td>
+                  <td>
+                    <button
+                      className="btn btn-danger btn-small"
+                      onClick={() => handleDeleteKeyClick(key)}
+                      disabled={deletingKeyUid === key.uid}
+                    >
+                      {deletingKeyUid === key.uid ? '削除中...' : '削除'}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-      )}
+        )}
+      </div>
 
       <div style={{ marginBottom: '2rem' }}>
         <h3>メトリクス表示</h3>
@@ -249,6 +422,102 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {confirmDeleteStorage && (
+        <div className="confirm-overlay" onClick={() => setConfirmDeleteStorage(false)}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <p>メトリクスストレージ「{detail.name}」を削除しますか？</p>
+            <p className="confirm-warning">この操作は取り消せません。保存されているメトリクスデータもすべて削除されます。</p>
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={() => setConfirmDeleteStorage(false)}>キャンセル</button>
+              <button className="btn btn-danger" onClick={handleDeleteStorageConfirm}>削除する</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreateKey && (
+        <div className="modal-overlay" onClick={handleCreateKeyCancel} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+            backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+            padding: '20px', minWidth: '320px', maxWidth: '420px',
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>アクセスキー作成</h3>
+            <div className="form-group">
+              <label htmlFor="ms-key-create-description">説明</label>
+              <input
+                id="ms-key-create-description"
+                type="text"
+                value={newKeyDescription}
+                onChange={(e) => setNewKeyDescription(e.target.value)}
+                placeholder="任意"
+                autoFocus
+              />
+            </div>
+            {createKeyError && (
+              <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                エラー: {createKeyError}
+              </div>
+            )}
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleCreateKeyCancel}>キャンセル</button>
+              <button className="btn btn-primary" onClick={handleCreateKeySubmit} disabled={creatingKey}>
+                {creatingKey ? '作成中...' : '作成する'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {newAccessKey && (
+        <div className="modal-overlay" onClick={() => setNewAccessKey(null)} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+            backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+            padding: '20px', minWidth: '320px', maxWidth: '480px',
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>アクセスキーを作成しました</h3>
+            <p style={{ color: '#ff6b6b', fontSize: '0.85rem' }}>
+              シークレットはこの画面を閉じると二度と表示されません。必要であれば今すぐ控えてください。
+            </p>
+            <div className="form-group">
+              <label>UID</label>
+              <input type="text" readOnly value={newAccessKey.uid} />
+            </div>
+            <div className="form-group">
+              <label>トークン</label>
+              <input type="text" readOnly value={newAccessKey.token} />
+            </div>
+            <div className="form-group">
+              <label>シークレット</label>
+              <input type="text" readOnly value={newAccessKey.secret} />
+            </div>
+            <div className="confirm-actions">
+              <button className="btn btn-primary" onClick={() => setNewAccessKey(null)}>閉じる</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDeleteKey && (
+        <div className="confirm-overlay" onClick={handleDeleteKeyCancel}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <p>アクセスキー「{confirmDeleteKey.uid}」を削除しますか？</p>
+            <p className="confirm-warning">この操作は取り消せません。このキーを使用しているクライアントは認証できなくなります。</p>
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleDeleteKeyCancel}>キャンセル</button>
+              <button className="btn btn-danger" onClick={handleDeleteKeyConfirm}>削除する</button>
+            </div>
+          </div>
         </div>
       )}
     </>

@@ -965,6 +965,105 @@ func (a *App) GetMSTraces(profileName string) ([]sakura.MSTraceInfo, error) {
 	return service.ListTraces(a.ctx)
 }
 
+func (a *App) CreateMSLogsStorage(profileName, name, description string) (*sakura.MSLogInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewMonitoringService(client)
+	return service.CreateLogsStorage(a.ctx, name, description)
+}
+
+func (a *App) UpdateMSLogsStorage(profileName, storageID, name, description string) (*sakura.MSLogInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewMonitoringService(client)
+	return service.UpdateLogsStorage(a.ctx, storageID, name, description)
+}
+
+func (a *App) DeleteMSLogsStorage(profileName, storageID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewMonitoringService(client)
+	return service.DeleteLogsStorage(a.ctx, storageID)
+}
+
+func (a *App) CreateMSMetricsStorage(profileName, name, description string) (*sakura.MSMetricInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewMonitoringService(client)
+	return service.CreateMetricsStorage(a.ctx, name, description)
+}
+
+func (a *App) UpdateMSMetricsStorage(profileName, storageID, name, description string) (*sakura.MSMetricInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewMonitoringService(client)
+	return service.UpdateMetricsStorage(a.ctx, storageID, name, description)
+}
+
+func (a *App) DeleteMSMetricsStorage(profileName, storageID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewMonitoringService(client)
+	return service.DeleteMetricsStorage(a.ctx, storageID)
+}
+
+func (a *App) CreateMSTracesStorage(profileName, name, description string) (*sakura.MSTraceInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewMonitoringService(client)
+	return service.CreateTracesStorage(a.ctx, name, description)
+}
+
+func (a *App) UpdateMSTracesStorage(profileName, storageID, name, description string) (*sakura.MSTraceInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewMonitoringService(client)
+	return service.UpdateTracesStorage(a.ctx, storageID, name, description)
+}
+
+func (a *App) DeleteMSTracesStorage(profileName, storageID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewMonitoringService(client)
+	return service.DeleteTracesStorage(a.ctx, storageID)
+}
+
+func (a *App) CreateMSMetricsAccessKey(profileName, storageID, description string) (*sakura.MSMetricsAccessKeyCreated, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewMonitoringService(client)
+	return service.CreateMetricsAccessKey(a.ctx, storageID, description)
+}
+
+func (a *App) DeleteMSMetricsAccessKey(profileName, storageID, uid string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewMonitoringService(client)
+	return service.DeleteMetricsAccessKey(a.ctx, storageID, uid)
+}
+
 func (a *App) GetMSMetricsStorageDetail(profileName, storageID string) (*sakura.MSMetricsStorageDetail, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
 	if err != nil {
