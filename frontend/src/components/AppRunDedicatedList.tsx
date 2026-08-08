@@ -15,6 +15,7 @@ import {
   DeleteAppRunApplication,
   DeleteAppRunASG,
   DeleteAppRunLoadBalancer,
+  DeleteAppRunApplicationVersion,
 } from '../../wailsjs/go/main/App';
 import { apprun } from '../../wailsjs/go/models';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -35,7 +36,8 @@ type DeleteTarget =
   | { kind: 'cluster'; id: string; name: string }
   | { kind: 'application'; id: string; name: string; clusterId: string }
   | { kind: 'asg'; id: string; name: string; clusterId: string }
-  | { kind: 'lb'; id: string; name: string; clusterId: string; asgId: string };
+  | { kind: 'lb'; id: string; name: string; clusterId: string; asgId: string }
+  | { kind: 'version'; id: string; name: string; appId: string; version: number };
 
 type ExposedPortFormRow = {
   targetPort: string;
@@ -291,6 +293,21 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
         case 'lb':
           await DeleteAppRunLoadBalancer(profile, target.clusterId, target.asgId, target.id);
           await loadASGDetails(target.clusterId, target.asgId);
+          break;
+        case 'version':
+          await DeleteAppRunApplicationVersion(profile, target.appId, target.version);
+          if (view.type === 'version' && view.appId === target.appId && view.version === target.version) {
+            setView({
+              type: 'app',
+              clusterId: view.clusterId,
+              clusterName: view.clusterName,
+              appId: view.appId,
+              appName: view.appName,
+              activeVersion: view.activeVersion,
+            });
+          } else {
+            await loadAppVersions(target.appId);
+          }
           break;
       }
     } catch (err) {
@@ -1010,11 +1027,13 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                 <th>イメージ</th>
                 <th>アクティブノード数</th>
                 <th>作成日時</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {versions.map((v) => {
                 const isActive = v.version === view.activeVersion;
+                const versionKey = `${view.appId}-v${v.version}`;
                 return (
                   <tr
                     key={v.version}
@@ -1052,6 +1071,16 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                       )}
                     </td>
                     <td>{v.createdAt || '-'}</td>
+                    <td style={{ textAlign: 'left' }}>
+                      <button
+                        className="btn btn-danger btn-small"
+                        onClick={(e) => handleDeleteClick(e, { kind: 'version', id: versionKey, name: `v${v.version}`, appId: view.appId, version: v.version })}
+                        disabled={isActive || deletingId === versionKey}
+                        title={isActive ? 'アクティブなバージョンは削除できません' : undefined}
+                      >
+                        {deletingId === versionKey ? '削除中...' : '削除'}
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -1059,6 +1088,7 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
           </table>
         )}
         {renderDeployModal()}
+        {renderConfirmDialog()}
       </>
     );
   }
@@ -1264,6 +1294,15 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                     >
                       このバージョンをアクティブにする
                     </button>
+                    <button
+                      className="dropdown-item"
+                      onClick={(e) => {
+                        setShowVersionMenu(false);
+                        handleDeleteClick(e, { kind: 'version', id: `${view.appId}-v${view.version}`, name: `v${view.version}`, appId: view.appId, version: view.version });
+                      }}
+                    >
+                      削除
+                    </button>
                   </div>
                 </div>
               )}
@@ -1398,6 +1437,7 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
         ) : (
           <div className="empty-state">バージョン情報を読み込めませんでした</div>
         )}
+        {renderConfirmDialog()}
       </>
     );
   }
