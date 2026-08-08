@@ -31,12 +31,19 @@ import (
 	"syscall"
 	"time"
 
+	sdkapprunshared "github.com/sacloud/sacloud-sdk-go/api/apprun"
+	sharedv1 "github.com/sacloud/sacloud-sdk-go/api/apprun/apis/v1"
+	sdkapprundedicated "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated"
+	dedicatedv1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
+	"github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/version"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/fake"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	sdkkms "github.com/sacloud/sacloud-sdk-go/api/kms"
 	kmsv1 "github.com/sacloud/sacloud-sdk-go/api/kms/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
+	mockapprundedicated "github.com/sacloud/sakumock/apprundedicated"
+	mockapprunshared "github.com/sacloud/sakumock/apprun"
 	mockkms "github.com/sacloud/sakumock/kms"
 	mockobjectstorage "github.com/sacloud/sakumock/objectstorage"
 	"github.com/zalando/go-keyring"
@@ -110,6 +117,22 @@ func runE2EServer(addr, dist string) error {
 	objectStorageSrv := mockobjectstorage.NewTestServer(mockobjectstorage.Config{})
 	if err := os.Setenv("SAKURA_ENDPOINTS_OBJECT_STORAGE", objectStorageSrv.TestURL()); err != nil {
 		return err
+	}
+
+	apprunDedicatedSrv := mockapprundedicated.NewTestServer(mockapprundedicated.Config{})
+	if err := os.Setenv("SAKURA_ENDPOINTS_APPRUN_DEDICATED", apprunDedicatedSrv.TestURL()); err != nil {
+		return err
+	}
+	if err := seedAppRunDedicated(apprunDedicatedSrv.TestURL()); err != nil {
+		return fmt.Errorf("failed to seed AppRun dedicated resources: %w", err)
+	}
+
+	apprunSharedSrv := mockapprunshared.NewTestServer(mockapprunshared.Config{})
+	if err := os.Setenv("SAKURA_ENDPOINTS_APPRUN_SHARED", apprunSharedSrv.TestURL()); err != nil {
+		return err
+	}
+	if err := seedAppRunShared(apprunSharedSrv.TestURL()); err != nil {
+		return fmt.Errorf("failed to seed AppRun shared resources: %w", err)
 	}
 
 	app := NewApp()
@@ -231,6 +254,178 @@ func seedServers() {
 			CreatedAt:      now,
 		})
 	}
+}
+
+// seedAppRunDedicated はAppRun専有型(sakumock apprundedicated)にE2Eシナリオ用の
+// クラスタ・アプリケーション・ASG・LB・バージョンを投入する。
+func seedAppRunDedicated(endpoint string) error {
+	ctx := context.Background()
+	var sc saclient.Client
+	if err := sc.SetEnviron(append(os.Environ(),
+		"SAKURA_ACCESS_TOKEN="+e2eAccessToken,
+		"SAKURA_ACCESS_TOKEN_SECRET="+e2eSecretToken,
+		"SAKURA_ENDPOINTS_APPRUN_DEDICATED="+endpoint,
+	)); err != nil {
+		return err
+	}
+	client, err := sdkapprundedicated.NewClient(&sc)
+	if err != nil {
+		return err
+	}
+
+	ports := []dedicatedv1.CreateLoadBalancerPort{
+		{Port: 443, Protocol: dedicatedv1.CreateLoadBalancerPortProtocolHTTPS},
+	}
+
+	cluster, err := client.CreateCluster(ctx, &dedicatedv1.CreateCluster{
+		Name:               "e2e-cluster",
+		ServicePrincipalID: "123456789012",
+		Ports:              ports,
+	})
+	if err != nil {
+		return err
+	}
+	clusterID := cluster.Cluster.GetClusterID()
+
+	if _, err := client.CreateCluster(ctx, &dedicatedv1.CreateCluster{
+		Name:               "e2e-doomed-cluster",
+		ServicePrincipalID: "123456789012",
+		Ports:              ports,
+	}); err != nil {
+		return err
+	}
+
+	app, err := client.CreateApplication(ctx, &dedicatedv1.CreateApplication{
+		Name:      "e2e-app",
+		ClusterID: clusterID,
+	})
+	if err != nil {
+		return err
+	}
+	appID := app.Application.GetApplicationID()
+
+	if _, err := client.CreateApplication(ctx, &dedicatedv1.CreateApplication{
+		Name:      "e2e-doomed-app",
+		ClusterID: clusterID,
+	}); err != nil {
+		return err
+	}
+
+	versionOp := sdkapprundedicated.NewVersionOp(client, appID)
+	if _, err := versionOp.Create(ctx, version.CreateParams{
+		Image:                  "nginx:latest",
+		CPU:                    1000,
+		Memory:                 512,
+		ScalingMode:            dedicatedv1.ScalingModeManual,
+		FixedScale:             saclient.Ptr(int32(1)),
+		RegistryPasswordAction: dedicatedv1.RegistryPasswordActionKeep,
+	}); err != nil {
+		return err
+	}
+
+	nameServers := []dedicatedv1.IPv4{"210.188.224.10"}
+	asgInterfaces := []dedicatedv1.AutoScalingGroupNodeInterface{
+		{InterfaceIndex: 0, Upstream: "shared"},
+	}
+
+	asgResp, err := client.CreateAutoScalingGroup(ctx, &dedicatedv1.CreateAutoScalingGroup{
+		Name:                   "e2e-asg",
+		Zone:                   e2eZone,
+		WorkerServiceClassPath: "cloud/apprun/dedicated/worker/1vcpu_2gb",
+		MinNodes:               1,
+		MaxNodes:               1,
+		NameServers:            nameServers,
+		Interfaces:             asgInterfaces,
+	}, dedicatedv1.CreateAutoScalingGroupParams{ClusterID: clusterID})
+	if err != nil {
+		return err
+	}
+	asgID := asgResp.AutoScalingGroup.GetAutoScalingGroupID()
+
+	if _, err := client.CreateAutoScalingGroup(ctx, &dedicatedv1.CreateAutoScalingGroup{
+		Name:                   "e2e-doomed-asg",
+		Zone:                   e2eZone,
+		WorkerServiceClassPath: "cloud/apprun/dedicated/worker/1vcpu_2gb",
+		MinNodes:               1,
+		MaxNodes:               1,
+		NameServers:            nameServers,
+		Interfaces:             asgInterfaces,
+	}, dedicatedv1.CreateAutoScalingGroupParams{ClusterID: clusterID}); err != nil {
+		return err
+	}
+
+	lbInterfaces := []dedicatedv1.LoadBalancerInterface{
+		{InterfaceIndex: 0, Upstream: "shared"},
+	}
+	if _, err := client.CreateLoadBalancer(ctx, &dedicatedv1.CreateLoadBalancer{
+		Name:             "e2e-lb",
+		ServiceClassPath: "cloud/apprun/dedicated/lb/1vcpu_2gb",
+		NameServers:      nameServers,
+		Interfaces:       lbInterfaces,
+	}, dedicatedv1.CreateLoadBalancerParams{ClusterID: clusterID, AutoScalingGroupID: asgID}); err != nil {
+		return err
+	}
+	if _, err := client.CreateLoadBalancer(ctx, &dedicatedv1.CreateLoadBalancer{
+		Name:             "e2e-doomed-lb",
+		ServiceClassPath: "cloud/apprun/dedicated/lb/1vcpu_2gb",
+		NameServers:      nameServers,
+		Interfaces:       lbInterfaces,
+	}, dedicatedv1.CreateLoadBalancerParams{ClusterID: clusterID, AutoScalingGroupID: asgID}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// seedAppRunShared はAppRun共用型(sakumock apprun)にE2Eシナリオ用のユーザーと
+// アプリケーションを投入する。
+func seedAppRunShared(endpoint string) error {
+	ctx := context.Background()
+	var sc saclient.Client
+	if err := sc.SetEnviron(append(os.Environ(),
+		"SAKURA_ACCESS_TOKEN="+e2eAccessToken,
+		"SAKURA_ACCESS_TOKEN_SECRET="+e2eSecretToken,
+		"SAKURA_ENDPOINTS_APPRUN_SHARED="+endpoint,
+	)); err != nil {
+		return err
+	}
+	client, err := sdkapprunshared.NewClient(&sc)
+	if err != nil {
+		return err
+	}
+
+	if _, err := sdkapprunshared.NewUserOp(client).Create(ctx); err != nil {
+		return err
+	}
+
+	components := []sharedv1.PostApplicationBodyComponentsItem{
+		{
+			Name:      "web",
+			MaxCPU:    sharedv1.PostApplicationBodyComponentsItemMaxCPU05,
+			MaxMemory: sharedv1.PostApplicationBodyComponentsItemMaxMemory1Gi,
+			DeploySource: sharedv1.PostApplicationBodyComponentsItemDeploySource{
+				ContainerRegistry: sharedv1.NewOptPostApplicationBodyComponentsItemDeploySourceContainerRegistry(
+					sharedv1.PostApplicationBodyComponentsItemDeploySourceContainerRegistry{
+						Image: "nginx:latest",
+					},
+				),
+			},
+		},
+	}
+
+	appOp := sdkapprunshared.NewApplicationOp(client)
+	if _, err := appOp.Create(ctx, &sharedv1.PostApplicationBody{
+		Name:           "e2e-shared-app",
+		TimeoutSeconds: 60,
+		Port:           8080,
+		MinScale:       0,
+		MaxScale:       1,
+		Components:     components,
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // seedDatabases はIaaS fakeドライバのデータストアにE2Eシナリオ用のデータベースを投入する。
