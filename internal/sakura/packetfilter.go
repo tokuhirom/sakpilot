@@ -8,10 +8,10 @@ import (
 )
 
 type PacketFilterInfo struct {
-	ID          string                   `json:"id"`
-	Name        string                   `json:"name"`
-	Description string                   `json:"description"`
-	Rules       []PacketFilterRuleInfo   `json:"rules,omitempty"`
+	ID          string                 `json:"id"`
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Rules       []PacketFilterRuleInfo `json:"rules,omitempty"`
 }
 
 type PacketFilterRuleInfo struct {
@@ -55,7 +55,62 @@ func (s *PacketFilterService) Get(ctx context.Context, zone string, id string) (
 	if err != nil {
 		return nil, err
 	}
+	return toPacketFilterInfo(pf), nil
+}
 
+func (s *PacketFilterService) Delete(ctx context.Context, zone string, id string) error {
+	pfOp := iaas.NewPacketFilterOp(s.client.Caller())
+	return pfOp.Delete(ctx, zone, types.StringID(id))
+}
+
+func (s *PacketFilterService) Create(ctx context.Context, zone, name, description string, rules []PacketFilterRuleInfo) (*PacketFilterInfo, error) {
+	pfOp := iaas.NewPacketFilterOp(s.client.Caller())
+	pf, err := pfOp.Create(ctx, zone, &iaas.PacketFilterCreateRequest{
+		Name:        name,
+		Description: description,
+		Expression:  toPacketFilterExpressions(rules),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return toPacketFilterInfo(pf), nil
+}
+
+// Update はパケットフィルタの名前・説明・ルールを更新する。
+// Update APIはExpressionHashによる楽観ロックが必須のため、先にReadして現在のハッシュを取得する。
+func (s *PacketFilterService) Update(ctx context.Context, zone, id, name, description string, rules []PacketFilterRuleInfo) (*PacketFilterInfo, error) {
+	pfOp := iaas.NewPacketFilterOp(s.client.Caller())
+	current, err := pfOp.Read(ctx, zone, types.StringID(id))
+	if err != nil {
+		return nil, err
+	}
+	pf, err := pfOp.Update(ctx, zone, types.StringID(id), &iaas.PacketFilterUpdateRequest{
+		Name:        name,
+		Description: description,
+		Expression:  toPacketFilterExpressions(rules),
+	}, current.ExpressionHash)
+	if err != nil {
+		return nil, err
+	}
+	return toPacketFilterInfo(pf), nil
+}
+
+func toPacketFilterExpressions(rules []PacketFilterRuleInfo) []*iaas.PacketFilterExpression {
+	exprs := make([]*iaas.PacketFilterExpression, 0, len(rules))
+	for _, r := range rules {
+		exprs = append(exprs, &iaas.PacketFilterExpression{
+			Protocol:        types.Protocol(r.Protocol),
+			SourceNetwork:   types.PacketFilterNetwork(r.SourceNetwork),
+			SourcePort:      types.PacketFilterPort(r.SourcePort),
+			DestinationPort: types.PacketFilterPort(r.DestinationPort),
+			Action:          types.Action(r.Action),
+			Description:     r.Description,
+		})
+	}
+	return exprs
+}
+
+func toPacketFilterInfo(pf *iaas.PacketFilter) *PacketFilterInfo {
 	rules := make([]PacketFilterRuleInfo, 0, len(pf.Expression))
 	for _, expr := range pf.Expression {
 		rules = append(rules, PacketFilterRuleInfo{
@@ -67,16 +122,10 @@ func (s *PacketFilterService) Get(ctx context.Context, zone string, id string) (
 			Description:     expr.Description,
 		})
 	}
-
 	return &PacketFilterInfo{
 		ID:          pf.ID.String(),
 		Name:        pf.Name,
 		Description: pf.Description,
 		Rules:       rules,
-	}, nil
-}
-
-func (s *PacketFilterService) Delete(ctx context.Context, zone string, id string) error {
-	pfOp := iaas.NewPacketFilterOp(s.client.Caller())
-	return pfOp.Delete(ctx, zone, types.StringID(id))
+	}
 }

@@ -71,6 +71,9 @@ func runE2EServer(addr, dist string) error {
 	if err := seedDNS(); err != nil {
 		return fmt.Errorf("failed to seed DNS zones: %w", err)
 	}
+	if err := seedPacketFilters(); err != nil {
+		return fmt.Errorf("failed to seed packet filters: %w", err)
+	}
 
 	kmsSrv := mockkms.NewTestServer(mockkms.Config{})
 	if err := os.Setenv("SAKURA_ENDPOINTS_KMS", kmsSrv.TestURL()); err != nil {
@@ -193,6 +196,34 @@ func seedDNS() error {
 	}
 	if _, err := dnsOp.Create(ctx, &iaas.DNSCreateRequest{
 		Name:        "e2e-doomed.com",
+		Description: "E2E: 削除シナリオ用",
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+// seedPacketFilters はIaaS fakeドライバのデータストアにE2Eシナリオ用のパケットフィルターを投入する。
+func seedPacketFilters() error {
+	ctx := context.Background()
+	pfOp := iaas.NewPacketFilterOp(nil)
+
+	if _, err := pfOp.Create(ctx, e2eZone, &iaas.PacketFilterCreateRequest{
+		Name:        "e2e-web-filter",
+		Description: "E2E: ルール操作シナリオ用",
+		Expression: []*iaas.PacketFilterExpression{
+			{
+				Protocol:        types.Protocols.TCP,
+				DestinationPort: "80",
+				Action:          types.Actions.Allow,
+				Description:     "HTTP",
+			},
+		},
+	}); err != nil {
+		return err
+	}
+	if _, err := pfOp.Create(ctx, e2eZone, &iaas.PacketFilterCreateRequest{
+		Name:        "e2e-doomed-filter",
 		Description: "E2E: 削除シナリオ用",
 	}); err != nil {
 		return err

@@ -20,7 +20,7 @@
 | Disk | ✅ あり | ✅ | (対象外) | 削除フローのFEテストを追加済み。Create/Update/接続変更は引き続き未実装 |
 | Archive | ✅ あり | ✅ | (対象外) | 削除フロー・busy状態のFEテストを追加済み。Create/共有/FTP転送は引き続き未実装 |
 | Switch | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #82）。共有スコープは削除不可でボタン無効化 |
-| PacketFilter | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #83） |
+| PacketFilter | ✅ あり | ✅ | (対象外) | 削除機能に加えCreate/Update（ルール管理）まで対応済み。読み書き一式が完備 |
 | KMS | ✅ あり | ✅（Delete） | (対象外) | 削除機能+FEテストを追加済み（PR #90）。Get/Rotate/ChangeStatus/暗号化は引き続き未実装 |
 | DNS | ✅ あり | ✅ | (対象外) | Create/Update/UpdateSettings（レコード管理）まで対応済み。読み書き一式が完備 |
 | GSLB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #85、CI待ちでauto-merge設定済み） |
@@ -66,10 +66,11 @@
 - SDK比較で残る不足: Create/Update/ConnectToBridge/DisconnectFromBridge/GetServers（未着手）
 
 ### PacketFilter
-- テスト: `PacketFilterList.test.tsx` あり（一覧表示・詳細遷移・削除確認フローをカバー）
-- バックエンド: List/Get/**Delete** 実装済み
+- テスト: `PacketFilterList.test.tsx`（一覧表示・詳細遷移・削除確認・作成フロー）、`PacketFilterDetail.test.tsx`（名前・説明編集、ルール追加/編集/削除）ともに整備済み。`frontend/e2e/packetfilter.spec.ts` で作成〜ルール操作〜削除までのE2Eもカバー
+- バックエンド: List/Get/**Create**/**Update**/**Delete** 実装済み
 - ✅ **対応済み（PR #83）**: 削除機能を追加
-- SDK比較で残る不足: Create/Update（ルール追加・編集、未着手）
+- ✅ **対応済み（2026-08-08 Tier1）**: 作成（Create）、名前・説明編集、ルール（Expression）の追加・編集・削除を追加。Update APIはExpressionHashによる楽観ロックが必須のため、`internal/sakura/packetfilter.go`のUpdateは事前Readでハッシュを取得してから呼び出す。`PacketFilterList.tsx`に作成モーダル、`PacketFilterDetail.tsx`に基本情報インライン編集とルール管理UIを実装
+- SDK比較で残る不足: なし（Read/Write一式が揃った）
 
 ### KMS
 - テスト: `KMSList.test.tsx`（一覧表示・詳細遷移・削除確認フロー）、`KMSDetail.test.tsx`（基本情報表示・ローテーション・ステータス変更・キャンセル・失敗時のalert）ともに整備済み
@@ -204,6 +205,9 @@
 - AppRun専有型の削除機能（Cluster/Application/ASG/LoadBalancer）とFEテストを追加
 - **方針転換**: SakPilotは「閲覧中心」に限定しない管理ツールとして、書き込み系操作（デプロイ含む）も対象に含める方針に変更。旧PLAN.mdに残っていた「閲覧中心」という自己制約の記述は撤廃した
 
+### ✅ 完了（2026-08-08 追加セッション7、Tier1 #2）
+- PacketFilterのCreate/Update（ルール管理）を実装。`internal/sakura/packetfilter.go`に`Create`/`Update`を追加（UpdateはExpressionHashによる楽観ロックのため事前Read必須）、`app.go`に`CreatePacketFilter`/`UpdatePacketFilter`のRPCを公開。`PacketFilterList.tsx`に作成モーダル、`PacketFilterDetail.tsx`に名前・説明のインライン編集とルール（プロトコル/送信元/ポート/アクション/説明）の追加・編集・削除UIを実装。`PacketFilterDetail.test.tsx`を新規作成し、`frontend/e2e/packetfilter.spec.ts`でE2Eシナリオも追加
+
 ### 実装順序（2026-08-08 方針転換後の書き込み系機能ロードマップ）
 
 「閲覧中心」制約の撤廃を受け、各節「SDK比較で残る不足」に列挙された未実装機能（主にCreate/Update系）を、(a) 利用頻度・実用価値、(b) 実装複雑度、(c) 誤操作時のリスク（実インフラ作成・課金発生の有無）で並べ替えたロードマップ。上から順に着手することを推奨するが、各Tier内の順序はユーザーの関心に応じて入れ替えてよい。
@@ -224,8 +228,8 @@
 
 **Tier 1: 高頻度・低〜中リスクな基本操作（次に着手すべき候補）**
 1. ✅ DNS: Create/Update/UpdateSettings（レコード追加・編集は最頻出の日常操作） — 2026-08-08対応済み
-2. PacketFilter: Create/Update（ルール追加・編集）
-3. SimpleMonitor: Create/Update/UpdateSettings（監視対象の追加・設定変更）
+2. ✅ PacketFilter: Create/Update（ルール追加・編集） — 2026-08-08対応済み
+3. SimpleMonitor: Create/Update/UpdateSettings（監視対象の追加・設定変更） — 次に着手すべき候補
 4. GSLB: Create/Update/UpdateSettings
 5. ContainerRegistry: Create、ユーザー管理（AddUser/UpdateUser/DeleteUser）
 6. AppRun専有型: Version Create（デプロイ）— 着手する場合はフルデプロイフォーム（image/CPU/メモリ/スケーリング/公開ポート/環境変数）として対応する方針（2026-08-08ユーザーに確認済み）

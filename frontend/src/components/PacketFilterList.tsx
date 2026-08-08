@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetPacketFilters, DeletePacketFilter } from '../../wailsjs/go/main/App';
+import { GetPacketFilters, DeletePacketFilter, CreatePacketFilter } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -18,6 +18,11 @@ export function PacketFilterList({ profile, zone, zones, onZoneChange, onSelectP
   const [loading, setLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<sakura.PacketFilterInfo | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const {
     searchQuery,
@@ -77,11 +82,37 @@ export function PacketFilterList({ profile, zone, zones, onZoneChange, onSelectP
     }
   };
 
+  const handleCreateOpen = () => {
+    setNewName('');
+    setNewDescription('');
+    setCreateError(null);
+    setShowCreate(true);
+  };
+
+  const handleCreateCancel = () => {
+    setShowCreate(false);
+  };
+
+  const handleCreateSubmit = async () => {
+    setCreating(true);
+    setCreateError(null);
+    try {
+      await CreatePacketFilter(profile, zone, newName, newDescription, []);
+      setShowCreate(false);
+      await loadPacketFilters();
+    } catch (e) {
+      setCreateError(String(e));
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <>
       <div className="header">
         <h2>パケットフィルター</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <button className="btn btn-primary btn-small" onClick={handleCreateOpen}>+ 作成</button>
           <select
             className="zone-select"
             value={zone}
@@ -154,6 +185,55 @@ export function PacketFilterList({ profile, zone, zones, onZoneChange, onSelectP
             <div className="confirm-actions">
               <button className="btn btn-secondary" onClick={handleDeleteCancel}>キャンセル</button>
               <button className="btn btn-danger" onClick={handleDeleteConfirm}>削除する</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreate && (
+        <div className="modal-overlay" onClick={handleCreateCancel} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+            backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+            padding: '20px', minWidth: '320px', maxWidth: '420px',
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>パケットフィルター作成</h3>
+            <div className="form-group">
+              <label>名前</label>
+              <input
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="my-filter"
+                autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <label>説明</label>
+              <input
+                type="text"
+                value={newDescription}
+                onChange={(e) => setNewDescription(e.target.value)}
+                placeholder="任意"
+              />
+            </div>
+            {createError && (
+              <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                エラー: {createError}
+              </div>
+            )}
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleCreateSubmit}
+                disabled={creating || !newName}
+              >
+                {creating ? '作成中...' : '作成する'}
+              </button>
             </div>
           </div>
         </div>

@@ -337,6 +337,24 @@ func (a *App) DeletePacketFilter(profileName, zone, pfId string) error {
 	return service.Delete(a.ctx, zone, pfId)
 }
 
+func (a *App) CreatePacketFilter(profileName, zone, name, description string, rules []sakura.PacketFilterRuleInfo) (*sakura.PacketFilterInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewPacketFilterService(client)
+	return service.Create(a.ctx, zone, name, description, rules)
+}
+
+func (a *App) UpdatePacketFilter(profileName, zone, pfId, name, description string, rules []sakura.PacketFilterRuleInfo) (*sakura.PacketFilterInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewPacketFilterService(client)
+	return service.Update(a.ctx, zone, pfId, name, description, rules)
+}
+
 // Disks
 func (a *App) GetDisks(profileName, zone string) ([]sakura.DiskInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)

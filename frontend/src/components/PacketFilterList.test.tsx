@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PacketFilterList } from './PacketFilterList';
 import { sakura } from '../../wailsjs/go/models';
-import { GetPacketFilters, DeletePacketFilter } from '../../wailsjs/go/main/App';
+import { GetPacketFilters, DeletePacketFilter, CreatePacketFilter } from '../../wailsjs/go/main/App';
 
 vi.mock('../../wailsjs/go/main/App');
 
@@ -25,6 +25,7 @@ describe('PacketFilterList', () => {
   beforeEach(() => {
     vi.mocked(GetPacketFilters).mockReset();
     vi.mocked(DeletePacketFilter).mockReset();
+    vi.mocked(CreatePacketFilter).mockReset();
   });
 
   it('lists packet filters returned by GetPacketFilters', async () => {
@@ -81,5 +82,41 @@ describe('PacketFilterList', () => {
     await waitFor(() => {
       expect(GetPacketFilters).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it('creates a packet filter via the create modal', async () => {
+    vi.mocked(GetPacketFilters)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([makePacketFilter({ name: 'new-filter' })]);
+    vi.mocked(CreatePacketFilter).mockResolvedValueOnce(makePacketFilter({ name: 'new-filter' }));
+    const user = userEvent.setup();
+
+    render(<PacketFilterList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectPacketFilter={() => {}} />);
+    await screen.findByText('パケットフィルターがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ 作成' }));
+    await user.type(screen.getByPlaceholderText('my-filter'), 'new-filter');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    await waitFor(() => {
+      expect(CreatePacketFilter).toHaveBeenCalledWith('default', 'is1a', 'new-filter', '', []);
+    });
+    expect(await screen.findByText('new-filter')).toBeInTheDocument();
+  });
+
+  it('shows an error and keeps the modal open when packet filter creation fails', async () => {
+    vi.mocked(GetPacketFilters).mockResolvedValueOnce([]);
+    vi.mocked(CreatePacketFilter).mockRejectedValueOnce(new Error('quota exceeded'));
+    const user = userEvent.setup();
+
+    render(<PacketFilterList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectPacketFilter={() => {}} />);
+    await screen.findByText('パケットフィルターがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ 作成' }));
+    await user.type(screen.getByPlaceholderText('my-filter'), 'bad-filter');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    expect(await screen.findByText(/quota exceeded/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('my-filter')).toBeInTheDocument();
   });
 });
