@@ -494,6 +494,45 @@ func (s *Service) ClearActiveVersion(ctx context.Context, applicationID string) 
 	return applicationOp.Update(ctx, v1.ApplicationID(appID), nil)
 }
 
+// CreateApplication アプリケーションを作成
+func (s *Service) CreateApplication(ctx context.Context, name, clusterID string) (*AppInfo, error) {
+	cID, err := uuid.Parse(clusterID)
+	if err != nil {
+		return nil, err
+	}
+
+	applicationOp := apprundedicated.NewApplicationOp(s.client)
+	created, err := applicationOp.Create(ctx, name, v1.ClusterID(cID))
+	if err != nil {
+		return nil, err
+	}
+
+	return &AppInfo{
+		ID:        uuid.UUID(created.GetApplicationID()).String(),
+		ClusterID: clusterID,
+		Name:      name,
+	}, nil
+}
+
+// UpdateWorkerNodeDraining ワーカーノードのdraining状態を更新
+func (s *Service) UpdateWorkerNodeDraining(ctx context.Context, clusterID, asgID, workerNodeID string, draining bool) error {
+	cID, err := uuid.Parse(clusterID)
+	if err != nil {
+		return err
+	}
+	aID, err := uuid.Parse(asgID)
+	if err != nil {
+		return err
+	}
+	wID, err := uuid.Parse(workerNodeID)
+	if err != nil {
+		return err
+	}
+
+	workerNodeOp := apprundedicated.NewWorkerNodeOp(s.client, v1.ClusterID(cID), v1.AutoScalingGroupID(aID))
+	return workerNodeOp.Update(ctx, v1.WorkerNodeID(wID), draining)
+}
+
 // DeleteCluster クラスタを削除
 func (s *Service) DeleteCluster(ctx context.Context, clusterID string) error {
 	cID, err := uuid.Parse(clusterID)

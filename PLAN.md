@@ -170,8 +170,9 @@
 - ✅ **対応済み（2026-08-08 追加セッション6）**: AppRun専有型の削除機能一式を実装。`internal/apprun/service.go`に`DeleteCluster`/`DeleteApplication`/`DeleteAutoScalingGroup`/`DeleteLoadBalancer`を追加し、`app.go`に対応するRPCを公開。`AppRunDedicatedList.tsx`のクラスタ一覧・アプリ一覧・ASG一覧・LB一覧の各行に削除ボタンと確認ダイアログを追加
 - ✅ **対応済み（2026-08-08 追加セッション11、Tier1 #6）**: AppRun専有型のVersion Create（デプロイ）を実装。`internal/apprun/service.go`にSDKの`version.CreateParams`を薄くラップした`CreateAppVersionParams`（CPU/Memory/ScalingMode+FixedScale or MinScale・MaxScale・閾値/Image/Cmd/RegistryUsername・Password/ExposedPorts(TargetPort/LoadBalancerPort/UseLetsEncrypt/Host/HealthCheck)/EnvVars(Key/Value/Secret)）と`CreateApplicationVersion`を追加、`app.go`に`CreateAppRunApplicationVersion`のRPCを公開。`AppRunDedicatedList.tsx`のバージョン一覧に「+ デプロイ」ボタンとフルデプロイフォーム（イメージ/コマンド/CPU・メモリ/スケーリングモード切替/公開ポート・ヘルスチェックの追加編集削除/環境変数の追加編集削除）を実装。`internal/apprun/service_test.go`に`sakumock/apprundedicated`のテストサーバーを使った`TestService_CreateApplicationVersion`を追加（実際のAPIリクエスト/レスポンスを検証）
 - ✅ **対応済み（2026-08-08 追加セッション22、Tier2 #14一部）**: Version Delete（バージョン削除）を実装。`internal/apprun/service.go`に`DeleteApplicationVersion`を追加（SDKの`VersionOp.Delete`をラップ）、`app.go`に`DeleteAppRunApplicationVersion`のRPCを公開。`AppRunDedicatedList.tsx`のバージョン一覧テーブルに削除ボタンの列を追加し、バージョン詳細画面の「⋯」ドロップダウンにも削除項目を追加（削除後は自動でアプリ詳細画面に戻る）。アクティブバージョンは削除できないためボタンを無効化。`internal/apprun/service_test.go`に`TestService_DeleteApplicationVersion`、`AppRunDedicatedList.test.tsx`に一覧からの削除・アクティブバージョンのボタン無効化・詳細画面からの削除の3テストを追加
+- ✅ **対応済み（2026-08-08 追加セッション23、Tier2 #14一部）**: Application Create・WorkerNode Update（draining）を実装。4つの残タスク（Cluster/Application/ASG/LoadBalancerのCreate、WorkerNode Update、Certificate系）のうち依存関係が最も単純（`Name`+`ClusterID`のみ）なApplication CreateとWorkerNode Updateを先行実装。`internal/apprun/service.go`に`CreateApplication`（SDKの`ApplicationOp.Create(ctx, name, clusterID)`をラップ）と`UpdateWorkerNodeDraining`（`WorkerNodeOp.Update(ctx, id, draining)`をラップ）を追加、`app.go`に`CreateAppRunApplication`/`UpdateAppRunWorkerNodeDraining`のRPCを公開。`AppRunDedicatedList.tsx`のクラスタ詳細画面に「+ アプリ作成」ボタンと作成モーダル（アプリ名のみ）、ASG詳細画面のワーカーノード一覧に「Draining開始/解除」トグルボタンを追加。`internal/apprun/service_test.go`に`TestService_CreateApplication`/`TestService_UpdateWorkerNodeDraining`を追加（sakumockはASG作成時にMinNodes分のワーカーノードを自動生成するため、既存の`TestService_DeleteAutoScalingGroup`と同じ`CreateAutoScalingGroup`シードで検証可能）
 - SDK比較で残る不足:
-  - 専有型: Cluster/Application/ASG/LoadBalancerの**Create**、WorkerNodeのUpdate（draining）、Certificate系全般（未着手。優先順位は後述の「実装順序」参照）
+  - 専有型: Cluster/ASG/LoadBalancerの**Create**、Certificate系全般（未着手。優先順位は後述の「実装順序」参照。ASG/LBのCreateはVIP/仮想ルータID/IPプール等ネットワーク知識が必要な`Interfaces`配列の入力UIが必要で複雑度が高い）
   - 共用型: ApplicationのCreate/Update/Delete、VersionのDelete、TrafficのUpdate（分散比率変更）、UserのCreate
 - **TODO**: `lb` view（ロードバランサー単体詳細）への遷移導線が無い点は意図的な未実装か実装漏れか要確認
 
@@ -271,7 +272,7 @@
 11. ✅ Database: Create/Update/UpdateSettings/GetParameter/SetParameter — 2026-08-08対応済み
 12. ✅ NFS: Create/Update — 2026-08-08対応済み
 13. ✅ EnhancedDB: Create/Update/SetPassword — 2026-08-08対応済み
-14. AppRun専有型: Cluster/Application/ASG/LoadBalancerのCreate、WorkerNodeのUpdate（draining）、Certificate系（VersionのDeleteは2026-08-08対応済み）
+14. AppRun専有型: Cluster/ASG/LoadBalancerのCreate、Certificate系（VersionのDelete、Application Create、WorkerNodeのUpdate（draining）は2026-08-08対応済み）
 15. AppRun共用型: ApplicationのCreate/Update/Delete、VersionのDelete、TrafficのUpdate、UserのCreate
 
 **Tier 3: 低優先度・ニッチ or 複雑度が高い機能**

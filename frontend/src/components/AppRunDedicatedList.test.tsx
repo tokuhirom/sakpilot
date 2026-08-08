@@ -15,6 +15,8 @@ import {
   ClearAppRunActiveVersion,
   SetAppRunActiveVersion,
   CreateAppRunApplicationVersion,
+  CreateAppRunApplication,
+  UpdateAppRunWorkerNodeDraining,
   DeleteAppRunCluster,
   DeleteAppRunApplication,
   DeleteAppRunASG,
@@ -87,6 +89,8 @@ describe('AppRunDedicatedList', () => {
     vi.mocked(ClearAppRunActiveVersion).mockReset();
     vi.mocked(SetAppRunActiveVersion).mockReset();
     vi.mocked(CreateAppRunApplicationVersion).mockReset();
+    vi.mocked(CreateAppRunApplication).mockReset();
+    vi.mocked(UpdateAppRunWorkerNodeDraining).mockReset();
     vi.mocked(DeleteAppRunCluster).mockReset();
     vi.mocked(DeleteAppRunApplication).mockReset();
     vi.mocked(DeleteAppRunASG).mockReset();
@@ -106,6 +110,10 @@ describe('AppRunDedicatedList', () => {
     vi.mocked(CreateAppRunApplicationVersion).mockResolvedValue(
       new apprun.AppVersionInfo({ version: 3, image: 'nginx:3', activeNodeCount: 0, createdAt: '2026-08-08T00:00:00Z' })
     );
+    vi.mocked(CreateAppRunApplication).mockResolvedValue(
+      new apprun.AppInfo({ id: 'app-2', clusterId: 'cluster-1', name: 'new-app', activeVersion: 0 })
+    );
+    vi.mocked(UpdateAppRunWorkerNodeDraining).mockResolvedValue();
     vi.mocked(DeleteAppRunCluster).mockResolvedValue();
     vi.mocked(DeleteAppRunApplication).mockResolvedValue();
     vi.mocked(DeleteAppRunASG).mockResolvedValue();
@@ -510,5 +518,103 @@ describe('AppRunDedicatedList', () => {
 
     expect(await screen.findByText(/エラー: Error: quota exceeded/)).toBeInTheDocument();
     expect(screen.getByText('新しいバージョンをデプロイ')).toBeInTheDocument();
+  });
+
+  it('creates an application from the cluster view and reloads cluster details', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+
+    await user.click(await screen.findByText('+ アプリ作成'));
+    expect(await screen.findByText('アプリケーションを作成')).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('my-app'), 'new-app');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    await waitFor(() => {
+      expect(CreateAppRunApplication).toHaveBeenCalledWith('default', 'cluster-1', 'new-app');
+    });
+    expect(GetAppRunApplications).toHaveBeenCalledWith('default', 'cluster-1');
+    expect(screen.queryByText('アプリケーションを作成')).not.toBeInTheDocument();
+  });
+
+  it('requires an app name before submitting the create-application form', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('+ アプリ作成'));
+
+    expect(screen.getByRole('button', { name: '作成する' })).toBeDisabled();
+    expect(CreateAppRunApplication).not.toHaveBeenCalled();
+  });
+
+  it('cancels the create-application form without calling the API', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('+ アプリ作成'));
+    await user.type(screen.getByPlaceholderText('my-app'), 'new-app');
+
+    await user.click(screen.getByText('キャンセル'));
+
+    expect(screen.queryByText('アプリケーションを作成')).not.toBeInTheDocument();
+    expect(CreateAppRunApplication).not.toHaveBeenCalled();
+  });
+
+  it('shows an error message when creating an application fails', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(CreateAppRunApplication).mockRejectedValue(new Error('quota exceeded'));
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('+ アプリ作成'));
+    await user.type(screen.getByPlaceholderText('my-app'), 'new-app');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    expect(await screen.findByText(/エラー: Error: quota exceeded/)).toBeInTheDocument();
+    expect(screen.getByText('アプリケーションを作成')).toBeInTheDocument();
+  });
+
+  it('toggles draining on a worker node from the ASG view', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(GetAppRunASGs).mockResolvedValue([makeAsg()]);
+    vi.mocked(GetAppRunWorkerNodes).mockResolvedValue([makeWorkerNode({ draining: false })]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('my-asg'));
+
+    await user.click(await screen.findByRole('button', { name: 'Draining開始' }));
+
+    await waitFor(() => {
+      expect(UpdateAppRunWorkerNodeDraining).toHaveBeenCalledWith('default', 'cluster-1', 'asg-1', 'wnode-12345678', true);
+    });
+    expect(GetAppRunWorkerNodes).toHaveBeenCalledWith('default', 'cluster-1', 'asg-1');
+  });
+
+  it('shows an alert when toggling worker node draining fails', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(GetAppRunASGs).mockResolvedValue([makeAsg()]);
+    vi.mocked(GetAppRunWorkerNodes).mockResolvedValue([makeWorkerNode({ draining: false })]);
+    vi.mocked(UpdateAppRunWorkerNodeDraining).mockRejectedValue(new Error('boom'));
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('my-asg'));
+    await user.click(await screen.findByRole('button', { name: 'Draining開始' }));
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('Draining状態の変更に失敗しました'));
+    });
   });
 });
