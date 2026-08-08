@@ -14,6 +14,7 @@ import {
   CreateAppRunApplication,
   CreateAppRunCluster,
   CreateAppRunASG,
+  CreateAppRunLoadBalancer,
   UpdateAppRunWorkerNodeDraining,
   DeleteAppRunCluster,
   DeleteAppRunApplication,
@@ -136,6 +137,40 @@ function emptyCreateASGForm(): CreateASGForm {
   };
 }
 
+const LB_SERVICE_CLASS_PATHS = [
+  { value: 'cloud/apprun/dedicated/lb/1vcpu_2gb', label: '1vCPU / 2GB' },
+  { value: 'cloud/apprun/dedicated/lb/2vcpu_2gb', label: '2vCPU / 2GB' },
+  { value: 'cloud/apprun/dedicated/lb-ha/1vcpu_2gb', label: '1vCPU / 2GB（冗長構成）' },
+  { value: 'cloud/apprun/dedicated/lb-ha/2vcpu_2gb', label: '2vCPU / 2GB（冗長構成）' },
+];
+
+type CreateLBInterfaceFormRow = {
+  upstream: string;
+  ipPoolStart: string;
+  ipPoolEnd: string;
+  netmaskLen: string;
+  defaultGateway: string;
+  vip: string;
+  virtualRouterID: string;
+  packetFilterID: string;
+};
+
+type CreateLBForm = {
+  name: string;
+  serviceClassPath: string;
+  nameServers: string[];
+  interfaces: CreateLBInterfaceFormRow[];
+};
+
+function emptyCreateLBForm(): CreateLBForm {
+  return {
+    name: '',
+    serviceClassPath: LB_SERVICE_CLASS_PATHS[0].value,
+    nameServers: ['133.242.0.3'],
+    interfaces: [{ upstream: 'shared', ipPoolStart: '', ipPoolEnd: '', netmaskLen: '', defaultGateway: '', vip: '', virtualRouterID: '', packetFilterID: '' }],
+  };
+}
+
 function emptyDeployForm(): DeployForm {
   return {
     image: '',
@@ -183,6 +218,9 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
   const [createASGForm, setCreateASGForm] = useState<CreateASGForm | null>(null);
   const [creatingASG, setCreatingASG] = useState(false);
   const [createASGError, setCreateASGError] = useState<string | null>(null);
+  const [createLBForm, setCreateLBForm] = useState<CreateLBForm | null>(null);
+  const [creatingLB, setCreatingLB] = useState(false);
+  const [createLBError, setCreateLBError] = useState<string | null>(null);
 
   const loadClusters = useCallback(async () => {
     if (!profile) return;
@@ -755,6 +793,95 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
     }
   };
 
+  const handleCreateLBOpen = () => {
+    setCreateLBError(null);
+    setCreateLBForm(emptyCreateLBForm());
+  };
+
+  const handleCreateLBCancel = () => {
+    setCreateLBForm(null);
+    setCreateLBError(null);
+  };
+
+  const handleAddLBNameServer = () => {
+    if (!createLBForm) return;
+    setCreateLBForm({ ...createLBForm, nameServers: [...createLBForm.nameServers, ''] });
+  };
+
+  const handleRemoveLBNameServer = (index: number) => {
+    if (!createLBForm) return;
+    setCreateLBForm({ ...createLBForm, nameServers: createLBForm.nameServers.filter((_, i) => i !== index) });
+  };
+
+  const handleLBNameServerChange = (index: number, value: string) => {
+    if (!createLBForm) return;
+    const nameServers = createLBForm.nameServers.map((v, i) => (i === index ? value : v));
+    setCreateLBForm({ ...createLBForm, nameServers });
+  };
+
+  const handleAddLBInterface = () => {
+    if (!createLBForm) return;
+    setCreateLBForm({
+      ...createLBForm,
+      interfaces: [...createLBForm.interfaces, { upstream: '', ipPoolStart: '', ipPoolEnd: '', netmaskLen: '', defaultGateway: '', vip: '', virtualRouterID: '', packetFilterID: '' }],
+    });
+  };
+
+  const handleRemoveLBInterface = (index: number) => {
+    if (!createLBForm) return;
+    setCreateLBForm({ ...createLBForm, interfaces: createLBForm.interfaces.filter((_, i) => i !== index) });
+  };
+
+  const handleLBInterfaceChange = (index: number, field: keyof CreateLBInterfaceFormRow, value: string) => {
+    if (!createLBForm) return;
+    const interfaces = createLBForm.interfaces.map((iface, i) => (i === index ? { ...iface, [field]: value } : iface));
+    setCreateLBForm({ ...createLBForm, interfaces });
+  };
+
+  const handleCreateLBSubmit = async () => {
+    if (!createLBForm || view.type !== 'asg') return;
+    if (!createLBForm.name.trim()) {
+      setCreateLBError('LB名を入力してください');
+      return;
+    }
+    if (createLBForm.nameServers.length === 0 || createLBForm.nameServers.some((ns) => !ns.trim())) {
+      setCreateLBError('ネームサーバーを1つ以上入力してください');
+      return;
+    }
+    if (createLBForm.interfaces.length === 0 || createLBForm.interfaces.some((iface) => !iface.upstream.trim())) {
+      setCreateLBError('インターフェースの接続先(upstream)を入力してください');
+      return;
+    }
+
+    setCreatingLB(true);
+    setCreateLBError(null);
+    try {
+      await CreateAppRunLoadBalancer(profile, view.clusterId, view.asgId, new apprun.CreateLBParams({
+        name: createLBForm.name.trim(),
+        serviceClassPath: createLBForm.serviceClassPath,
+        nameServers: createLBForm.nameServers.map((ns) => ns.trim()),
+        interfaces: createLBForm.interfaces.map((iface, i) => new apprun.CreateLBInterfaceParams({
+          interfaceIndex: i,
+          upstream: iface.upstream.trim(),
+          ipPool: iface.upstream.trim() === 'shared' || (!iface.ipPoolStart.trim() && !iface.ipPoolEnd.trim())
+            ? undefined
+            : [new apprun.CreateIPRangeParams({ start: iface.ipPoolStart.trim(), end: iface.ipPoolEnd.trim() })],
+          netmaskLen: iface.netmaskLen.trim() ? Number(iface.netmaskLen) : undefined,
+          defaultGateway: iface.defaultGateway.trim() || undefined,
+          vip: iface.vip.trim() || undefined,
+          virtualRouterID: iface.virtualRouterID.trim() ? Number(iface.virtualRouterID) : undefined,
+          packetFilterID: iface.packetFilterID.trim() || undefined,
+        })),
+      }));
+      setCreateLBForm(null);
+      await loadASGDetails(view.clusterId, view.asgId);
+    } catch (e) {
+      setCreateLBError(String(e));
+    } finally {
+      setCreatingLB(false);
+    }
+  };
+
   const handleToggleDraining = async (nodeId: string, draining: boolean) => {
     if (!profile || view.type !== 'asg') return;
     setUpdatingDrainingId(nodeId);
@@ -1152,6 +1279,169 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
               disabled={creatingASG || !createASGForm.name.trim()}
             >
               {creatingASG ? '作成中...' : '作成する'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCreateLBModal = () => {
+    if (!createLBForm) return null;
+    return (
+      <div className="modal-overlay" onClick={handleCreateLBCancel} style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+      }}>
+        <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+          backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+          padding: '20px', minWidth: '480px', maxWidth: '640px', maxHeight: '85vh', overflowY: 'auto',
+        }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>ロードバランサーを作成</h3>
+          <div className="form-group">
+            <label>LB名</label>
+            <input
+              type="text"
+              value={createLBForm.name}
+              onChange={(e) => setCreateLBForm({ ...createLBForm, name: e.target.value })}
+              placeholder="my-lb"
+              autoFocus
+            />
+          </div>
+          <div className="form-group">
+            <label>プラン</label>
+            <select
+              value={createLBForm.serviceClassPath}
+              onChange={(e) => setCreateLBForm({ ...createLBForm, serviceClassPath: e.target.value })}
+            >
+              {LB_SERVICE_CLASS_PATHS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>ネームサーバー</label>
+            {createLBForm.nameServers.map((ns, i) => (
+              <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  value={ns}
+                  onChange={(e) => handleLBNameServerChange(i, e.target.value)}
+                  placeholder="133.242.0.3"
+                />
+                <button
+                  className="btn btn-danger btn-small"
+                  onClick={() => handleRemoveLBNameServer(i)}
+                  disabled={createLBForm.nameServers.length <= 1}
+                >
+                  削除
+                </button>
+              </div>
+            ))}
+            <button
+              className="btn btn-secondary btn-small"
+              onClick={handleAddLBNameServer}
+              disabled={createLBForm.nameServers.length >= 3}
+            >
+              + ネームサーバー追加
+            </button>
+          </div>
+          <div className="form-group">
+            <label>ネットワークインターフェース</label>
+            {createLBForm.interfaces.map((iface, i) => (
+              <div key={i} style={{ border: '1px solid #333', borderRadius: '6px', padding: '0.75rem', marginBottom: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.85rem', color: '#999' }}>eth{i}</span>
+                  <button
+                    className="btn btn-danger btn-small"
+                    onClick={() => handleRemoveLBInterface(i)}
+                    disabled={createLBForm.interfaces.length <= 1}
+                  >
+                    削除
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={iface.upstream}
+                  onChange={(e) => handleLBInterfaceChange(i, 'upstream', e.target.value)}
+                  placeholder="shared またはスイッチID"
+                  style={{ marginTop: '0.5rem', width: '100%' }}
+                />
+                {iface.upstream.trim() !== 'shared' && (
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                    <input
+                      type="text"
+                      value={iface.ipPoolStart}
+                      onChange={(e) => handleLBInterfaceChange(i, 'ipPoolStart', e.target.value)}
+                      placeholder="IPプール開始"
+                      style={{ width: '130px' }}
+                    />
+                    <input
+                      type="text"
+                      value={iface.ipPoolEnd}
+                      onChange={(e) => handleLBInterfaceChange(i, 'ipPoolEnd', e.target.value)}
+                      placeholder="IPプール終了"
+                      style={{ width: '130px' }}
+                    />
+                    <input
+                      type="number"
+                      value={iface.netmaskLen}
+                      onChange={(e) => handleLBInterfaceChange(i, 'netmaskLen', e.target.value)}
+                      placeholder="ネットマスク長"
+                      style={{ width: '110px' }}
+                    />
+                    <input
+                      type="text"
+                      value={iface.defaultGateway}
+                      onChange={(e) => handleLBInterfaceChange(i, 'defaultGateway', e.target.value)}
+                      placeholder="デフォルトゲートウェイ"
+                      style={{ width: '150px' }}
+                    />
+                    <input
+                      type="text"
+                      value={iface.vip}
+                      onChange={(e) => handleLBInterfaceChange(i, 'vip', e.target.value)}
+                      placeholder="VIP"
+                      style={{ width: '130px' }}
+                    />
+                    <input
+                      type="number"
+                      value={iface.virtualRouterID}
+                      onChange={(e) => handleLBInterfaceChange(i, 'virtualRouterID', e.target.value)}
+                      placeholder="仮想ルータID"
+                      style={{ width: '110px' }}
+                    />
+                    <input
+                      type="text"
+                      value={iface.packetFilterID}
+                      onChange={(e) => handleLBInterfaceChange(i, 'packetFilterID', e.target.value)}
+                      placeholder="パケットフィルタID(任意)"
+                      style={{ width: '160px' }}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+            <button
+              className="btn btn-secondary btn-small"
+              onClick={handleAddLBInterface}
+              disabled={createLBForm.interfaces.length >= 5}
+            >
+              + インターフェース追加
+            </button>
+          </div>
+          {createLBError && (
+            <div style={{ marginTop: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+              エラー: {createLBError}
+            </div>
+          )}
+          <div className="confirm-actions" style={{ marginTop: '1.5rem' }}>
+            <button className="btn btn-secondary" onClick={handleCreateLBCancel}>キャンセル</button>
+            <button
+              className="btn btn-primary"
+              onClick={handleCreateLBSubmit}
+              disabled={creatingLB || !createLBForm.name.trim()}
+            >
+              {creatingLB ? '作成中...' : '作成する'}
             </button>
           </div>
         </div>
@@ -1725,7 +2015,10 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
         </div>
         {renderBreadcrumb()}
 
-        <h3 style={{ marginTop: '1rem', color: '#00adb5' }}>ロードバランサー</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem' }}>
+          <h3 style={{ color: '#00adb5', margin: 0 }}>ロードバランサー</h3>
+          <button className="btn btn-primary btn-small" onClick={handleCreateLBOpen}>+ LB作成</button>
+        </div>
         {lbs.length === 0 ? (
           <div className="empty-state">ロードバランサーがありません</div>
         ) : (
@@ -1833,6 +2126,7 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
             </tbody>
           </table>
         )}
+        {renderCreateLBModal()}
         {renderConfirmDialog()}
       </>
     );

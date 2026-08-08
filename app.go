@@ -1063,6 +1063,14 @@ func (a *App) GetAppRunLoadBalancers(profileName, clusterID, asgID string) ([]ap
 	return service.ListLoadBalancers(a.ctx, clusterID, asgID)
 }
 
+func (a *App) CreateAppRunLoadBalancer(profileName, clusterID, asgID string, params apprun.CreateLBParams) (*apprun.LBInfo, error) {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateLoadBalancer(a.ctx, clusterID, asgID, params)
+}
+
 func (a *App) GetAppRunWorkerNodes(profileName, clusterID, asgID string) ([]apprun.WorkerNodeInfo, error) {
 	service, err := apprun.NewService(profileName)
 	if err != nil {

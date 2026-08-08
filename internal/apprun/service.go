@@ -12,6 +12,7 @@ import (
 	apprundedicated "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated"
 	"github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/autoscalinggroup"
 	"github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/cluster"
+	"github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/loadbalancer"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/version"
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
@@ -746,6 +747,78 @@ func (s *Service) ListAutoScalingGroups(ctx context.Context, clusterID string) (
 		})
 	}
 	return asgs, nil
+}
+
+// CreateLBInterfaceParams LB作成時のインターフェース設定
+type CreateLBInterfaceParams struct {
+	InterfaceIndex  int16                 `json:"interfaceIndex"`
+	Upstream        string                `json:"upstream"`
+	IPPool          []CreateIPRangeParams `json:"ipPool,omitempty"`
+	NetmaskLen      *int16                `json:"netmaskLen,omitempty"`
+	DefaultGateway  *string               `json:"defaultGateway,omitempty"`
+	Vip             *string               `json:"vip,omitempty"`
+	VirtualRouterID *int16                `json:"virtualRouterID,omitempty"`
+	PacketFilterID  *string               `json:"packetFilterID,omitempty"`
+}
+
+// CreateLBParams LB作成パラメータ
+type CreateLBParams struct {
+	Name             string                    `json:"name"`
+	ServiceClassPath string                    `json:"serviceClassPath"`
+	NameServers      []string                  `json:"nameServers"`
+	Interfaces       []CreateLBInterfaceParams `json:"interfaces"`
+}
+
+// CreateLoadBalancer ロードバランサーを作成
+func (s *Service) CreateLoadBalancer(ctx context.Context, clusterID, asgID string, params CreateLBParams) (*LBInfo, error) {
+	cID, err := uuid.Parse(clusterID)
+	if err != nil {
+		return nil, err
+	}
+	aID, err := uuid.Parse(asgID)
+	if err != nil {
+		return nil, err
+	}
+
+	nameServers := make([]v1.IPv4, 0, len(params.NameServers))
+	for _, ns := range params.NameServers {
+		nameServers = append(nameServers, v1.IPv4(ns))
+	}
+
+	interfaces := make([]loadbalancer.LoadBalancerInterface, 0, len(params.Interfaces))
+	for _, iface := range params.Interfaces {
+		ipPool := make([]v1.IpRange, 0, len(iface.IPPool))
+		for _, r := range iface.IPPool {
+			ipPool = append(ipPool, v1.IpRange{Start: v1.IPv4(r.Start), End: v1.IPv4(r.End)})
+		}
+		interfaces = append(interfaces, loadbalancer.LoadBalancerInterface{
+			InterfaceIndex:  iface.InterfaceIndex,
+			Upstream:        iface.Upstream,
+			IpPool:          ipPool,
+			NetmaskLen:      iface.NetmaskLen,
+			DefaultGateway:  iface.DefaultGateway,
+			Vip:             iface.Vip,
+			VirtualRouterID: iface.VirtualRouterID,
+			PacketFilterID:  iface.PacketFilterID,
+		})
+	}
+
+	lbOp := apprundedicated.NewLoadBalancerOp(s.client, v1.ClusterID(cID), v1.AutoScalingGroupID(aID))
+	created, err := lbOp.Create(ctx, loadbalancer.CreateParams{
+		Name:             params.Name,
+		ServiceClassPath: params.ServiceClassPath,
+		NameServers:      nameServers,
+		Interfaces:       interfaces,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &LBInfo{
+		ID:               uuid.UUID(created.GetLoadBalancerID()).String(),
+		Name:             params.Name,
+		ServiceClassPath: params.ServiceClassPath,
+	}, nil
 }
 
 // ListLoadBalancers ロードバランサー一覧を取得
