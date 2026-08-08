@@ -9,6 +9,8 @@ import {
   GetAppRunSharedVersions,
   GetAppRunSharedTraffics,
   HasAppRunSharedUser,
+  CreateAppRunSharedApplication,
+  UpdateAppRunSharedApplication,
 } from '../../wailsjs/go/main/App';
 
 vi.mock('../../wailsjs/go/main/App');
@@ -66,12 +68,16 @@ describe('AppRunSharedList', () => {
     vi.mocked(GetAppRunSharedApplication).mockReset();
     vi.mocked(GetAppRunSharedVersions).mockReset();
     vi.mocked(GetAppRunSharedTraffics).mockReset();
+    vi.mocked(CreateAppRunSharedApplication).mockReset();
+    vi.mocked(UpdateAppRunSharedApplication).mockReset();
 
     vi.mocked(HasAppRunSharedUser).mockResolvedValue(true);
     vi.mocked(GetAppRunSharedApplications).mockResolvedValue([]);
     vi.mocked(GetAppRunSharedApplication).mockResolvedValue(makeAppDetail());
     vi.mocked(GetAppRunSharedVersions).mockResolvedValue([]);
     vi.mocked(GetAppRunSharedTraffics).mockResolvedValue([]);
+    vi.mocked(CreateAppRunSharedApplication).mockResolvedValue(makeAppDetail());
+    vi.mocked(UpdateAppRunSharedApplication).mockResolvedValue(makeAppDetail());
   });
 
   it('shows a guidance message when no shared user is configured', async () => {
@@ -151,5 +157,72 @@ describe('AppRunSharedList', () => {
     await user.click(await screen.findByText('my-app'));
 
     expect(await screen.findByText('エラー: detail error')).toBeInTheDocument();
+  });
+
+  it('creates an application via the create modal', async () => {
+    const user = userEvent.setup();
+
+    render(<AppRunSharedList profile="default" />);
+    await screen.findByText('アプリケーションがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ アプリ作成' }));
+    await user.type(screen.getByPlaceholderText('my-app'), 'new-app');
+    await user.type(screen.getByPlaceholderText('docker.io/library/nginx:latest'), 'docker.io/library/nginx:latest');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    await waitFor(() => {
+      expect(CreateAppRunSharedApplication).toHaveBeenCalledWith('default', expect.objectContaining({
+        name: 'new-app',
+        image: 'docker.io/library/nginx:latest',
+      }));
+    });
+    expect(screen.queryByText('アプリケーションを作成')).not.toBeInTheDocument();
+  });
+
+  it('shows a validation error when creating without required fields', async () => {
+    const user = userEvent.setup();
+
+    render(<AppRunSharedList profile="default" />);
+    await screen.findByText('アプリケーションがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ アプリ作成' }));
+    await user.type(screen.getByPlaceholderText('my-app'), 'new-app');
+    expect(screen.getByRole('button', { name: '作成する' })).toBeDisabled();
+    expect(CreateAppRunSharedApplication).not.toHaveBeenCalled();
+  });
+
+  it('cancels the create modal without submitting', async () => {
+    const user = userEvent.setup();
+
+    render(<AppRunSharedList profile="default" />);
+    await screen.findByText('アプリケーションがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ アプリ作成' }));
+    await user.click(screen.getByRole('button', { name: 'キャンセル' }));
+
+    expect(screen.queryByText('アプリケーションを作成')).not.toBeInTheDocument();
+    expect(CreateAppRunSharedApplication).not.toHaveBeenCalled();
+  });
+
+  it('updates scale/timeout settings via the edit modal', async () => {
+    vi.mocked(GetAppRunSharedApplications).mockResolvedValue([makeApp()]);
+    const user = userEvent.setup();
+
+    render(<AppRunSharedList profile="default" />);
+    await user.click(await screen.findByText('my-app'));
+    await screen.findByRole('heading', { name: 'my-app' });
+
+    await user.click(screen.getByRole('button', { name: '編集' }));
+    const maxScaleInput = screen.getByDisplayValue('3');
+    await user.clear(maxScaleInput);
+    await user.type(maxScaleInput, '5');
+    await user.click(screen.getByRole('button', { name: '保存する' }));
+
+    await waitFor(() => {
+      expect(UpdateAppRunSharedApplication).toHaveBeenCalledWith('default', 'app-1', expect.objectContaining({
+        maxScale: 5,
+      }));
+    });
+    expect(screen.queryByText('スケール・タイムアウト設定を編集')).not.toBeInTheDocument();
   });
 });

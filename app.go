@@ -1192,6 +1192,22 @@ func (a *App) GetAppRunSharedTraffics(profileName, appID string) ([]apprunshared
 	return service.ListTraffics(a.ctx, appID)
 }
 
+func (a *App) CreateAppRunSharedApplication(profileName string, params apprunshared.CreateApplicationParams) (*apprunshared.AppDetailInfo, error) {
+	service, err := apprunshared.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateApplication(a.ctx, params)
+}
+
+func (a *App) UpdateAppRunSharedApplication(profileName, appID string, params apprunshared.UpdateApplicationParams) (*apprunshared.AppDetailInfo, error) {
+	service, err := apprunshared.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateApplication(a.ctx, appID, params)
+}
+
 func (a *App) HasAppRunSharedUser(profileName string) (bool, error) {
 	service, err := apprunshared.NewService(profileName)
 	if err != nil {

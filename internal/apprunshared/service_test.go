@@ -82,3 +82,95 @@ func TestService_HasUser_NoUser(t *testing.T) {
 		t.Error("HasUser = true, want false on a fresh mock server")
 	}
 }
+
+func TestService_CreateApplication(t *testing.T) {
+	srv := mockapprun.NewTestServer(mockapprun.Config{})
+	defer srv.Close()
+
+	t.Setenv("SAKURA_ENDPOINTS_APPRUN_SHARED", srv.TestURL())
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+
+	service, err := apprunshared.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	app, err := service.CreateApplication(context.Background(), apprunshared.CreateApplicationParams{
+		Name:           "test-app",
+		Port:           80,
+		MinScale:       0,
+		MaxScale:       1,
+		TimeoutSeconds: 60,
+		ComponentName:  "component1",
+		Image:          "docker.io/library/nginx:latest",
+		MaxCPU:         "0.5",
+		MaxMemory:      "1Gi",
+	})
+	if err != nil {
+		t.Fatalf("CreateApplication: %v", err)
+	}
+	if app.Name != "test-app" {
+		t.Errorf("Name = %q, want %q", app.Name, "test-app")
+	}
+	if app.Port != 80 || app.MinScale != 0 || app.MaxScale != 1 || app.TimeoutSeconds != 60 {
+		t.Errorf("unexpected scale/port/timeout: %+v", app)
+	}
+	if len(app.Components) != 1 || app.Components[0].Image != "docker.io/library/nginx:latest" {
+		t.Errorf("unexpected components: %+v", app.Components)
+	}
+
+	apps, err := service.ListApplications(context.Background())
+	if err != nil {
+		t.Fatalf("ListApplications: %v", err)
+	}
+	if len(apps) != 1 {
+		t.Errorf("got %d applications, want 1", len(apps))
+	}
+}
+
+func TestService_UpdateApplication(t *testing.T) {
+	srv := mockapprun.NewTestServer(mockapprun.Config{})
+	defer srv.Close()
+
+	t.Setenv("SAKURA_ENDPOINTS_APPRUN_SHARED", srv.TestURL())
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+
+	service, err := apprunshared.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	created, err := service.CreateApplication(context.Background(), apprunshared.CreateApplicationParams{
+		Name:           "test-app",
+		Port:           80,
+		MinScale:       0,
+		MaxScale:       1,
+		TimeoutSeconds: 60,
+		ComponentName:  "component1",
+		Image:          "docker.io/library/nginx:latest",
+		MaxCPU:         "0.5",
+		MaxMemory:      "1Gi",
+	})
+	if err != nil {
+		t.Fatalf("CreateApplication: %v", err)
+	}
+
+	timeoutUpdated := 30
+	maxScaleUpdated := 3
+	updated, err := service.UpdateApplication(context.Background(), created.ID, apprunshared.UpdateApplicationParams{
+		TimeoutSeconds: &timeoutUpdated,
+		MaxScale:       &maxScaleUpdated,
+	})
+	if err != nil {
+		t.Fatalf("UpdateApplication: %v", err)
+	}
+	if updated.TimeoutSeconds != timeoutUpdated {
+		t.Errorf("TimeoutSeconds = %d, want %d", updated.TimeoutSeconds, timeoutUpdated)
+	}
+	if updated.MaxScale != maxScaleUpdated {
+		t.Errorf("MaxScale = %d, want %d", updated.MaxScale, maxScaleUpdated)
+	}
+	if updated.Port != 80 {
+		t.Errorf("Port = %d, want unchanged 80", updated.Port)
+	}
+}

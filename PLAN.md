@@ -31,7 +31,7 @@
 | NFS | ✅ あり | ✅ | ✅ | 完備。FEテストとResetを追加済み（PR #80） |
 | ObjectStorage | ✅ あり | ✅（バケット・アクセスキー） | (対象外) | バケット作成/削除、アクセスキー作成/削除+FEテストを追加済み |
 | ContainerRegistry | ✅ あり | ✅ | (対象外) | 削除機能+FEテスト(List/Detail)に加え、Create/Update・ユーザー管理(AddUser/UpdateUser/DeleteUser)まで対応済み。読み書き一式が完備 |
-| AppRun (専有/共用) | ✅ あり | 専有型は✅（Cluster/App/ASG/LB） | (対象外) | 専有型・共用型ともFEテスト追加済み。専有型は削除機能に加えVersion Create（デプロイ）まで対応済み |
+| AppRun (専有/共用) | ✅ あり | 専有型は✅（Cluster/App/ASG/LB） | (対象外) | 専有型・共用型ともFEテスト追加済み。専有型は削除機能に加えVersion Create（デプロイ）まで対応済み、共用型はApplication Create/Updateまで対応済み |
 | Bill | ❌ なし | (対象外) | (対象外) | 読み取り専用リソースなので概ね妥当 |
 
 **17リソース中、FEテストが未着手なのは Bill のみ。**
@@ -171,9 +171,10 @@
 - ✅ **対応済み（2026-08-08 追加セッション11、Tier1 #6）**: AppRun専有型のVersion Create（デプロイ）を実装。`internal/apprun/service.go`にSDKの`version.CreateParams`を薄くラップした`CreateAppVersionParams`（CPU/Memory/ScalingMode+FixedScale or MinScale・MaxScale・閾値/Image/Cmd/RegistryUsername・Password/ExposedPorts(TargetPort/LoadBalancerPort/UseLetsEncrypt/Host/HealthCheck)/EnvVars(Key/Value/Secret)）と`CreateApplicationVersion`を追加、`app.go`に`CreateAppRunApplicationVersion`のRPCを公開。`AppRunDedicatedList.tsx`のバージョン一覧に「+ デプロイ」ボタンとフルデプロイフォーム（イメージ/コマンド/CPU・メモリ/スケーリングモード切替/公開ポート・ヘルスチェックの追加編集削除/環境変数の追加編集削除）を実装。`internal/apprun/service_test.go`に`sakumock/apprundedicated`のテストサーバーを使った`TestService_CreateApplicationVersion`を追加（実際のAPIリクエスト/レスポンスを検証）
 - ✅ **対応済み（2026-08-08 追加セッション22、Tier2 #14一部）**: Version Delete（バージョン削除）を実装。`internal/apprun/service.go`に`DeleteApplicationVersion`を追加（SDKの`VersionOp.Delete`をラップ）、`app.go`に`DeleteAppRunApplicationVersion`のRPCを公開。`AppRunDedicatedList.tsx`のバージョン一覧テーブルに削除ボタンの列を追加し、バージョン詳細画面の「⋯」ドロップダウンにも削除項目を追加（削除後は自動でアプリ詳細画面に戻る）。アクティブバージョンは削除できないためボタンを無効化。`internal/apprun/service_test.go`に`TestService_DeleteApplicationVersion`、`AppRunDedicatedList.test.tsx`に一覧からの削除・アクティブバージョンのボタン無効化・詳細画面からの削除の3テストを追加
 - ✅ **対応済み（2026-08-08 追加セッション23、Tier2 #14一部）**: Application Create・WorkerNode Update（draining）を実装。4つの残タスク（Cluster/Application/ASG/LoadBalancerのCreate、WorkerNode Update、Certificate系）のうち依存関係が最も単純（`Name`+`ClusterID`のみ）なApplication CreateとWorkerNode Updateを先行実装。`internal/apprun/service.go`に`CreateApplication`（SDKの`ApplicationOp.Create(ctx, name, clusterID)`をラップ）と`UpdateWorkerNodeDraining`（`WorkerNodeOp.Update(ctx, id, draining)`をラップ）を追加、`app.go`に`CreateAppRunApplication`/`UpdateAppRunWorkerNodeDraining`のRPCを公開。`AppRunDedicatedList.tsx`のクラスタ詳細画面に「+ アプリ作成」ボタンと作成モーダル（アプリ名のみ）、ASG詳細画面のワーカーノード一覧に「Draining開始/解除」トグルボタンを追加。`internal/apprun/service_test.go`に`TestService_CreateApplication`/`TestService_UpdateWorkerNodeDraining`を追加（sakumockはASG作成時にMinNodes分のワーカーノードを自動生成するため、既存の`TestService_DeleteAutoScalingGroup`と同じ`CreateAutoScalingGroup`シードで検証可能）
+- ✅ **対応済み（2026-08-08 追加セッション24、Tier2 #15一部）**: 共用型のApplication Create・Update（スケール・タイムアウト設定）を実装。`internal/apprunshared/service.go`に`CreateApplication`/`UpdateApplication`を追加（SDKの`apprun.NewApplicationOp`が既に`Create`/`Update`を実装済みだった。コンポーネントは1件のみ（sakumockの`maxComponents=1`制約と一致）、MaxCPU/MaxMemoryは組み合わせ制約があるため任意の値の組ではなく`0.5`/`1`/`2`vCPUと`1Gi`/`2Gi`/`4Gi`から選択させるUIとした。Nameは作成時のみ指定可能でUpdate非対応）、`app.go`に`CreateAppRunSharedApplication`/`UpdateAppRunSharedApplication`のRPCを公開。`AppRunSharedList.tsx`に作成モーダル（アプリ名/ポート/スケール/タイムアウト/コンポーネント名/イメージ/CPU・メモリ/環境変数）と基本情報カードの「編集」ボタン（ポート/スケール/タイムアウトの編集モーダル）を追加。`internal/apprunshared/service_test.go`に`github.com/sacloud/sakumock/apprun`のテストサーバーを使った`TestService_CreateApplication`/`TestService_UpdateApplication`を追加、`frontend/e2e/apprun-shared.spec.ts`に作成・編集シナリオを追加
 - SDK比較で残る不足:
   - 専有型: Cluster/ASG/LoadBalancerの**Create**、Certificate系全般（未着手。優先順位は後述の「実装順序」参照。ASG/LBのCreateはVIP/仮想ルータID/IPプール等ネットワーク知識が必要な`Interfaces`配列の入力UIが必要で複雑度が高い）
-  - 共用型: ApplicationのCreate/Update/Delete、VersionのDelete、TrafficのUpdate（分散比率変更）、UserのCreate
+  - 共用型: Applicationの**Delete**、VersionのDelete、TrafficのUpdate（分散比率変更）、UserのCreate
 - **TODO**: `lb` view（ロードバランサー単体詳細）への遷移導線が無い点は意図的な未実装か実装漏れか要確認
 
 ### Bill（請求）
@@ -232,6 +233,9 @@
 ### ✅ 完了（2026-08-08 追加セッション13、Tier2 #11）
 - DatabaseのCreate/Update/UpdateSettings/GetParameter/SetParameterを実装。`internal/sakura/database.go`にGet/Create/Update/UpdateSettings/GetParameter/SetParameterを追加（Update/UpdateSettingsはGSLB等と同じく事前Readで既存の稼働設定を維持したまま送信、UpdateSettingsのパスワード欄は空欄なら既存値を維持するフォールバックを実装）、`app.go`に対応する6つのRPCを公開。`DatabaseDetail.tsx`を新設（従来Detail画面が存在しなかった）し、`DatabaseList.tsx`に作成モーダル（プラン/接続先スイッチ/IPアドレス/RDBMS種別/管理ユーザー等）とカードクリックでの詳細遷移を追加。冗長化構成（Proxyプラン）・マスター/スレーブのレプリケーション設定は対象外とした。`internal/sakura/database_test.go`、`DatabaseList.test.tsx`/`DatabaseDetail.test.tsx`、`frontend/e2e/database.spec.ts`を追加。あわせてE2Eシード投入時に`Database.Conf`が未設定だとfakeドライバの`GetParameter`がnilポインタ参照でpanicするSDK側バグを発見し、シードデータに`Conf`/`CommonSetting`を設定して回避（詳細は`docs/upstream-issues.md`参照）
 
+### ✅ 完了（2026-08-08 追加セッション24、Tier2 #15一部）
+- AppRun共用型のApplication Create・Update（スケール・タイムアウト設定）を実装。詳細は上記「AppRun（専有型 / 共用型）」節を参照
+
 ### ✅ 完了（2026-08-08 追加セッション21、Tier2 #13）
 - EnhancedDBのCreate/Update/SetPasswordを実装。`internal/sakura/enhanced_db.go`にGet/Create/Update/SetPasswordを追加（UpdateはSettingsHashによる楽観ロックが必要なため事前Read、GSLB/ProxyLB等と同じパターン）、`app.go`に対応する4つのRPCを公開。`EnhancedDBDetail.tsx`を新設（従来Detail画面が存在しなかった）し、`EnhancedDBList.tsx`に作成モーダル（名前/説明/DB名/DB種別[TiDB・MariaDB]/リージョン[石狩・東京]/タグ）とカードクリックでの詳細遷移を追加。パスワード再設定は詳細画面に専用フォーム+確認ダイアログを実装。`EnhancedDBList.test.tsx`拡充、`EnhancedDBDetail.test.tsx`新規追加、`frontend/e2e/enhanceddb.spec.ts`を追加
 
@@ -273,7 +277,7 @@
 12. ✅ NFS: Create/Update — 2026-08-08対応済み
 13. ✅ EnhancedDB: Create/Update/SetPassword — 2026-08-08対応済み
 14. AppRun専有型: Cluster/ASG/LoadBalancerのCreate、Certificate系（VersionのDelete、Application Create、WorkerNodeのUpdate（draining）は2026-08-08対応済み）
-15. AppRun共用型: ApplicationのCreate/Update/Delete、VersionのDelete、TrafficのUpdate、UserのCreate
+15. AppRun共用型: ApplicationのDelete、VersionのDelete、TrafficのUpdate、UserのCreate（ApplicationのCreate/Updateは2026-08-08対応済み）
 
 **Tier 3: 低優先度・ニッチ or 複雑度が高い機能**
 16. Server: ChangePlan/InsertCDROM/EjectCDROM/SendKey/SendNMI/GetVNCProxy等パワーユーザー向け機能（複雑さ・利用頻度の観点で後回し。読み取り専用方針による除外ではない）
