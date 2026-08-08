@@ -9,20 +9,34 @@ import (
 )
 
 type ProxyLBInfo struct {
-	ID               string                `json:"id"`
-	Name             string                `json:"name"`
-	Description      string                `json:"description"`
-	Tags             []string              `json:"tags"`
-	Plan             string                `json:"plan"`
-	Region           string                `json:"region"`
-	FQDN             string                `json:"fqdn"`
-	VirtualIPAddress string                `json:"virtualIPAddress"`
-	ProxyNetworks    []string              `json:"proxyNetworks"`
-	UseVIPFailover   bool                  `json:"useVIPFailover"`
-	BindPorts        []ProxyLBBindPortInfo `json:"bindPorts"`
-	Servers          []ProxyLBServerInfo   `json:"servers"`
-	CreatedAt        string                `json:"createdAt"`
-	ModifiedAt       string                `json:"modifiedAt"`
+	ID               string                  `json:"id"`
+	Name             string                  `json:"name"`
+	Description      string                  `json:"description"`
+	Tags             []string                `json:"tags"`
+	Plan             string                  `json:"plan"`
+	Region           string                  `json:"region"`
+	FQDN             string                  `json:"fqdn"`
+	VirtualIPAddress string                  `json:"virtualIPAddress"`
+	ProxyNetworks    []string                `json:"proxyNetworks"`
+	UseVIPFailover   bool                    `json:"useVIPFailover"`
+	HealthCheck      *ProxyLBHealthCheckInfo `json:"healthCheck"`
+	SorryServer      *ProxyLBSorryServerInfo `json:"sorryServer"`
+	BindPorts        []ProxyLBBindPortInfo   `json:"bindPorts"`
+	Servers          []ProxyLBServerInfo     `json:"servers"`
+	CreatedAt        string                  `json:"createdAt"`
+	ModifiedAt       string                  `json:"modifiedAt"`
+}
+
+type ProxyLBHealthCheckInfo struct {
+	Protocol  string `json:"protocol"`
+	Path      string `json:"path"`
+	Host      string `json:"host"`
+	DelayLoop int    `json:"delayLoop"`
+}
+
+type ProxyLBSorryServerInfo struct {
+	IPAddress string `json:"ipAddress"`
+	Port      int    `json:"port"`
 }
 
 type ProxyLBBindPortInfo struct {
@@ -80,6 +94,47 @@ type ProxyLBSetCertificatesInput struct {
 	AdditionalCerts []ProxyLBCertInput `json:"additionalCerts"`
 }
 
+type ProxyLBCreateInput struct {
+	Name           string `json:"name"`
+	Description    string `json:"description"`
+	Plan           int    `json:"plan"`
+	Region         string `json:"region"`
+	UseVIPFailover bool   `json:"useVipFailover"`
+}
+
+type ProxyLBHealthCheckInput struct {
+	Protocol  string `json:"protocol"`
+	Path      string `json:"path"`
+	Host      string `json:"host"`
+	DelayLoop int    `json:"delayLoop"`
+}
+
+type ProxyLBSorryServerInput struct {
+	IPAddress string `json:"ipAddress"`
+	Port      int    `json:"port"`
+}
+
+type ProxyLBBindPortInput struct {
+	ProxyMode       string `json:"proxyMode"`
+	Port            int    `json:"port"`
+	RedirectToHTTPS bool   `json:"redirectToHttps"`
+	SupportHTTP2    bool   `json:"supportHttp2"`
+}
+
+type ProxyLBServerInput struct {
+	IPAddress   string `json:"ipAddress"`
+	Port        int    `json:"port"`
+	ServerGroup string `json:"serverGroup"`
+	Enabled     bool   `json:"enabled"`
+}
+
+type ProxyLBSettingsInput struct {
+	HealthCheck ProxyLBHealthCheckInput  `json:"healthCheck"`
+	SorryServer *ProxyLBSorryServerInput `json:"sorryServer"`
+	BindPorts   []ProxyLBBindPortInput   `json:"bindPorts"`
+	Servers     []ProxyLBServerInput     `json:"servers"`
+}
+
 type ProxyLBService struct {
 	client *Client
 }
@@ -117,6 +172,128 @@ func (s *ProxyLBService) Get(ctx context.Context, id string) (*ProxyLBInfo, erro
 func (s *ProxyLBService) Delete(ctx context.Context, id string) error {
 	op := iaas.NewProxyLBOp(s.client.Caller())
 	return op.Delete(ctx, types.StringID(id))
+}
+
+// Create はELBを新規作成する。待ち受けポート・実サーバー等の詳細設定は作成後、UpdateSettingsで行う。
+func (s *ProxyLBService) Create(ctx context.Context, input ProxyLBCreateInput) (*ProxyLBInfo, error) {
+	op := iaas.NewProxyLBOp(s.client.Caller())
+	result, err := op.Create(ctx, &iaas.ProxyLBCreateRequest{
+		Name:           input.Name,
+		Description:    input.Description,
+		Plan:           types.EProxyLBPlan(input.Plan),
+		Region:         types.EProxyLBRegion(input.Region),
+		UseVIPFailover: input.UseVIPFailover,
+	})
+	if err != nil {
+		return nil, err
+	}
+	info := convertProxyLB(result)
+	return &info, nil
+}
+
+// Update はELBの名前・説明を更新する。監視設定は既存のものを維持したまま送信する
+// (Update APIはSettingsも含むリクエスト構造のため、空で送ると設定が失われる)。
+func (s *ProxyLBService) Update(ctx context.Context, id, name, description string) (*ProxyLBInfo, error) {
+	op := iaas.NewProxyLBOp(s.client.Caller())
+	proxyLBID := types.StringID(id)
+	current, err := op.Read(ctx, proxyLBID)
+	if err != nil {
+		return nil, err
+	}
+	result, err := op.Update(ctx, proxyLBID, &iaas.ProxyLBUpdateRequest{
+		Name:                 name,
+		Description:          description,
+		Tags:                 current.Tags,
+		IconID:               current.IconID,
+		HealthCheck:          current.HealthCheck,
+		SorryServer:          current.SorryServer,
+		BindPorts:            current.BindPorts,
+		Servers:              current.Servers,
+		Rules:                current.Rules,
+		LetsEncrypt:          current.LetsEncrypt,
+		StickySession:        current.StickySession,
+		Timeout:              current.Timeout,
+		Gzip:                 current.Gzip,
+		BackendHttpKeepAlive: current.BackendHttpKeepAlive,
+		MonitoringSuiteLog:   current.MonitoringSuiteLog,
+		ProxyProtocol:        current.ProxyProtocol,
+		Syslog:               current.Syslog,
+		OriginGuard:          current.OriginGuard,
+		StrictRule:           current.StrictRule,
+		SettingsHash:         current.SettingsHash,
+	})
+	if err != nil {
+		return nil, err
+	}
+	info := convertProxyLB(result)
+	return &info, nil
+}
+
+// UpdateSettings はELBのヘルスチェック・Sorry Server・待ち受けポート・実サーバーを更新する。名前・説明は変更しない。
+func (s *ProxyLBService) UpdateSettings(ctx context.Context, id string, input ProxyLBSettingsInput) (*ProxyLBInfo, error) {
+	op := iaas.NewProxyLBOp(s.client.Caller())
+	proxyLBID := types.StringID(id)
+	current, err := op.Read(ctx, proxyLBID)
+	if err != nil {
+		return nil, err
+	}
+
+	var sorryServer *iaas.ProxyLBSorryServer
+	if input.SorryServer != nil && input.SorryServer.IPAddress != "" {
+		sorryServer = &iaas.ProxyLBSorryServer{
+			IPAddress: input.SorryServer.IPAddress,
+			Port:      input.SorryServer.Port,
+		}
+	}
+
+	bindPorts := make([]*iaas.ProxyLBBindPort, 0, len(input.BindPorts))
+	for _, bp := range input.BindPorts {
+		bindPorts = append(bindPorts, &iaas.ProxyLBBindPort{
+			ProxyMode:       types.EProxyLBProxyMode(bp.ProxyMode),
+			Port:            bp.Port,
+			RedirectToHTTPS: bp.RedirectToHTTPS,
+			SupportHTTP2:    bp.SupportHTTP2,
+		})
+	}
+
+	servers := make([]*iaas.ProxyLBServer, 0, len(input.Servers))
+	for _, srv := range input.Servers {
+		servers = append(servers, &iaas.ProxyLBServer{
+			IPAddress:   srv.IPAddress,
+			Port:        srv.Port,
+			ServerGroup: srv.ServerGroup,
+			Enabled:     srv.Enabled,
+		})
+	}
+
+	result, err := op.UpdateSettings(ctx, proxyLBID, &iaas.ProxyLBUpdateSettingsRequest{
+		HealthCheck: &iaas.ProxyLBHealthCheck{
+			Protocol:  types.EProxyLBHealthCheckProtocol(input.HealthCheck.Protocol),
+			Path:      input.HealthCheck.Path,
+			Host:      input.HealthCheck.Host,
+			DelayLoop: input.HealthCheck.DelayLoop,
+		},
+		SorryServer:          sorryServer,
+		BindPorts:            bindPorts,
+		Servers:              servers,
+		Rules:                current.Rules,
+		LetsEncrypt:          current.LetsEncrypt,
+		StickySession:        current.StickySession,
+		Timeout:              current.Timeout,
+		Gzip:                 current.Gzip,
+		BackendHttpKeepAlive: current.BackendHttpKeepAlive,
+		MonitoringSuiteLog:   current.MonitoringSuiteLog,
+		ProxyProtocol:        current.ProxyProtocol,
+		Syslog:               current.Syslog,
+		OriginGuard:          current.OriginGuard,
+		StrictRule:           current.StrictRule,
+		SettingsHash:         current.SettingsHash,
+	})
+	if err != nil {
+		return nil, err
+	}
+	info := convertProxyLB(result)
+	return &info, nil
 }
 
 func (s *ProxyLBService) GetHealth(ctx context.Context, id string) (*ProxyLBHealthInfo, error) {
@@ -253,6 +430,24 @@ func convertProxyLB(p *iaas.ProxyLB) ProxyLBInfo {
 		})
 	}
 
+	var healthCheck *ProxyLBHealthCheckInfo
+	if p.HealthCheck != nil {
+		healthCheck = &ProxyLBHealthCheckInfo{
+			Protocol:  string(p.HealthCheck.Protocol),
+			Path:      p.HealthCheck.Path,
+			Host:      p.HealthCheck.Host,
+			DelayLoop: p.HealthCheck.DelayLoop,
+		}
+	}
+
+	var sorryServer *ProxyLBSorryServerInfo
+	if p.SorryServer != nil {
+		sorryServer = &ProxyLBSorryServerInfo{
+			IPAddress: p.SorryServer.IPAddress,
+			Port:      p.SorryServer.Port,
+		}
+	}
+
 	return ProxyLBInfo{
 		ID:               p.ID.String(),
 		Name:             p.Name,
@@ -264,6 +459,8 @@ func convertProxyLB(p *iaas.ProxyLB) ProxyLBInfo {
 		VirtualIPAddress: p.VirtualIPAddress,
 		ProxyNetworks:    p.ProxyNetworks,
 		UseVIPFailover:   p.UseVIPFailover,
+		HealthCheck:      healthCheck,
+		SorryServer:      sorryServer,
 		BindPorts:        bindPorts,
 		Servers:          servers,
 		CreatedAt:        p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),

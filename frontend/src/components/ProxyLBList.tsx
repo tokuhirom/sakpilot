@@ -8,6 +8,9 @@ import {
   SetProxyLBCertificates,
   DeleteProxyLBCertificates,
   RenewProxyLBLetsEncryptCert,
+  CreateProxyLB,
+  UpdateProxyLB,
+  UpdateProxyLBSettings,
 } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
@@ -42,6 +45,72 @@ const emptyCertForm = (): CertForm => ({
   additionalCerts: [],
 });
 
+const PLAN_OPTIONS = [100, 500, 1000, 5000, 10000, 50000, 100000, 400000];
+
+interface CreateForm {
+  name: string;
+  description: string;
+  plan: number;
+  region: string;
+  useVipFailover: boolean;
+}
+
+const emptyCreateForm = (): CreateForm => ({
+  name: '',
+  description: '',
+  plan: 100,
+  region: 'is1',
+  useVipFailover: false,
+});
+
+interface BindPortFormRow {
+  proxyMode: string;
+  port: string;
+  redirectToHttps: boolean;
+  supportHttp2: boolean;
+}
+
+interface ServerFormRow {
+  ipAddress: string;
+  port: string;
+  serverGroup: string;
+  enabled: boolean;
+}
+
+interface SettingsForm {
+  healthCheckProtocol: string;
+  healthCheckPath: string;
+  healthCheckHost: string;
+  healthCheckDelayLoop: string;
+  sorryServerIpAddress: string;
+  sorryServerPort: string;
+  bindPorts: BindPortFormRow[];
+  servers: ServerFormRow[];
+}
+
+function toSettingsForm(lb: sakura.ProxyLBInfo): SettingsForm {
+  return {
+    healthCheckProtocol: lb.healthCheck?.protocol || 'http',
+    healthCheckPath: lb.healthCheck?.path || '/',
+    healthCheckHost: lb.healthCheck?.host || '',
+    healthCheckDelayLoop: String(lb.healthCheck?.delayLoop || 10),
+    sorryServerIpAddress: lb.sorryServer?.ipAddress || '',
+    sorryServerPort: lb.sorryServer?.port ? String(lb.sorryServer.port) : '',
+    bindPorts: (lb.bindPorts || []).map((bp) => ({
+      proxyMode: bp.proxyMode,
+      port: String(bp.port),
+      redirectToHttps: bp.redirectToHttps,
+      supportHttp2: bp.supportHttp2,
+    })),
+    servers: (lb.servers || []).map((srv) => ({
+      ipAddress: srv.ipAddress,
+      port: String(srv.port),
+      serverGroup: srv.serverGroup,
+      enabled: srv.enabled,
+    })),
+  };
+}
+
 export function ProxyLBList({ profile }: ProxyLBListProps) {
   const [proxyLBs, setProxyLBs] = useState<sakura.ProxyLBInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -60,6 +129,17 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
   const [deletingCert, setDeletingCert] = useState(false);
   const [confirmRenewCert, setConfirmRenewCert] = useState(false);
   const [renewingCert, setRenewingCert] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [createForm, setCreateForm] = useState<CreateForm>(emptyCreateForm());
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [editingBasic, setEditingBasic] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [descriptionInput, setDescriptionInput] = useState('');
+  const [savingBasic, setSavingBasic] = useState(false);
+  const [settingsForm, setSettingsForm] = useState<SettingsForm | null>(null);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
 
   const {
     searchQuery,
@@ -281,6 +361,187 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
     }
   };
 
+  const handleCreateOpen = () => {
+    setCreateForm(emptyCreateForm());
+    setCreateError(null);
+    setShowCreate(true);
+  };
+
+  const handleCreateCancel = () => {
+    setShowCreate(false);
+  };
+
+  const handleCreateSubmit = async () => {
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const input = new sakura.ProxyLBCreateInput({
+        name: createForm.name,
+        description: createForm.description,
+        plan: createForm.plan,
+        region: createForm.region,
+        useVipFailover: createForm.useVipFailover,
+      });
+      await CreateProxyLB(profile, input);
+      setShowCreate(false);
+      await loadProxyLBs();
+    } catch (e) {
+      setCreateError(String(e));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleBasicEditStart = () => {
+    if (!selectedProxyLB) return;
+    setNameInput(selectedProxyLB.name);
+    setDescriptionInput(selectedProxyLB.description || '');
+    setEditingBasic(true);
+  };
+
+  const handleBasicEditCancel = () => {
+    setEditingBasic(false);
+  };
+
+  const handleBasicSave = async () => {
+    if (!selectedProxyLB) return;
+    setSavingBasic(true);
+    try {
+      const updated = await UpdateProxyLB(profile, selectedProxyLB.id, nameInput, descriptionInput);
+      setSelectedProxyLB(updated);
+      setEditingBasic(false);
+    } catch (e) {
+      alert(`基本情報の更新に失敗しました: ${e}`);
+    } finally {
+      setSavingBasic(false);
+    }
+  };
+
+  const handleSettingsEditOpen = () => {
+    if (!selectedProxyLB) return;
+    setSettingsError(null);
+    setSettingsForm(toSettingsForm(selectedProxyLB));
+  };
+
+  const handleSettingsEditCancel = () => {
+    setSettingsForm(null);
+    setSettingsError(null);
+  };
+
+  const handleBindPortAdd = () => {
+    if (!settingsForm) return;
+    setSettingsForm({
+      ...settingsForm,
+      bindPorts: [...settingsForm.bindPorts, { proxyMode: 'http', port: '80', redirectToHttps: false, supportHttp2: false }],
+    });
+  };
+
+  const handleBindPortRemove = (index: number) => {
+    if (!settingsForm) return;
+    setSettingsForm({ ...settingsForm, bindPorts: settingsForm.bindPorts.filter((_, i) => i !== index) });
+  };
+
+  const handleBindPortChange = (index: number, field: keyof BindPortFormRow, value: string | boolean) => {
+    if (!settingsForm) return;
+    setSettingsForm({
+      ...settingsForm,
+      bindPorts: settingsForm.bindPorts.map((bp, i) => (i === index ? { ...bp, [field]: value } : bp)),
+    });
+  };
+
+  const handleServerAdd = () => {
+    if (!settingsForm) return;
+    setSettingsForm({
+      ...settingsForm,
+      servers: [...settingsForm.servers, { ipAddress: '', port: '80', serverGroup: '', enabled: true }],
+    });
+  };
+
+  const handleServerRemove = (index: number) => {
+    if (!settingsForm) return;
+    setSettingsForm({ ...settingsForm, servers: settingsForm.servers.filter((_, i) => i !== index) });
+  };
+
+  const handleServerChange = (index: number, field: keyof ServerFormRow, value: string | boolean) => {
+    if (!settingsForm) return;
+    setSettingsForm({
+      ...settingsForm,
+      servers: settingsForm.servers.map((s, i) => (i === index ? { ...s, [field]: value } : s)),
+    });
+  };
+
+  const handleSettingsSave = async () => {
+    if (!settingsForm || !selectedProxyLB) return;
+
+    const delayLoop = parseInt(settingsForm.healthCheckDelayLoop, 10);
+    if (isNaN(delayLoop)) {
+      setSettingsError('監視間隔を正しく入力してください');
+      return;
+    }
+    if (settingsForm.bindPorts.some((bp) => !bp.port)) {
+      setSettingsError('待ち受けポートを入力してください');
+      return;
+    }
+    const bindPortNumbers = settingsForm.bindPorts.map((bp) => parseInt(bp.port, 10));
+    if (bindPortNumbers.some(isNaN)) {
+      setSettingsError('待ち受けポートを正しく入力してください');
+      return;
+    }
+    if (settingsForm.servers.some((s) => !s.ipAddress || !s.port)) {
+      setSettingsError('実サーバーのIPアドレス・ポートを入力してください');
+      return;
+    }
+    const serverPorts = settingsForm.servers.map((s) => parseInt(s.port, 10));
+    if (serverPorts.some(isNaN)) {
+      setSettingsError('実サーバーのポートを正しく入力してください');
+      return;
+    }
+    let sorryServerPort = 0;
+    if (settingsForm.sorryServerIpAddress && settingsForm.sorryServerPort) {
+      sorryServerPort = parseInt(settingsForm.sorryServerPort, 10);
+      if (isNaN(sorryServerPort)) {
+        setSettingsError('Sorry Serverのポートを正しく入力してください');
+        return;
+      }
+    }
+
+    const input = new sakura.ProxyLBSettingsInput({
+      healthCheck: {
+        protocol: settingsForm.healthCheckProtocol,
+        path: settingsForm.healthCheckPath,
+        host: settingsForm.healthCheckHost,
+        delayLoop,
+      },
+      sorryServer: settingsForm.sorryServerIpAddress
+        ? { ipAddress: settingsForm.sorryServerIpAddress, port: sorryServerPort }
+        : undefined,
+      bindPorts: settingsForm.bindPorts.map((bp, i) => ({
+        proxyMode: bp.proxyMode,
+        port: bindPortNumbers[i],
+        redirectToHttps: bp.redirectToHttps,
+        supportHttp2: bp.supportHttp2,
+      })),
+      servers: settingsForm.servers.map((s, i) => ({
+        ipAddress: s.ipAddress,
+        port: serverPorts[i],
+        serverGroup: s.serverGroup,
+        enabled: s.enabled,
+      })),
+    });
+
+    setSavingSettings(true);
+    setSettingsError(null);
+    try {
+      const updated = await UpdateProxyLBSettings(profile, selectedProxyLB.id, input);
+      setSelectedProxyLB(updated);
+      setSettingsForm(null);
+    } catch (e) {
+      setSettingsError(String(e));
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   const formatCertDate = (dateString?: string) => {
     if (!dateString) return '-';
     return formatDate(dateString);
@@ -368,12 +629,46 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
 
         {/* Basic Info */}
         <div className="card" style={{ marginBottom: '1rem', padding: '1rem', background: '#2a2a2a', borderRadius: '8px' }}>
-          <h4 style={{ color: '#00adb5', marginTop: 0, marginBottom: '1rem' }}>基本情報</h4>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h4 style={{ color: '#00adb5', margin: 0 }}>基本情報</h4>
+            <button className="btn btn-secondary btn-small" onClick={handleSettingsEditOpen}>設定を編集</button>
+          </div>
           <table style={{ borderCollapse: 'collapse', width: '100%' }}>
             <tbody>
               <tr>
                 <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', width: '150px', textAlign: 'left' }}>ID</td>
                 <td style={{ padding: '0.5rem 0', fontFamily: 'monospace', textAlign: 'left' }}>{selectedProxyLB.id}</td>
+              </tr>
+              <tr>
+                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>名前 / 説明</td>
+                <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>
+                  {editingBasic ? (
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <input
+                        type="text"
+                        value={nameInput}
+                        onChange={(e) => setNameInput(e.target.value)}
+                        placeholder="名前"
+                        autoFocus
+                      />
+                      <input
+                        type="text"
+                        value={descriptionInput}
+                        onChange={(e) => setDescriptionInput(e.target.value)}
+                        placeholder="説明"
+                      />
+                      <button className="btn btn-primary btn-small" onClick={handleBasicSave} disabled={savingBasic || !nameInput}>
+                        {savingBasic ? '保存中...' : '保存'}
+                      </button>
+                      <button className="btn btn-secondary btn-small" onClick={handleBasicEditCancel} disabled={savingBasic}>キャンセル</button>
+                    </div>
+                  ) : (
+                    <span style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      {selectedProxyLB.name} / {selectedProxyLB.description || '-'}
+                      <button className="btn btn-secondary btn-small" onClick={handleBasicEditStart}>編集</button>
+                    </span>
+                  )}
+                </td>
               </tr>
               <tr>
                 <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>FQDN</td>
@@ -402,6 +697,49 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
             </tbody>
           </table>
         </div>
+
+        {/* Health Check / Sorry Server */}
+        {(selectedProxyLB.healthCheck || selectedProxyLB.sorryServer) && (
+          <div className="card" style={{ marginBottom: '1rem', padding: '1rem', background: '#2a2a2a', borderRadius: '8px' }}>
+            <h4 style={{ color: '#00adb5', marginTop: 0, marginBottom: '1rem' }}>ヘルスチェック / Sorry Server</h4>
+            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+              <tbody>
+                {selectedProxyLB.healthCheck && (
+                  <>
+                    <tr>
+                      <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', width: '150px', textAlign: 'left' }}>プロトコル</td>
+                      <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{selectedProxyLB.healthCheck.protocol}</td>
+                    </tr>
+                    {selectedProxyLB.healthCheck.protocol === 'http' && (
+                      <>
+                        <tr>
+                          <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>パス</td>
+                          <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{selectedProxyLB.healthCheck.path || '-'}</td>
+                        </tr>
+                        <tr>
+                          <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>Hostヘッダー</td>
+                          <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{selectedProxyLB.healthCheck.host || '-'}</td>
+                        </tr>
+                      </>
+                    )}
+                    <tr>
+                      <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>監視間隔</td>
+                      <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{selectedProxyLB.healthCheck.delayLoop}秒</td>
+                    </tr>
+                  </>
+                )}
+                {selectedProxyLB.sorryServer && (
+                  <tr>
+                    <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>Sorry Server</td>
+                    <td style={{ padding: '0.5rem 0', fontFamily: 'monospace', textAlign: 'left' }}>
+                      {selectedProxyLB.sorryServer.ipAddress}{selectedProxyLB.sorryServer.port ? `:${selectedProxyLB.sorryServer.port}` : ''}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {/* Bind Ports */}
         <div className="card" style={{ marginBottom: '1rem', padding: '1rem', background: '#2a2a2a', borderRadius: '8px' }}>
@@ -706,6 +1044,184 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
             </div>
           )}
         </div>
+
+        {settingsForm && (
+          <div className="modal-overlay" onClick={handleSettingsEditCancel} style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+          }}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+              backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+              padding: '20px', minWidth: '360px', maxWidth: '620px', maxHeight: '85vh', overflowY: 'auto',
+            }}>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>設定を編集</h3>
+
+              <h4 style={{ color: '#00adb5', margin: '1rem 0' }}>ヘルスチェック</h4>
+              <div className="form-group">
+                <label>プロトコル</label>
+                <select
+                  value={settingsForm.healthCheckProtocol}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, healthCheckProtocol: e.target.value })}
+                >
+                  <option value="http">http</option>
+                  <option value="tcp">tcp</option>
+                </select>
+              </div>
+              {settingsForm.healthCheckProtocol === 'http' && (
+                <>
+                  <div className="form-group">
+                    <label>パス</label>
+                    <input
+                      type="text"
+                      value={settingsForm.healthCheckPath}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, healthCheckPath: e.target.value })}
+                      placeholder="/"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Hostヘッダー</label>
+                    <input
+                      type="text"
+                      value={settingsForm.healthCheckHost}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, healthCheckHost: e.target.value })}
+                    />
+                  </div>
+                </>
+              )}
+              <div className="form-group">
+                <label>監視間隔(秒)</label>
+                <input
+                  type="number"
+                  value={settingsForm.healthCheckDelayLoop}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, healthCheckDelayLoop: e.target.value })}
+                />
+              </div>
+
+              <h4 style={{ color: '#00adb5', margin: '1rem 0' }}>Sorry Server</h4>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div className="form-group" style={{ flex: 2 }}>
+                  <label>IPアドレス</label>
+                  <input
+                    type="text"
+                    value={settingsForm.sorryServerIpAddress}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, sorryServerIpAddress: e.target.value })}
+                    placeholder="任意"
+                  />
+                </div>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>ポート</label>
+                  <input
+                    type="text"
+                    value={settingsForm.sorryServerPort}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, sorryServerPort: e.target.value })}
+                    placeholder="任意"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '1rem 0' }}>
+                <h4 style={{ color: '#00adb5', margin: 0 }}>待ち受けポート</h4>
+                <button className="btn btn-secondary btn-small" onClick={handleBindPortAdd}>+ ポート追加</button>
+              </div>
+              {settingsForm.bindPorts.length === 0 ? (
+                <p style={{ color: '#666', fontSize: '0.85rem' }}>待ち受けポートが登録されていません</p>
+              ) : (
+                settingsForm.bindPorts.map((bp, index) => (
+                  <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                    <select
+                      value={bp.proxyMode}
+                      onChange={(e) => handleBindPortChange(index, 'proxyMode', e.target.value)}
+                    >
+                      <option value="http">HTTP</option>
+                      <option value="https">HTTPS</option>
+                      <option value="tcp">TCP</option>
+                    </select>
+                    <input
+                      type="number"
+                      value={bp.port}
+                      onChange={(e) => handleBindPortChange(index, 'port', e.target.value)}
+                      placeholder="ポート"
+                      style={{ width: '90px' }}
+                    />
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', whiteSpace: 'nowrap' }}>
+                      <input
+                        type="checkbox"
+                        checked={bp.redirectToHttps}
+                        onChange={(e) => handleBindPortChange(index, 'redirectToHttps', e.target.checked)}
+                      />
+                      HTTPSリダイレクト
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', whiteSpace: 'nowrap' }}>
+                      <input
+                        type="checkbox"
+                        checked={bp.supportHttp2}
+                        onChange={(e) => handleBindPortChange(index, 'supportHttp2', e.target.checked)}
+                      />
+                      HTTP/2
+                    </label>
+                    <button className="btn btn-danger btn-small" onClick={() => handleBindPortRemove(index)}>削除</button>
+                  </div>
+                ))
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '1rem 0' }}>
+                <h4 style={{ color: '#00adb5', margin: 0 }}>実サーバー</h4>
+                <button className="btn btn-secondary btn-small" onClick={handleServerAdd}>+ サーバー追加</button>
+              </div>
+              {settingsForm.servers.length === 0 ? (
+                <p style={{ color: '#666', fontSize: '0.85rem' }}>実サーバーが登録されていません</p>
+              ) : (
+                settingsForm.servers.map((server, index) => (
+                  <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                    <input
+                      type="text"
+                      value={server.ipAddress}
+                      onChange={(e) => handleServerChange(index, 'ipAddress', e.target.value)}
+                      placeholder="IPアドレス"
+                      style={{ flex: 2 }}
+                    />
+                    <input
+                      type="number"
+                      value={server.port}
+                      onChange={(e) => handleServerChange(index, 'port', e.target.value)}
+                      placeholder="ポート"
+                      style={{ width: '90px' }}
+                    />
+                    <input
+                      type="text"
+                      value={server.serverGroup}
+                      onChange={(e) => handleServerChange(index, 'serverGroup', e.target.value)}
+                      placeholder="グループ(任意)"
+                      style={{ flex: 1 }}
+                    />
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', whiteSpace: 'nowrap' }}>
+                      <input
+                        type="checkbox"
+                        checked={server.enabled}
+                        onChange={(e) => handleServerChange(index, 'enabled', e.target.checked)}
+                      />
+                      有効
+                    </label>
+                    <button className="btn btn-danger btn-small" onClick={() => handleServerRemove(index)}>削除</button>
+                  </div>
+                ))
+              )}
+
+              {settingsError && (
+                <div style={{ marginTop: '1rem', marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                  エラー: {settingsError}
+                </div>
+              )}
+              <div className="confirm-actions">
+                <button className="btn btn-secondary" onClick={handleSettingsEditCancel}>キャンセル</button>
+                <button className="btn btn-primary" onClick={handleSettingsSave} disabled={savingSettings}>
+                  {savingSettings ? '保存中...' : '保存する'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </>
     );
   }
@@ -715,6 +1231,7 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
     <>
       <div className="header">
         <h2>エンハンスドロードバランサ (ELB)</h2>
+        <button className="btn btn-primary btn-small" onClick={handleCreateOpen}>+ ELB作成</button>
       </div>
 
       <SearchBar
@@ -799,6 +1316,91 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
             </div>
           </div>
         ))
+      )}
+
+      {showCreate && (
+        <div className="modal-overlay" onClick={handleCreateCancel} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+            backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+            padding: '20px', minWidth: '320px', maxWidth: '420px',
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>ELB作成</h3>
+            <div className="form-group">
+              <label>名前</label>
+              <input
+                type="text"
+                value={createForm.name}
+                onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                placeholder="my-elb"
+                autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <label>説明</label>
+              <input
+                type="text"
+                value={createForm.description}
+                onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
+                placeholder="任意"
+              />
+            </div>
+            <div className="form-group">
+              <label>プラン</label>
+              <select
+                value={createForm.plan}
+                onChange={(e) => setCreateForm({ ...createForm, plan: parseInt(e.target.value, 10) })}
+              >
+                {PLAN_OPTIONS.map((p) => (
+                  <option key={p} value={p}>{getPlanName(String(p))}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>リージョン</label>
+              <select
+                value={createForm.region}
+                onChange={(e) => setCreateForm({ ...createForm, region: e.target.value })}
+              >
+                <option value="is1">{getRegionName('is1')}</option>
+                <option value="tk1">{getRegionName('tk1')}</option>
+                <option value="anycast">{getRegionName('anycast')}</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={createForm.useVipFailover}
+                  onChange={(e) => setCreateForm({ ...createForm, useVipFailover: e.target.checked })}
+                  style={{ marginRight: '0.5rem' }}
+                />
+                VIPフェイルオーバーを有効にする
+              </label>
+            </div>
+            <p style={{ color: '#888', fontSize: '0.85rem' }}>
+              待ち受けポートや実サーバーの設定は作成後、詳細画面から設定できます。
+            </p>
+            {createError && (
+              <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                エラー: {createError}
+              </div>
+            )}
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleCreateSubmit}
+                disabled={creating || !createForm.name}
+              >
+                {creating ? '作成中...' : '作成する'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

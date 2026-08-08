@@ -1379,3 +1379,30 @@ func (a *App) RenewProxyLBLetsEncryptCert(profileName, proxyLBId string) error {
 	service := sakura.NewProxyLBService(client)
 	return service.RenewLetsEncryptCert(a.ctx, proxyLBId)
 }
+
+func (a *App) CreateProxyLB(profileName string, input sakura.ProxyLBCreateInput) (*sakura.ProxyLBInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewProxyLBService(client)
+	return service.Create(a.ctx, input)
+}
+
+func (a *App) UpdateProxyLB(profileName, proxyLBId, name, description string) (*sakura.ProxyLBInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewProxyLBService(client)
+	return service.Update(a.ctx, proxyLBId, name, description)
+}
+
+func (a *App) UpdateProxyLBSettings(profileName, proxyLBId string, input sakura.ProxyLBSettingsInput) (*sakura.ProxyLBInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewProxyLBService(client)
+	return service.UpdateSettings(a.ctx, proxyLBId, input)
+}

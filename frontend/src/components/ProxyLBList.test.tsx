@@ -12,6 +12,9 @@ import {
   SetProxyLBCertificates,
   DeleteProxyLBCertificates,
   RenewProxyLBLetsEncryptCert,
+  CreateProxyLB,
+  UpdateProxyLB,
+  UpdateProxyLBSettings,
 } from '../../wailsjs/go/main/App';
 
 vi.mock('../../wailsjs/go/main/App');
@@ -75,6 +78,9 @@ describe('ProxyLBList', () => {
     vi.mocked(SetProxyLBCertificates).mockReset();
     vi.mocked(DeleteProxyLBCertificates).mockReset();
     vi.mocked(RenewProxyLBLetsEncryptCert).mockReset();
+    vi.mocked(CreateProxyLB).mockReset();
+    vi.mocked(UpdateProxyLB).mockReset();
+    vi.mocked(UpdateProxyLBSettings).mockReset();
     vi.mocked(GetProxyLBCertificates).mockResolvedValue(null as unknown as sakura.ProxyLBCertificatesInfo);
   });
 
@@ -251,5 +257,108 @@ describe('ProxyLBList', () => {
     await waitFor(() => {
       expect(GetProxyLBCertificates).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it('creates a new ELB via the create form', async () => {
+    vi.mocked(GetProxyLBs)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([makeProxyLB({ name: 'new-elb' })]);
+    vi.mocked(CreateProxyLB).mockResolvedValueOnce(makeProxyLB({ name: 'new-elb' }));
+    const user = userEvent.setup();
+
+    render(<ProxyLBList profile="default" />);
+    await screen.findByText('エンハンスドロードバランサがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ ELB作成' }));
+    await user.type(screen.getByPlaceholderText('my-elb'), 'new-elb');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    await waitFor(() => {
+      expect(CreateProxyLB).toHaveBeenCalledWith('default', expect.objectContaining({
+        name: 'new-elb',
+        description: '',
+        plan: 100,
+        region: 'is1',
+        useVipFailover: false,
+      }));
+    });
+    expect(await screen.findByText('new-elb')).toBeInTheDocument();
+  });
+
+  it('updates name and description on the detail page', async () => {
+    vi.mocked(GetProxyLBs).mockResolvedValueOnce([makeProxyLB()]);
+    vi.mocked(GetProxyLBDetail).mockResolvedValueOnce(makeProxyLB());
+    vi.mocked(GetProxyLBHealth).mockResolvedValueOnce(makeHealth());
+    vi.mocked(UpdateProxyLB).mockResolvedValueOnce(makeProxyLB({ name: 'renamed-elb', description: 'updated' }));
+    const user = userEvent.setup();
+
+    render(<ProxyLBList profile="default" />);
+    await screen.findByText('my-elb');
+    await user.click(screen.getByText('my-elb'));
+    await screen.findByText('ID');
+
+    await user.click(screen.getByRole('button', { name: '編集' }));
+    const [nameInput, descriptionInput] = screen.getAllByPlaceholderText(/名前|説明/);
+    await user.clear(nameInput);
+    await user.type(nameInput, 'renamed-elb');
+    await user.type(descriptionInput, 'updated');
+    await user.click(screen.getByRole('button', { name: '保存' }));
+
+    await waitFor(() => {
+      expect(UpdateProxyLB).toHaveBeenCalledWith('default', '123456789012', 'renamed-elb', 'updated');
+    });
+    expect(await screen.findByText('renamed-elb / updated')).toBeInTheDocument();
+  });
+
+  it('updates settings including a newly added bind port and server', async () => {
+    vi.mocked(GetProxyLBs).mockResolvedValueOnce([makeProxyLB()]);
+    vi.mocked(GetProxyLBDetail).mockResolvedValueOnce(makeProxyLB());
+    vi.mocked(GetProxyLBHealth).mockResolvedValueOnce(makeHealth());
+    vi.mocked(UpdateProxyLBSettings).mockResolvedValueOnce(makeProxyLB({
+      bindPorts: [{ port: 443, proxyMode: 'https', redirectToHttps: false, supportHttp2: true }],
+      servers: [{ ipAddress: '192.0.2.10', port: 443, serverGroup: '', enabled: true }],
+    }));
+    const user = userEvent.setup();
+
+    render(<ProxyLBList profile="default" />);
+    await screen.findByText('my-elb');
+    await user.click(screen.getByText('my-elb'));
+    await screen.findByText('ID');
+
+    await user.click(screen.getByRole('button', { name: '設定を編集' }));
+    await user.click(screen.getByRole('button', { name: '+ ポート追加' }));
+    await user.click(screen.getByRole('button', { name: '+ サーバー追加' }));
+    await user.type(screen.getByPlaceholderText('IPアドレス'), '192.0.2.10');
+    await user.click(screen.getByRole('button', { name: '保存する' }));
+
+    await waitFor(() => {
+      expect(UpdateProxyLBSettings).toHaveBeenCalledWith(
+        'default',
+        '123456789012',
+        expect.objectContaining({
+          bindPorts: [expect.objectContaining({ proxyMode: 'http', port: 80 })],
+          servers: [expect.objectContaining({ ipAddress: '192.0.2.10', port: 80 })],
+        }),
+      );
+    });
+  });
+
+  it('shows a validation error when a server IP address is missing', async () => {
+    vi.mocked(GetProxyLBs).mockResolvedValueOnce([makeProxyLB()]);
+    vi.mocked(GetProxyLBDetail).mockResolvedValueOnce(makeProxyLB());
+    vi.mocked(GetProxyLBHealth).mockResolvedValueOnce(makeHealth());
+    const user = userEvent.setup();
+
+    render(<ProxyLBList profile="default" />);
+    await screen.findByText('my-elb');
+    await user.click(screen.getByText('my-elb'));
+    await screen.findByText('ID');
+
+    await user.click(screen.getByRole('button', { name: '設定を編集' }));
+    await user.click(screen.getByRole('button', { name: '+ サーバー追加' }));
+    await user.click(screen.getByRole('button', { name: '保存する' }));
+
+    expect(await screen.findByText('エラー: 実サーバーのIPアドレス・ポートを入力してください')).toBeInTheDocument();
+    expect(UpdateProxyLBSettings).not.toHaveBeenCalled();
   });
 });
