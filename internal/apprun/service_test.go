@@ -332,6 +332,50 @@ func TestService_CreateApplicationVersion(t *testing.T) {
 	}
 }
 
+func TestService_DeleteApplicationVersion(t *testing.T) {
+	srv := mockapprundedicated.NewTestServer(mockapprundedicated.Config{})
+	defer srv.Close()
+	ctx := context.Background()
+	rawClient := newRawClient(t, srv.TestURL())
+
+	clusterID := seedCluster(t, ctx, rawClient)
+	appID := seedApplication(t, ctx, rawClient, clusterID)
+	appIDStr := uuid.UUID(appID).String()
+
+	versionOp := sdkapprundedicated.NewVersionOp(rawClient, appID)
+	created, err := versionOp.Create(ctx, version.CreateParams{
+		Image:                  "nginx:latest",
+		CPU:                    1000,
+		Memory:                 512,
+		ScalingMode:            v1.ScalingModeManual,
+		FixedScale:             saclient.Ptr(int32(1)),
+		RegistryPasswordAction: v1.RegistryPasswordActionKeep,
+	})
+	if err != nil {
+		t.Fatalf("seed Version.Create: %v", err)
+	}
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_APPRUN_DEDICATED", srv.TestURL())
+
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	if err := service.DeleteApplicationVersion(ctx, appIDStr, int(created.Version)); err != nil {
+		t.Fatalf("DeleteApplicationVersion: %v", err)
+	}
+
+	versions, err := service.ListApplicationVersions(ctx, appIDStr)
+	if err != nil {
+		t.Fatalf("ListApplicationVersions: %v", err)
+	}
+	if len(versions) != 0 {
+		t.Errorf("got %d versions after delete, want 0: %+v", len(versions), versions)
+	}
+}
+
 func TestService_DeleteCluster(t *testing.T) {
 	srv := mockapprundedicated.NewTestServer(mockapprundedicated.Config{})
 	defer srv.Close()

@@ -460,6 +460,17 @@ func (s *Service) CreateApplicationVersion(ctx context.Context, applicationID st
 	}, nil
 }
 
+// DeleteApplicationVersion アプリケーションバージョンを削除
+func (s *Service) DeleteApplicationVersion(ctx context.Context, applicationID string, version int) error {
+	appID, err := uuid.Parse(applicationID)
+	if err != nil {
+		return err
+	}
+
+	versionOp := apprundedicated.NewVersionOp(s.client, v1.ApplicationID(appID))
+	return versionOp.Delete(ctx, v1.ApplicationVersionNumber(version))
+}
+
 // SetActiveVersion アプリケーションのアクティブバージョンを設定
 func (s *Service) SetActiveVersion(ctx context.Context, applicationID string, version int) error {
 	appID, err := uuid.Parse(applicationID)

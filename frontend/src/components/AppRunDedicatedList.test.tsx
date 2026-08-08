@@ -19,6 +19,7 @@ import {
   DeleteAppRunApplication,
   DeleteAppRunASG,
   DeleteAppRunLoadBalancer,
+  DeleteAppRunApplicationVersion,
 } from '../../wailsjs/go/main/App';
 
 vi.mock('../../wailsjs/go/main/App');
@@ -90,6 +91,7 @@ describe('AppRunDedicatedList', () => {
     vi.mocked(DeleteAppRunApplication).mockReset();
     vi.mocked(DeleteAppRunASG).mockReset();
     vi.mocked(DeleteAppRunLoadBalancer).mockReset();
+    vi.mocked(DeleteAppRunApplicationVersion).mockReset();
 
     vi.mocked(GetAppRunClusters).mockResolvedValue([]);
     vi.mocked(GetAppRunApplications).mockResolvedValue([]);
@@ -108,6 +110,7 @@ describe('AppRunDedicatedList', () => {
     vi.mocked(DeleteAppRunApplication).mockResolvedValue();
     vi.mocked(DeleteAppRunASG).mockResolvedValue();
     vi.mocked(DeleteAppRunLoadBalancer).mockResolvedValue();
+    vi.mocked(DeleteAppRunApplicationVersion).mockResolvedValue();
   });
 
   it('shows an empty state when there are no clusters', async () => {
@@ -349,6 +352,66 @@ describe('AppRunDedicatedList', () => {
       expect(DeleteAppRunLoadBalancer).toHaveBeenCalledWith('default', 'cluster-1', 'asg-1', 'lb-1');
     });
     expect(GetAppRunLoadBalancers).toHaveBeenCalledWith('default', 'cluster-1', 'asg-1');
+  });
+
+  it('deletes a non-active version from the version list and reloads it', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(GetAppRunApplications).mockResolvedValue([makeApp({ activeVersion: 2 })]);
+    vi.mocked(GetAppRunApplicationVersions).mockResolvedValue([
+      makeVersion({ version: 1 }),
+      makeVersion({ version: 2 }),
+    ]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('my-app'));
+    await screen.findByText('v1');
+
+    const deleteButtons = await screen.findAllByRole('button', { name: '削除' });
+    expect(deleteButtons).toHaveLength(2);
+    await user.click(deleteButtons[0]);
+    await user.click(await screen.findByText('削除する'));
+
+    await waitFor(() => {
+      expect(DeleteAppRunApplicationVersion).toHaveBeenCalledWith('default', 'app-1', 1);
+    });
+    expect(GetAppRunApplicationVersions).toHaveBeenCalledTimes(2);
+  });
+
+  it('disables the delete button for the active version in the version list', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(GetAppRunApplications).mockResolvedValue([makeApp({ activeVersion: 1 })]);
+    vi.mocked(GetAppRunApplicationVersions).mockResolvedValue([makeVersion({ version: 1 })]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('my-app'));
+
+    expect(await screen.findByRole('button', { name: '削除' })).toBeDisabled();
+  });
+
+  it('deletes the current version from the version detail dropdown and navigates back to the app view', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(GetAppRunApplications).mockResolvedValue([makeApp({ activeVersion: 2 })]);
+    vi.mocked(GetAppRunApplicationVersions).mockResolvedValue([makeVersion({ version: 1 })]);
+    vi.mocked(GetAppRunApplicationVersion).mockResolvedValue(makeVersionDetail({ version: 1 }));
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('my-app'));
+    await user.click(await screen.findByText('v1'));
+
+    await user.click(await screen.findByRole('button', { name: '⋯' }));
+    await user.click(screen.getByText('削除'));
+    await user.click(await screen.findByText('削除する'));
+
+    await waitFor(() => {
+      expect(DeleteAppRunApplicationVersion).toHaveBeenCalledWith('default', 'app-1', 1);
+    });
+    expect(await screen.findByText('+ デプロイ')).toBeInTheDocument();
   });
 
   it('deploys a new version with default (manual) scaling and reloads the version list', async () => {

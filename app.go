@@ -1095,6 +1095,14 @@ func (a *App) CreateAppRunApplicationVersion(profileName, applicationID string, 
 	return service.CreateApplicationVersion(a.ctx, applicationID, params)
 }
 
+func (a *App) DeleteAppRunApplicationVersion(profileName, applicationID string, version int) error {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteApplicationVersion(a.ctx, applicationID, version)
+}
+
 func (a *App) DeleteAppRunCluster(profileName, clusterID string) error {
 	service, err := apprun.NewService(profileName)
 	if err != nil {
