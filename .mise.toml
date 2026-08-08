@@ -1,3 +1,11 @@
 [tools]
 go = "1.25.5"
 "go:github.com/wailsapp/wails/v2/cmd/wails" = "v2.13.0"
+
+[tasks.demo]
+description = "実クラウドに接続せず、sakumock/fakeのシードデータでGUIをブラウザ確認する (http://127.0.0.1:34199)"
+run = """
+set -e
+(cd frontend && npm run build)
+go run -tags e2e .
+"""

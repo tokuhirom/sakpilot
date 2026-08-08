@@ -139,6 +139,16 @@ cd frontend && npm install && cd ..
 wails dev
 ```
 
+### 実クラウドに繋がずGUIを動作確認する (sakumock/fake)
+
+さくらのクラウドに実際に接続せず、[sacloud-sdk-go 同梱のIaaS fakeドライバ](https://github.com/sacloud/sacloud-sdk-go) と [sakumock](https://github.com/sacloud/sakumock) のシードデータでGUIをブラウザから触って確認できます。認証情報や実リソースは一切不要です。
+
+```bash
+mise run demo
+```
+
+起動したら `http://127.0.0.1:34199` をブラウザで開いてください。裏では `go run -tags e2e .` でE2Eテスト用サーバー(詳細は [ADR 0001](docs/adr/0001-e2e-testing-strategy.md))が起動しており、サーバー・DNS・GSLB等の各種リソースに `e2e-` プレフィックスのシードデータが投入された状態で操作を確認できます。
+
 ### ビルド
 
 ```bash
