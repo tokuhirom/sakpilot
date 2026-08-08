@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetSimpleMonitors, DeleteSimpleMonitor } from '../../wailsjs/go/main/App';
+import { GetSimpleMonitors, DeleteSimpleMonitor, CreateSimpleMonitor } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -10,11 +10,30 @@ interface MonitorListProps {
   onSelectMonitor: (id: string) => void;
 }
 
+const emptyCreateSettings = new sakura.SimpleMonitorSettingsInput({
+  delayLoop: 60,
+  maxCheckAttempts: 3,
+  retryInterval: 60,
+  timeout: 10,
+  enabled: true,
+  notifyEmailEnabled: true,
+  notifySlackEnabled: false,
+  slackWebhooksUrl: '',
+  notifyInterval: 3600,
+  healthCheck: { protocol: 'ping', port: '', path: '', status: '', host: '', containsString: '' },
+});
+
 export function MonitorList({ profile, onSelectMonitor }: MonitorListProps) {
   const [monitors, setMonitors] = useState<sakura.SimpleMonitorInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<sakura.SimpleMonitorInfo | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newTarget, setNewTarget] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [newProtocol, setNewProtocol] = useState('ping');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const {
     searchQuery,
@@ -81,10 +100,39 @@ export function MonitorList({ profile, onSelectMonitor }: MonitorListProps) {
     }
   };
 
+  const handleCreateOpen = () => {
+    setNewTarget('');
+    setNewDescription('');
+    setNewProtocol('ping');
+    setCreateError(null);
+    setShowCreate(true);
+  };
+
+  const handleCreateCancel = () => {
+    setShowCreate(false);
+  };
+
+  const handleCreateSubmit = async () => {
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const settings = new sakura.SimpleMonitorSettingsInput(emptyCreateSettings);
+      settings.healthCheck = new sakura.SimpleMonitorHealthCheckInput({ ...emptyCreateSettings.healthCheck, protocol: newProtocol });
+      await CreateSimpleMonitor(profile, newTarget, newDescription, settings);
+      setShowCreate(false);
+      await loadMonitors();
+    } catch (e) {
+      setCreateError(String(e));
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <>
       <div className="header">
         <h2>シンプル監視</h2>
+        <button className="btn btn-primary btn-small" onClick={handleCreateOpen}>+ 監視作成</button>
       </div>
 
       <SearchBar
@@ -146,6 +194,69 @@ export function MonitorList({ profile, onSelectMonitor }: MonitorListProps) {
             <div className="confirm-actions">
               <button className="btn btn-secondary" onClick={handleDeleteCancel}>キャンセル</button>
               <button className="btn btn-danger" onClick={handleDeleteConfirm}>削除する</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreate && (
+        <div className="modal-overlay" onClick={handleCreateCancel} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+            backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+            padding: '20px', minWidth: '320px', maxWidth: '420px',
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>シンプル監視作成</h3>
+            <div className="form-group">
+              <label>ターゲット(ホスト名/IPアドレス)</label>
+              <input
+                type="text"
+                value={newTarget}
+                onChange={(e) => setNewTarget(e.target.value)}
+                placeholder="example.com"
+                autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <label>プロトコル</label>
+              <select value={newProtocol} onChange={(e) => setNewProtocol(e.target.value)}>
+                <option value="ping">ping</option>
+                <option value="http">http</option>
+                <option value="https">https</option>
+                <option value="tcp">tcp</option>
+                <option value="ssh">ssh</option>
+                <option value="dns">dns</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>説明</label>
+              <input
+                type="text"
+                value={newDescription}
+                onChange={(e) => setNewDescription(e.target.value)}
+                placeholder="任意"
+              />
+            </div>
+            <p style={{ color: '#888', fontSize: '0.8rem', margin: '0 0 1rem' }}>
+              詳細な監視設定は作成後、詳細画面から編集できます。
+            </p>
+            {createError && (
+              <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                エラー: {createError}
+              </div>
+            )}
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleCreateSubmit}
+                disabled={creating || !newTarget}
+              >
+                {creating ? '作成中...' : '作成する'}
+              </button>
             </div>
           </div>
         </div>

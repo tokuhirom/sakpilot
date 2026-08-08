@@ -226,6 +226,33 @@ func (a *App) GetSimpleMonitorDetail(profileName, monitorId string) (*sakura.Sim
 	return service.GetSimpleMonitor(a.ctx, monitorId)
 }
 
+func (a *App) CreateSimpleMonitor(profileName, target, description string, settings sakura.SimpleMonitorSettingsInput) (*sakura.SimpleMonitorDetailInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.CreateSimpleMonitor(a.ctx, target, description, settings)
+}
+
+func (a *App) UpdateSimpleMonitor(profileName, monitorId, description string) (*sakura.SimpleMonitorDetailInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.UpdateSimpleMonitor(a.ctx, monitorId, description)
+}
+
+func (a *App) UpdateSimpleMonitorSettings(profileName, monitorId string, settings sakura.SimpleMonitorSettingsInput) (*sakura.SimpleMonitorDetailInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.UpdateSimpleMonitorSettings(a.ctx, monitorId, settings)
+}
+
 func (a *App) GetGSLBList(profileName string) ([]sakura.GSLBInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
 	if err != nil {

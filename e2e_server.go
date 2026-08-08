@@ -74,6 +74,9 @@ func runE2EServer(addr, dist string) error {
 	if err := seedPacketFilters(); err != nil {
 		return fmt.Errorf("failed to seed packet filters: %w", err)
 	}
+	if err := seedSimpleMonitors(); err != nil {
+		return fmt.Errorf("failed to seed simple monitors: %w", err)
+	}
 
 	kmsSrv := mockkms.NewTestServer(mockkms.Config{})
 	if err := os.Setenv("SAKURA_ENDPOINTS_KMS", kmsSrv.TestURL()); err != nil {
@@ -225,6 +228,36 @@ func seedPacketFilters() error {
 	if _, err := pfOp.Create(ctx, e2eZone, &iaas.PacketFilterCreateRequest{
 		Name:        "e2e-doomed-filter",
 		Description: "E2E: 削除シナリオ用",
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+// seedSimpleMonitors はIaaS fakeドライバのデータストアにE2Eシナリオ用のシンプル監視を投入する。
+func seedSimpleMonitors() error {
+	ctx := context.Background()
+	smOp := iaas.NewSimpleMonitorOp(nil)
+
+	if _, err := smOp.Create(ctx, &iaas.SimpleMonitorCreateRequest{
+		Target:      "e2e-monitor-target.example.com",
+		Description: "E2E: 設定編集シナリオ用",
+		DelayLoop:   60,
+		Enabled:     true,
+		HealthCheck: &iaas.SimpleMonitorHealthCheck{
+			Protocol: types.SimpleMonitorProtocols.Ping,
+		},
+	}); err != nil {
+		return err
+	}
+	if _, err := smOp.Create(ctx, &iaas.SimpleMonitorCreateRequest{
+		Target:      "e2e-doomed-monitor.example.com",
+		Description: "E2E: 削除シナリオ用",
+		DelayLoop:   60,
+		Enabled:     true,
+		HealthCheck: &iaas.SimpleMonitorHealthCheck{
+			Protocol: types.SimpleMonitorProtocols.Ping,
+		},
 	}); err != nil {
 		return err
 	}
