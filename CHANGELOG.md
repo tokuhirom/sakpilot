@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.0.18](https://github.com/tokuhirom/sakpilot/compare/v0.0.17...v0.0.18) - 2026-08-08
+- feat: AppRun専有型のCluster Createを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/131
+- feat: AppRun専有型のASG(AutoScalingGroup) Createを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/133
+- feat: AppRun専有型のLoadBalancer Createを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/134
+- ci: E2Eテスト失敗時にPlaywrightのtraceをアーティファクト保存する by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/135
+- feat: AppRun専有型のCertificate(証明書) CRUDを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/136
+- feat: サーバーのパワーユーザー機能(ChangePlan/CD-ROM/SendKey/NMI/VNC)を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/137
+- feat: アーカイブのCreate/CreateBlank/CreateFromShared/Share/OpenFTP/CloseFTPを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/138
+- 実クラウドに繋がずGUI確認できるmise taskを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/139
+- feat: オブジェクトストレージのAccount/Permissions/バケット暗号化・レプリケーション・クォータ/S3 Put・DeleteObjectを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/140
+- feat: モニタリングスイートのストレージ・アクセスキーCreate/Update/Destroyを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/141
+
 ## [v0.0.17](https://github.com/tokuhirom/sakpilot/compare/v0.0.16...v0.0.17) - 2026-08-08
 - test: DiskList/ArchiveListの削除フローにFEテストを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/92
 - feat: SimpleMonitorの詳細取得(Get)と詳細ページを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/94
