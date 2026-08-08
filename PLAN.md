@@ -140,10 +140,11 @@
 - SDK比較で残る不足: GetConfig/SetConfig（最大接続数・接続許可ネットワーク、パワーユーザー向け機能のため優先度低）
 
 ### NFS
-- テスト: `NFSList.test.tsx` あり（確認ダイアログ・ボタン活性制御・ポーリング・再起動・削除フローをカバー）
-- バックエンド: List/PowerOn/PowerOff/ForceStop/**Reset**/Delete/GetStatus 実装済み、app.goで全て公開
+- テスト: `NFSList.test.tsx` あり（確認ダイアログ・ボタン活性制御・ポーリング・再起動・削除・作成フローをカバー）。`frontend/e2e/nfs.spec.ts` で電源操作・削除・作成・編集までのE2Eもカバー
+- バックエンド: `internal/sakura/nfs.go` に**Get**/**Create**/**Update**を追加。List/PowerOn/PowerOff/ForceStop/Reset/Delete/GetStatusとあわせてapp.goで全て公開
 - ✅ **対応済み（PR #80）**: `NFSList.test.tsx`（最優先項目）とResetボタンを追加
-- SDK比較で残る不足: Create/Update（未着手）
+- ✅ **対応済み（2026-08-08 Tier2 #12）**: 接続スイッチ・IPアドレス・ネットワーク設定・プラン（HDD/SSD）・サイズを指定した作成（Create）、名前・説明・タグの編集（Update）を追加。PlanIDはプランクラス+サイズから`sacloud-sdk-go`の`helper/query.FindNFSPlanID`（sys-nfsノートを検索）で解決する。`NFSDetail.tsx`を新設し一覧のカードクリックで遷移する導線を追加（従来はDetail画面が存在しなかった）
+- SDK比較で残る不足: ChangePlan等のパワーユーザー向け機能（優先度低）
 
 ### ObjectStorage（オブジェクトストレージ）
 - テスト: `ObjectStorageList.test.tsx` あり（sites→bucketsビュー遷移、シークレットキー保存とバケット自動取得、バケット作成/削除、アクセスキー作成〜Secret一度きり表示〜保存、アクセスキー削除の各フローをカバー。objectsビューの検索/ページネーション/プレビューは対象外）
@@ -264,7 +265,7 @@
 9. ✅ ProxyLB: Create/Update/UpdateSettings — 2026-08-08対応済み
 10. ✅ KMS: Create/Update — 2026-08-08対応済み
 11. ✅ Database: Create/Update/UpdateSettings/GetParameter/SetParameter — 2026-08-08対応済み
-12. NFS: Create/Update
+12. ✅ NFS: Create/Update — 2026-08-08対応済み
 13. ✅ EnhancedDB: Create/Update/SetPassword — 2026-08-08対応済み
 14. AppRun専有型: Cluster/Application/ASG/LoadBalancerのCreate、VersionのDelete、WorkerNodeのUpdate（draining）、Certificate系
 15. AppRun共用型: ApplicationのCreate/Update/Delete、VersionのDelete、TrafficのUpdate、UserのCreate
