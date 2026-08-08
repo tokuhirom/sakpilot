@@ -1047,6 +1047,14 @@ func (a *App) GetAppRunASGs(profileName, clusterID string) ([]apprun.ASGInfo, er
 	return service.ListAutoScalingGroups(a.ctx, clusterID)
 }
 
+func (a *App) CreateAppRunASG(profileName, clusterID string, params apprun.CreateASGParams) (*apprun.ASGInfo, error) {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateAutoScalingGroup(a.ctx, clusterID, params)
+}
+
 func (a *App) GetAppRunLoadBalancers(profileName, clusterID, asgID string) ([]apprun.LBInfo, error) {
 	service, err := apprun.NewService(profileName)
 	if err != nil {

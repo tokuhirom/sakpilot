@@ -17,6 +17,7 @@ import {
   CreateAppRunApplicationVersion,
   CreateAppRunApplication,
   CreateAppRunCluster,
+  CreateAppRunASG,
   UpdateAppRunWorkerNodeDraining,
   DeleteAppRunCluster,
   DeleteAppRunApplication,
@@ -92,6 +93,7 @@ describe('AppRunDedicatedList', () => {
     vi.mocked(CreateAppRunApplicationVersion).mockReset();
     vi.mocked(CreateAppRunApplication).mockReset();
     vi.mocked(CreateAppRunCluster).mockReset();
+    vi.mocked(CreateAppRunASG).mockReset();
     vi.mocked(UpdateAppRunWorkerNodeDraining).mockReset();
     vi.mocked(DeleteAppRunCluster).mockReset();
     vi.mocked(DeleteAppRunApplication).mockReset();
@@ -117,6 +119,9 @@ describe('AppRunDedicatedList', () => {
     );
     vi.mocked(CreateAppRunCluster).mockResolvedValue(
       new apprun.ClusterInfo({ id: 'cluster-2', name: 'new-cluster' })
+    );
+    vi.mocked(CreateAppRunASG).mockResolvedValue(
+      new apprun.ASGInfo({ id: 'asg-2', name: 'new-asg', zone: 'is1a', minNodes: 1, maxNodes: 1, workerNodeCount: 0, interfaces: [] })
     );
     vi.mocked(UpdateAppRunWorkerNodeDraining).mockResolvedValue();
     vi.mocked(DeleteAppRunCluster).mockResolvedValue();
@@ -644,6 +649,94 @@ describe('AppRunDedicatedList', () => {
 
     expect(await screen.findByText(/エラー: Error: quota exceeded/)).toBeInTheDocument();
     expect(screen.getByText('アプリケーションを作成')).toBeInTheDocument();
+  });
+
+  it('creates an ASG from the cluster view with the default shared interface and reloads cluster details', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+
+    await user.click(await screen.findByText('+ ASG作成'));
+    expect(await screen.findByText('Auto Scaling Groupを作成')).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('my-asg'), 'new-asg');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    await waitFor(() => {
+      expect(CreateAppRunASG).toHaveBeenCalledWith('default', 'cluster-1', expect.objectContaining({
+        name: 'new-asg',
+        zone: 'is1a',
+        nameServers: ['133.242.0.3'],
+        minNodes: 1,
+        maxNodes: 1,
+        interfaces: [expect.objectContaining({ interfaceIndex: 0, upstream: 'shared', connectsToLB: true })],
+      }));
+    });
+    expect(GetAppRunASGs).toHaveBeenCalledWith('default', 'cluster-1');
+    expect(screen.queryByText('Auto Scaling Groupを作成')).not.toBeInTheDocument();
+  });
+
+  it('reveals network fields for a non-shared ASG interface and includes them on submit', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('+ ASG作成'));
+    await user.type(screen.getByPlaceholderText('my-asg'), 'new-asg');
+
+    await user.clear(screen.getByPlaceholderText('shared またはスイッチID'));
+    await user.type(screen.getByPlaceholderText('shared またはスイッチID'), 'switch-123');
+
+    await user.type(screen.getByPlaceholderText('IPプール開始'), '192.168.1.10');
+    await user.type(screen.getByPlaceholderText('IPプール終了'), '192.168.1.20');
+    await user.type(screen.getByPlaceholderText('ネットマスク長'), '24');
+    await user.type(screen.getByPlaceholderText('デフォルトゲートウェイ'), '192.168.1.1');
+
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    await waitFor(() => {
+      expect(CreateAppRunASG).toHaveBeenCalledWith('default', 'cluster-1', expect.objectContaining({
+        interfaces: [expect.objectContaining({
+          upstream: 'switch-123',
+          ipPool: [{ start: '192.168.1.10', end: '192.168.1.20' }],
+          netmaskLen: 24,
+          defaultGateway: '192.168.1.1',
+        })],
+      }));
+    });
+  });
+
+  it('cancels the create-ASG form without calling the API', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('+ ASG作成'));
+    await user.type(screen.getByPlaceholderText('my-asg'), 'new-asg');
+
+    await user.click(screen.getByText('キャンセル'));
+
+    expect(screen.queryByText('Auto Scaling Groupを作成')).not.toBeInTheDocument();
+    expect(CreateAppRunASG).not.toHaveBeenCalled();
+  });
+
+  it('shows an error message when creating an ASG fails', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(CreateAppRunASG).mockRejectedValue(new Error('quota exceeded'));
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('+ ASG作成'));
+    await user.type(screen.getByPlaceholderText('my-asg'), 'new-asg');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    expect(await screen.findByText(/エラー: Error: quota exceeded/)).toBeInTheDocument();
+    expect(screen.getByText('Auto Scaling Groupを作成')).toBeInTheDocument();
   });
 
   it('toggles draining on a worker node from the ASG view', async () => {
