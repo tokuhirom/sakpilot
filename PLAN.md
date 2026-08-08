@@ -298,6 +298,16 @@
 
 22. スクショ付きユーザーマニュアルの整備（Playwrightベース）— 各リソースの主要な操作フロー（作成・編集・削除等）をスクリーンショット付きで説明するユーザー向けドキュメントが現状無い。[[sakpilot-e2e-testing]]で整備済みのE2Eテスト基盤（`frontend/e2e/*.spec.ts`、`go run -tags e2e .`）を流用してスクリーンショットを撮る運用を想定。未着手。着手時は「既存のE2E specにスクショ撮影ステップを追記する形」か「専用のドキュメント生成スクリプトを別途書く形」かをユーザーに相談してからスコープを決めること
 
+**Tier 5: フォームUX見直し（横断的な品質改善、2026-08-09ユーザー指摘により追加）**
+
+23. Create/Update系フォームの入力ガイダンス・バリデーション見直し — 現状、`frontend/src/components/*.tsx`の作成・編集モーダル/フォーム（DNS/GSLB/ProxyLB/SimpleMonitor/Switch/Disk/Database/NFS/EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/AppRun専有・共用型/Server等、Tier1〜Tier3で実装した全リソース）は、**どの項目が必須か・どんな形式の値を期待しているかが画面から読み取れないものが多い**とユーザーから指摘あり。個別実装時にその場のスコープでしか見ておらず、フォーム全体を横断した使いやすさの観点でのレビューをしていなかったため。着手時は以下の観点で全フォームを棚卸しすること:
+    - 必須項目にHTML5の`required`属性を付与し、視覚的にも必須であることが分かるようにする（未入力のまま送信しようとした際にブラウザネイティブのバリデーションメッセージが出る状態にする）
+    - 数値項目は`type="number"`+`min`/`max`（例: ポート番号1-65535、監視間隔の下限値等、SDK/API側の制約に合わせる）を付与する
+    - 形式が決まっている項目（IPアドレス、ネットワークマスク長、ドメイン名、タグの命名規則等）は`pattern`属性やplaceholderの入力例で期待値を明示する
+    - 各フォームの入力欄に「何を入力すればよいか」が分かるplaceholderやヘルプテキストが無い箇所を洗い出し追加する（現状はラベルのみで単位や制約の説明が無い項目が多い）
+    - 見直し対象はTier1〜Tier3で実装した機能に限らず、既存の全Create/Updateフォームが対象。範囲が広いため、着手時にリソース単位で区切って段階的にPRを分けるか、ユーザーと相談してスコープを決めること
+    - フォームごとに前提（SDK側のバリデーション仕様、必須/任意の別）を確認した上で実装すること。SDK側で判明した制約や挙動の不明点は[[sakpilot-upstream-issues-doc]]の運用に従いdocs/upstream-issues.mdに記録する
+
 ### ✅ 完了（2026-08-08 追加セッション26、Tier3 #16）
 - ServerのChangePlan/InsertCDROM/EjectCDROM/SendKey/SendNMI/GetVNCProxyを実装。`internal/sakura/server.go`に各メソッドを追加（ChangePlanはAPI仕様上サーバーIDが再採番されるため戻り値のIDが変わる点に注意、CD-ROM一覧取得用に`internal/sakura/cdrom.go`を新設）、`app.go`に対応する7つのRPCを公開。`ServerDetail.tsx`を新設（従来Detail画面が存在しなかった）し、`ServerList.tsx`のカードクリックで遷移するようにした。プラン変更フォーム、CD-ROM挿入/排出、コンソールキー送信（プリセット+NMI確認ダイアログ）、VNC接続情報取得UIを実装。あわせて`internal/sakura/server.go`に残っていた`println`デバッグ文を削除。`internal/sakura/server_test.go`、`ServerDetail.test.tsx`、`frontend/e2e/server-detail.spec.ts`を追加
 
