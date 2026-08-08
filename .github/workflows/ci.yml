@@ -54,3 +54,27 @@ jobs:
         run: |
           cd frontend
           npx tsc --noEmit
+
+      - name: Go test
+        run: go test ./...
+
+      - name: Frontend test
+        run: |
+          cd frontend
+          npm run test
+
+      # E2E用エントリポイント(e2e_server.go)は通常ビルドから除外されるため個別にvetする
+      - name: Vet E2E entrypoint
+        run: go vet -tags e2e .
+
+      - name: Install Playwright browsers
+        run: |
+          cd frontend
+          npx playwright install --with-deps chromium
+
+      # wails build が生成した frontend/dist に対して、`go run -tags e2e .` の
+      # E2Eサーバー(IaaS fake + sakumock)を起動してPlaywrightでテストする
+      - name: E2E test
+        run: |
+          cd frontend
+          npx playwright test
