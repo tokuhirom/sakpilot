@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
 	"sakpilot/internal/apprun"
 	"sakpilot/internal/apprunshared"
@@ -1513,6 +1514,150 @@ func (a *App) DeleteObjectStorageBucket(profileName, siteID, bucketName string) 
 	return service.DeleteBucket(a.ctx, siteID, bucketName)
 }
 
+func (a *App) GetObjectStorageAccount(profileName, siteID string) (*sakura.AccountInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.ReadAccount(a.ctx, siteID)
+}
+
+func (a *App) DeleteObjectStorageAccount(profileName, siteID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.DeleteAccount(a.ctx, siteID)
+}
+
+func (a *App) GetObjectStorageBucketEncryption(profileName, siteID, bucketName string) (*sakura.BucketEncryptionInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.ReadBucketEncryption(a.ctx, siteID, bucketName)
+}
+
+func (a *App) EnableObjectStorageBucketEncryption(profileName, siteID, bucketName, kmsKeyID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.EnableBucketEncryption(a.ctx, siteID, bucketName, kmsKeyID)
+}
+
+func (a *App) DisableObjectStorageBucketEncryption(profileName, siteID, bucketName string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.DisableBucketEncryption(a.ctx, siteID, bucketName)
+}
+
+func (a *App) GetObjectStorageBucketReplication(profileName, siteID, bucketName string) (*sakura.BucketReplicationInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.ReadBucketReplication(a.ctx, siteID, bucketName)
+}
+
+func (a *App) EnableObjectStorageBucketReplication(profileName, siteID, bucketName, targetBucket string) (*sakura.BucketReplicationInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.EnableBucketReplication(a.ctx, siteID, bucketName, targetBucket)
+}
+
+func (a *App) DisableObjectStorageBucketReplication(profileName, siteID, bucketName string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.DisableBucketReplication(a.ctx, siteID, bucketName)
+}
+
+func (a *App) GetObjectStorageBucketQuota(profileName, siteID, bucketName string) (*sakura.BucketQuotaInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.ReadBucketQuota(a.ctx, siteID, bucketName)
+}
+
+func (a *App) GetObjectStoragePermissions(profileName, siteID string) ([]sakura.PermissionInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.ListPermissions(a.ctx, siteID)
+}
+
+func (a *App) CreateObjectStoragePermission(profileName, siteID, displayName string, controls []sakura.BucketControlInfo) (*sakura.PermissionInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.CreatePermission(a.ctx, siteID, displayName, controls)
+}
+
+func (a *App) UpdateObjectStoragePermission(profileName, siteID, permissionID, displayName string, controls []sakura.BucketControlInfo) (*sakura.PermissionInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.UpdatePermission(a.ctx, siteID, permissionID, displayName, controls)
+}
+
+func (a *App) DeleteObjectStoragePermission(profileName, siteID, permissionID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.DeletePermission(a.ctx, siteID, permissionID)
+}
+
+func (a *App) GetObjectStoragePermissionAccessKeys(profileName, siteID, permissionID string) ([]sakura.PermissionAccessKeyInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.ListPermissionAccessKeys(a.ctx, siteID, permissionID)
+}
+
+func (a *App) CreateObjectStoragePermissionAccessKey(profileName, siteID, permissionID string) (*sakura.PermissionAccessKeyCreated, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.CreatePermissionAccessKey(a.ctx, siteID, permissionID)
+}
+
+func (a *App) DeleteObjectStoragePermissionAccessKey(profileName, siteID, permissionID, accessKeyID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewObjectStorageService(client)
+	return service.DeletePermissionAccessKey(a.ctx, siteID, permissionID, accessKeyID)
+}
+
 // Object Storage Secret Key management (Keychain)
 func (a *App) SaveObjectStorageSecretKey(siteID, accessKeyID, secretKey string) error {
 	return sakura.SaveObjectStorageSecret(siteID, accessKeyID, secretKey)
@@ -1546,6 +1691,24 @@ func (a *App) DownloadObjectStorageObject(endpoint, accessKey, secretKey, bucket
 		return fmt.Errorf("cancelled")
 	}
 	return sakura.DownloadObject(a.ctx, endpoint, accessKey, secretKey, bucketName, key, savePath)
+}
+
+func (a *App) UploadObjectStorageObject(endpoint, accessKey, secretKey, bucketName, prefix string) error {
+	localPath, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "アップロードするファイルを選択",
+	})
+	if err != nil {
+		return err
+	}
+	if localPath == "" {
+		return fmt.Errorf("cancelled")
+	}
+	key := prefix + filepath.Base(localPath)
+	return sakura.UploadObject(a.ctx, endpoint, accessKey, secretKey, bucketName, key, localPath)
+}
+
+func (a *App) DeleteObjectStorageObject(endpoint, accessKey, secretKey, bucketName, key string) error {
+	return sakura.DeleteObject(a.ctx, endpoint, accessKey, secretKey, bucketName, key)
 }
 
 func (a *App) PreviewGzipJSONL(endpoint, accessKey, secretKey, bucketName, key string, maxLines int) (*sakura.PreviewResult, error) {

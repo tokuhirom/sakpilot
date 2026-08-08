@@ -29,7 +29,7 @@
 | Database | ✅ あり | ✅ | ✅ | 起動/停止/再起動+削除+Create/Update/UpdateSettings/GetParameter/SetParameter+FEテストを追加済み（PR #81、2026-08-08 Tier2 #11） |
 | EnhancedDB | ✅ あり | ✅ | (対象外) | 削除機能に加えCreate/Update/SetPassword（パスワード再設定）まで対応済み（2026-08-08 Tier2 #13） |
 | NFS | ✅ あり | ✅ | ✅ | 完備。FEテストとResetを追加済み（PR #80） |
-| ObjectStorage | ✅ あり | ✅（バケット・アクセスキー） | (対象外) | バケット作成/削除、アクセスキー作成/削除+FEテストを追加済み |
+| ObjectStorage | ✅ あり | ✅（バケット・アクセスキー・アカウント） | (対象外) | バケット/アクセスキー/アカウントのCreate/Delete、Permissions API、バケット暗号化/レプリケーション/クォータ、S3 Put/DeleteObjectまで対応済み |
 | ContainerRegistry | ✅ あり | ✅ | (対象外) | 削除機能+FEテスト(List/Detail)に加え、Create/Update・ユーザー管理(AddUser/UpdateUser/DeleteUser)まで対応済み。読み書き一式が完備 |
 | AppRun (専有/共用) | ✅ あり | 専有型は✅（Cluster/App/ASG/LB/Certificate）、共用型は✅（App/Version） | (対象外) | 専有型・共用型ともFEテスト追加済み。専有型はCluster/ASG/LoadBalancer/Certificate全リソースのCreate系まで対応済み、共用型はCreate/Update/Delete/Traffic更新/サインアップまで対応済み |
 | Bill | ❌ なし | (対象外) | (対象外) | 読み取り専用リソースなので概ね妥当 |
@@ -147,10 +147,10 @@
 - SDK比較で残る不足: ChangePlan等のパワーユーザー向け機能（優先度低）
 
 ### ObjectStorage（オブジェクトストレージ）
-- テスト: `ObjectStorageList.test.tsx` あり（sites→bucketsビュー遷移、シークレットキー保存とバケット自動取得、バケット作成/削除、アクセスキー作成〜Secret一度きり表示〜保存、アクセスキー削除の各フローをカバー。objectsビューの検索/ページネーション/プレビューは対象外）
-- バックエンド: ListSites/ListAccessKeys/ListBuckets/ListObjects/DownloadObject/Preview系に加え、**CreateBucket/DeleteBucket/CreateAccessKey/DeleteAccessKey** を実装
+- テスト: `ObjectStorageList.test.tsx`（sites→bucketsビュー遷移、シークレットキー保存とバケット自動取得、バケット作成/削除、アクセスキー作成〜Secret一度きり表示〜保存、アクセスキー削除、アカウント表示/削除、バケット設定モーダル・パーミッション管理モーダルの起動、オブジェクトのアップロード/削除の各フローをカバー。objectsビューの検索/ページネーション/プレビューは対象外）、`BucketSettingsModal.test.tsx`、`ObjectStoragePermissions.test.tsx`
+- バックエンド: ListSites/ListAccessKeys/ListBuckets/ListObjects/DownloadObject/Preview系に加え、CreateBucket/DeleteBucket/CreateAccessKey/DeleteAccessKey、**ReadAccount/DeleteAccount**、**Permissions API一式**（List/Create/Update/Delete + アクセスキーList/Create/Delete）、**バケット暗号化/レプリケーション/クォータ**（Read/Enable/Disable）、**S3のUploadObject/DeleteObject** を実装
 - ✅ **対応済み**: バケット作成/削除（`internal/sakura/objectstorage.go`の`CreateBucket`/`DeleteBucket`、`BucketAPI`経由）、アクセスキー作成/削除（`CreateAccessKey`/`DeleteAccessKey`、`AccountAPI`経由。アカウント未作成時は`CreateAccessKey`内で自動的にアカウント作成）。アクセスキーのSecretは作成レスポンスでしか取得できないため、フロントに一度きりの表示モーダルを追加し、`SaveObjectStorageSecretKey`（既存のキーチェーン保存）へ誘導するUXとした
-- SDK比較で残る不足: AccountのRead/Delete、PermissionsAPI全般、暗号化/レプリケーション/クォータ設定、S3側のPutObject/DeleteObject（オブジェクト単位の作成/削除は未着手）
+- ✅ **対応済み（2026-08-09、Tier3 #18）**: Account Read/Delete、Permissions API全般（バケット単位read/write制御付きの、通常のアカウントアクセスキーとは独立したアクセスキー発行機構）、バケット暗号化/レプリケーション/クォータ、S3のPutObject/DeleteObject。詳細は下記「完了（2026-08-09 追加セッション28、Tier3 #18）」を参照
 
 ---
 
@@ -290,7 +290,7 @@
 **Tier 3: 低優先度・ニッチ or 複雑度が高い機能**
 16. ✅ Server: ChangePlan/InsertCDROM/EjectCDROM/SendKey/SendNMI/GetVNCProxy等パワーユーザー向け機能 — 2026-08-08対応済み
 17. ✅ Archive: Create/CreateBlank/CreateFromShared/Share/OpenFTP/CloseFTP — 2026-08-08対応済み
-18. ObjectStorage: AccountのRead/Delete、PermissionsAPI全般、暗号化/レプリケーション/クォータ設定、S3側のPutObject/DeleteObject
+18. ✅ ObjectStorage: AccountのRead/Delete、PermissionsAPI全般、暗号化/レプリケーション/クォータ設定、S3側のPutObject/DeleteObject — 2026-08-09対応済み
 19. Monitoring Suite: ストレージ・アクセスキーのCreate/Update/Destroy
 20. ProxyLB: ChangePlan/MonitorConnection（トラフィックグラフ）
 21. Bill: ByContractYear/ByContractYearMonth（期間絞り込み）/DetailsCSV
@@ -303,3 +303,10 @@
 - WailsのTS変換は「戻り値がerror以外に2つ以上ある場合の型付けが正しく生成されない」ことが判明したため（`.d.ts`上は最初の戻り値の型しか出ない）、CreateBlankは`*ArchiveInfo, *FTPServerInfo, error`ではなく`ArchiveWithFTP{Archive, FTPServer}`という単一構造体を返す形に設計。他のGo→TS RPCを増やす際もこの制約に注意すること（upstream-issues.md行き案件ではなくWails自体の制約）。
 - 共有キーの形式は`ゾーン名:元アーカイブID:トークン`（`types.ArchiveShareKey`）。CreateFromShared時の複製先ゾーンはゾーン名からSDKの`types.ZoneIDs`で数値IDに変換して渡す。
 - `ArchiveList.tsx`に「+ アーカイブ作成」（空/ディスクから/既存アーカイブからの3方式）、「共有キーから複製」ボタン、行ごとの「共有」「FTP」ボタンを追加。`internal/sakura/archive_test.go`（Goテスト5件）、`ArchiveList.test.tsx`への追加テスト5件で検証
+
+### ✅ 完了（2026-08-09 追加セッション28、Tier3 #18）
+- ObjectStorageのAccount Read/Delete、PermissionsAPI全般（Permission自体のList/Create/Update/Delete、およびPermission配下のアクセスキーList/Create/Delete）、バケットの暗号化（Read/Enable/Disable）・レプリケーション（Read/Enable/Disable）・クォータ（Read）、S3側のPutObject/DeleteObjectを実装。`internal/sakura/objectstorage.go`に各メソッドを追加し、`app.go`に対応する18個のRPCを公開。既存の`ListObjects`/`DownloadObject`等5箇所に重複していたS3クライアント構築処理を`newS3Client`ヘルパーに集約。
+- Permissionは通常のアカウントアクセスキー（token/secret）とは独立した、バケット単位read/write制御付きの別系統のアクセスキー発行機構。SDK上の`PermissionID`はint64のため、フロント向けDTOでは`strconv.FormatInt`で文字列化している。
+- バケットの暗号化・レプリケーションはsakumockでは未設定時に404を返す仕様のため、`saclient.IsNotFoundError`で判定して`Enabled: false`として返すようにした（エラーではなく正常系として扱う）。
+- フロントに`BucketSettingsModal.tsx`（暗号化/レプリケーション/クォータの表示・切り替え）、`ObjectStoragePermissions.tsx`（パーミッションCRUD＋アクセスキー発行管理）を新設し、`ObjectStorageList.tsx`のバケット一覧に「設定」ボタン、サイトヘッダーに「パーミッション管理」ボタン、アカウントコード表示＋削除ボタンを追加。オブジェクト一覧にはアップロード（ファイル選択ダイアログ）・削除ボタンを追加。
+- S3のPutObject/DeleteObjectはsakumockのS3データプレーンが外部`versitygw`バイナリ依存のオプトイン機能のため、既存の`ListObjects`/`DownloadObject`同様ユニットテスト対象外とした（E2Eでも同じ理由で従来から対象外）。`internal/sakura/objectstorage_test.go`にAccount/Permissions/暗号化/レプリケーション/クォータのGoテスト8件、`BucketSettingsModal.test.tsx`/`ObjectStoragePermissions.test.tsx`/`ObjectStorageList.test.tsx`にフロントテストを追加して検証
