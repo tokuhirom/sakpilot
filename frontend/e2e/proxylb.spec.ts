@@ -26,6 +26,45 @@ test('ELB詳細でヘルスステータスが確認できる', async ({ page }) 
   await expect(page.getByText('現在のVIP:')).toBeVisible();
 });
 
+test('ELBを新規作成すると一覧に表示される', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'ELB' }).click();
+
+  await page.getByRole('button', { name: '+ ELB作成' }).click();
+  await page.getByPlaceholder('my-elb').fill('e2e-created-elb');
+  await page.getByRole('button', { name: '作成する' }).click();
+
+  await expect(card(page, 'e2e-created-elb')).toBeVisible();
+});
+
+test('ELB詳細で名前・説明を編集できる', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'ELB' }).click();
+  await card(page, 'e2e-elb').click();
+
+  await page.getByRole('button', { name: '編集', exact: true }).click();
+  await page.getByPlaceholder('名前').fill('e2e-elb-renamed');
+  await page.getByPlaceholder('説明').fill('E2Eで編集');
+  await page.getByRole('button', { name: '保存' }).click();
+
+  await expect(page.getByText('e2e-elb-renamed / E2Eで編集')).toBeVisible();
+});
+
+test('ELB詳細で待ち受けポート・実サーバーを編集できる', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'ELB' }).click();
+  await card(page, 'e2e-created-elb').click();
+
+  await page.getByRole('button', { name: '設定を編集' }).click();
+  await page.getByRole('button', { name: '+ ポート追加' }).click();
+  await page.getByRole('button', { name: '+ サーバー追加' }).click();
+  await page.getByPlaceholder('IPアドレス').fill('192.0.2.50');
+  await page.getByRole('button', { name: '保存する' }).click();
+
+  await expect(page.getByText('192.0.2.50')).toBeVisible();
+  await expect(page.getByText('HTTP', { exact: true })).toBeVisible();
+});
+
 // SSL証明書の設定(SetCertificates)はIaaS fakeドライバ(sacloud-sdk-go)側のバグにより
 // E2E化できない: fakeの実装が `copySameNameField` でリクエストの `PrimaryCerts`
 // フィールドを結果側の `PrimaryCert` にコピーしようとするが、フィールド名の単数/複数が
