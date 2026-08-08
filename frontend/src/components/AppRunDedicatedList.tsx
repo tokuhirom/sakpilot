@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   GetAppRunClusters,
   GetAppRunApplications,
+  GetAppRunCertificates,
   GetAppRunApplicationVersions,
   GetAppRunApplicationVersion,
   GetAppRunASGs,
@@ -15,6 +16,9 @@ import {
   CreateAppRunCluster,
   CreateAppRunASG,
   CreateAppRunLoadBalancer,
+  CreateAppRunCertificate,
+  UpdateAppRunCertificate,
+  DeleteAppRunCertificate,
   UpdateAppRunWorkerNodeDraining,
   DeleteAppRunCluster,
   DeleteAppRunApplication,
@@ -42,6 +46,7 @@ type DeleteTarget =
   | { kind: 'application'; id: string; name: string; clusterId: string }
   | { kind: 'asg'; id: string; name: string; clusterId: string }
   | { kind: 'lb'; id: string; name: string; clusterId: string; asgId: string }
+  | { kind: 'certificate'; id: string; name: string; clusterId: string }
   | { kind: 'version'; id: string; name: string; appId: string; version: number };
 
 type ExposedPortFormRow = {
@@ -171,6 +176,18 @@ function emptyCreateLBForm(): CreateLBForm {
   };
 }
 
+type CertificateForm = {
+  editingId: string | null;
+  name: string;
+  certificatePEM: string;
+  privateKeyPEM: string;
+  intermediateCertificatePEM: string;
+};
+
+function emptyCertificateForm(): CertificateForm {
+  return { editingId: null, name: '', certificatePEM: '', privateKeyPEM: '', intermediateCertificatePEM: '' };
+}
+
 function emptyDeployForm(): DeployForm {
   return {
     image: '',
@@ -194,6 +211,7 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
   const [apps, setApps] = useState<apprun.AppInfo[]>([]);
   const [versions, setVersions] = useState<apprun.AppVersionInfo[]>([]);
   const [asgs, setAsgs] = useState<apprun.ASGInfo[]>([]);
+  const [certificates, setCertificates] = useState<apprun.CertificateInfo[]>([]);
   const [lbs, setLbs] = useState<apprun.LBInfo[]>([]);
   const [workerNodes, setWorkerNodes] = useState<apprun.WorkerNodeInfo[]>([]);
   const [lbNodes, setLbNodes] = useState<apprun.LBNodeInfo[]>([]);
@@ -221,6 +239,9 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
   const [createLBForm, setCreateLBForm] = useState<CreateLBForm | null>(null);
   const [creatingLB, setCreatingLB] = useState(false);
   const [createLBError, setCreateLBError] = useState<string | null>(null);
+  const [certificateForm, setCertificateForm] = useState<CertificateForm | null>(null);
+  const [savingCertificate, setSavingCertificate] = useState(false);
+  const [certificateError, setCertificateError] = useState<string | null>(null);
 
   const loadClusters = useCallback(async () => {
     if (!profile) return;
@@ -240,12 +261,14 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
     if (!profile) return;
     setLoading(true);
     try {
-      const [appList, asgList] = await Promise.all([
+      const [appList, asgList, certList] = await Promise.all([
         GetAppRunApplications(profile, clusterId),
         GetAppRunASGs(profile, clusterId),
+        GetAppRunCertificates(profile, clusterId),
       ]);
       setApps(appList || []);
       setAsgs(asgList || []);
+      setCertificates(certList || []);
     } catch (err) {
       console.error('[AppRunList] loadClusterDetails error:', err);
     } finally {
@@ -407,6 +430,10 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
         case 'lb':
           await DeleteAppRunLoadBalancer(profile, target.clusterId, target.asgId, target.id);
           await loadASGDetails(target.clusterId, target.asgId);
+          break;
+        case 'certificate':
+          await DeleteAppRunCertificate(profile, target.clusterId, target.id);
+          await loadClusterDetails(target.clusterId);
           break;
         case 'version':
           await DeleteAppRunApplicationVersion(profile, target.appId, target.version);
@@ -882,6 +909,55 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
     }
   };
 
+  const handleCreateCertificateOpen = () => {
+    setCertificateError(null);
+    setCertificateForm(emptyCertificateForm());
+  };
+
+  const handleEditCertificateOpen = (cert: apprun.CertificateInfo) => {
+    setCertificateError(null);
+    setCertificateForm({ editingId: cert.id, name: cert.name, certificatePEM: '', privateKeyPEM: '', intermediateCertificatePEM: '' });
+  };
+
+  const handleCertificateCancel = () => {
+    setCertificateForm(null);
+    setCertificateError(null);
+  };
+
+  const handleCertificateSubmit = async () => {
+    if (!certificateForm || view.type !== 'cluster') return;
+    if (!certificateForm.name.trim()) {
+      setCertificateError('証明書名を入力してください');
+      return;
+    }
+    if (!certificateForm.certificatePEM.trim() || !certificateForm.privateKeyPEM.trim()) {
+      setCertificateError('証明書と秘密鍵のPEMを入力してください');
+      return;
+    }
+
+    setSavingCertificate(true);
+    setCertificateError(null);
+    try {
+      const params = new apprun.CreateCertificateParams({
+        name: certificateForm.name.trim(),
+        certificatePem: certificateForm.certificatePEM.trim(),
+        privateKeyPem: certificateForm.privateKeyPEM.trim(),
+        intermediateCertificatePem: certificateForm.intermediateCertificatePEM.trim() || undefined,
+      });
+      if (certificateForm.editingId) {
+        await UpdateAppRunCertificate(profile, view.clusterId, certificateForm.editingId, params);
+      } else {
+        await CreateAppRunCertificate(profile, view.clusterId, params);
+      }
+      setCertificateForm(null);
+      await loadClusterDetails(view.clusterId);
+    } catch (e) {
+      setCertificateError(String(e));
+    } finally {
+      setSavingCertificate(false);
+    }
+  };
+
   const handleToggleDraining = async (nodeId: string, draining: boolean) => {
     if (!profile || view.type !== 'asg') return;
     setUpdatingDrainingId(nodeId);
@@ -1279,6 +1355,86 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
               disabled={creatingASG || !createASGForm.name.trim()}
             >
               {creatingASG ? '作成中...' : '作成する'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCertificateModal = () => {
+    if (!certificateForm) return null;
+    return (
+      <div className="modal-overlay" onClick={handleCertificateCancel} style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+      }}>
+        <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+          backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+          padding: '20px', minWidth: '480px', maxWidth: '640px', maxHeight: '85vh', overflowY: 'auto',
+        }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>
+            {certificateForm.editingId ? '証明書を更新' : '証明書を作成'}
+          </h3>
+          <div className="form-group">
+            <label>証明書名</label>
+            <input
+              type="text"
+              value={certificateForm.name}
+              onChange={(e) => setCertificateForm({ ...certificateForm, name: e.target.value })}
+              placeholder="my-cert"
+              autoFocus
+            />
+          </div>
+          <div className="form-group">
+            <label>証明書(PEM)</label>
+            <textarea
+              value={certificateForm.certificatePEM}
+              onChange={(e) => setCertificateForm({ ...certificateForm, certificatePEM: e.target.value })}
+              placeholder="-----BEGIN CERTIFICATE-----"
+              rows={5}
+              style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.8rem' }}
+            />
+          </div>
+          <div className="form-group">
+            <label>秘密鍵(PEM)</label>
+            <textarea
+              value={certificateForm.privateKeyPEM}
+              onChange={(e) => setCertificateForm({ ...certificateForm, privateKeyPEM: e.target.value })}
+              placeholder="-----BEGIN PRIVATE KEY-----"
+              rows={5}
+              style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.8rem' }}
+            />
+          </div>
+          <div className="form-group">
+            <label>中間証明書(PEM、任意)</label>
+            <textarea
+              value={certificateForm.intermediateCertificatePEM}
+              onChange={(e) => setCertificateForm({ ...certificateForm, intermediateCertificatePEM: e.target.value })}
+              placeholder="-----BEGIN CERTIFICATE----- (中間証明書)"
+              rows={3}
+              style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.8rem' }}
+            />
+          </div>
+          {certificateForm.editingId && (
+            <div style={{ color: '#888', fontSize: '0.8rem', marginBottom: '0.5rem' }}>
+              APIの仕様上、更新時も証明書・秘密鍵を再入力する必要があります(取得済みの内容は表示されません)。
+            </div>
+          )}
+          {certificateError && (
+            <div style={{ marginTop: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+              エラー: {certificateError}
+            </div>
+          )}
+          <div className="confirm-actions" style={{ marginTop: '1.5rem' }}>
+            <button className="btn btn-secondary" onClick={handleCertificateCancel}>キャンセル</button>
+            <button
+              className="btn btn-primary"
+              onClick={handleCertificateSubmit}
+              disabled={savingCertificate || !certificateForm.name.trim() || !certificateForm.certificatePEM.trim() || !certificateForm.privateKeyPEM.trim()}
+            >
+              {savingCertificate ? '保存中...' : certificateForm.editingId ? '更新する' : '作成する'}
             </button>
           </div>
         </div>
@@ -1898,8 +2054,53 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
             </tbody>
           </table>
         )}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2rem' }}>
+          <h3 style={{ color: '#00adb5', margin: 0 }}>証明書</h3>
+          <button className="btn btn-primary btn-small" onClick={handleCreateCertificateOpen}>+ 証明書作成</button>
+        </div>
+        {certificates.length === 0 ? (
+          <div className="empty-state">証明書がありません</div>
+        ) : (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>名前</th>
+                <th>コモンネーム</th>
+                <th>有効期限</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {certificates.map((cert) => (
+                <tr key={cert.id}>
+                  <td style={{ color: '#00adb5', fontWeight: 'bold' }}>{cert.name}</td>
+                  <td>{cert.commonName || '-'}</td>
+                  <td>{cert.notAfter || '-'}</td>
+                  <td style={{ textAlign: 'left' }}>
+                    <button
+                      className="btn btn-secondary btn-small"
+                      onClick={() => handleEditCertificateOpen(cert)}
+                      style={{ marginRight: '0.5rem' }}
+                    >
+                      編集
+                    </button>
+                    <button
+                      className="btn btn-danger btn-small"
+                      onClick={(e) => handleDeleteClick(e, { kind: 'certificate', id: cert.id, name: cert.name, clusterId: view.clusterId })}
+                      disabled={deletingId === cert.id}
+                    >
+                      {deletingId === cert.id ? '削除中...' : '削除'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
         {renderCreateAppModal()}
         {renderCreateASGModal()}
+        {renderCertificateModal()}
         {renderConfirmDialog()}
       </>
     );
