@@ -8,6 +8,8 @@ interface GSLBDetailProps {
   gslbId: string;
 }
 
+const IPV4_PATTERN = '^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$';
+
 type ServerFormRow = {
   ipAddress: string;
   enabled: boolean;
@@ -89,7 +91,8 @@ export function GSLBDetail({ profile, gslbId }: GSLBDetailProps) {
     setEditingBasic(false);
   };
 
-  const handleBasicSave = async () => {
+  const handleBasicSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSavingBasic(true);
     try {
       const updated = await UpdateGSLB(profile, gslbId, nameInput, descriptionInput);
@@ -137,7 +140,8 @@ export function GSLBDetail({ profile, gslbId }: GSLBDetailProps) {
     });
   };
 
-  const handleSettingsSave = async () => {
+  const handleSettingsSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!settingsForm) return;
 
     const delayLoop = parseInt(settingsForm.delayLoop, 10);
@@ -145,10 +149,6 @@ export function GSLBDetail({ profile, gslbId }: GSLBDetailProps) {
     const port = settingsForm.port ? parseInt(settingsForm.port, 10) : 0;
     if ([delayLoop, responseCode, port].some(isNaN)) {
       setSettingsError('数値項目を正しく入力してください');
-      return;
-    }
-    if (settingsForm.servers.some((s) => !s.ipAddress)) {
-      setSettingsError('サーバーのIPアドレスを入力してください');
       return;
     }
     const serverWeights = settingsForm.servers.map((s) => parseInt(s.weight, 10));
@@ -216,25 +216,26 @@ export function GSLBDetail({ profile, gslbId }: GSLBDetailProps) {
               <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>名前 / 説明</td>
               <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>
                 {editingBasic ? (
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <form onSubmit={handleBasicSave} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     <input
                       type="text"
                       value={nameInput}
                       onChange={(e) => setNameInput(e.target.value)}
                       placeholder="名前"
+                      required
                       autoFocus
                     />
                     <input
                       type="text"
                       value={descriptionInput}
                       onChange={(e) => setDescriptionInput(e.target.value)}
-                      placeholder="説明"
+                      placeholder="説明(任意)"
                     />
-                    <button className="btn btn-primary btn-small" onClick={handleBasicSave} disabled={savingBasic || !nameInput}>
+                    <button type="submit" className="btn btn-primary btn-small" disabled={savingBasic}>
                       {savingBasic ? '保存中...' : '保存'}
                     </button>
-                    <button className="btn btn-secondary btn-small" onClick={handleBasicEditCancel} disabled={savingBasic}>キャンセル</button>
-                  </div>
+                    <button type="button" className="btn btn-secondary btn-small" onClick={handleBasicEditCancel} disabled={savingBasic}>キャンセル</button>
+                  </form>
                 ) : (
                   <span style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                     {gslb.name} / {gslb.description || '-'}
@@ -341,21 +342,27 @@ export function GSLBDetail({ profile, gslbId }: GSLBDetailProps) {
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>監視設定を編集</h3>
 
+            <form onSubmit={handleSettingsSave}>
             <div className="form-group">
               <label>Sorry Server(IPアドレス)</label>
               <input
                 type="text"
                 value={settingsForm.sorryServer}
                 onChange={(e) => setSettingsForm({ ...settingsForm, sorryServer: e.target.value })}
-                placeholder="任意"
+                placeholder="任意 (例: 192.0.2.1)"
+                pattern={IPV4_PATTERN}
+                title="IPv4アドレスの形式で入力してください"
               />
             </div>
             <div className="form-group">
-              <label>監視間隔(秒)</label>
+              <label>監視間隔(秒) *</label>
               <input
                 type="number"
                 value={settingsForm.delayLoop}
                 onChange={(e) => setSettingsForm({ ...settingsForm, delayLoop: e.target.value })}
+                min={10}
+                step={1}
+                required
               />
             </div>
             <div className="form-group">
@@ -386,10 +393,13 @@ export function GSLBDetail({ profile, gslbId }: GSLBDetailProps) {
             <div className="form-group">
               <label>ポート</label>
               <input
-                type="text"
+                type="number"
                 value={settingsForm.port}
                 onChange={(e) => setSettingsForm({ ...settingsForm, port: e.target.value })}
                 placeholder="80"
+                min={1}
+                max={65535}
+                step={1}
               />
             </div>
             <div className="form-group">
@@ -407,21 +417,25 @@ export function GSLBDetail({ profile, gslbId }: GSLBDetailProps) {
                 type="text"
                 value={settingsForm.hostHeader}
                 onChange={(e) => setSettingsForm({ ...settingsForm, hostHeader: e.target.value })}
+                placeholder="example.com"
               />
             </div>
             <div className="form-group">
               <label>期待レスポンスコード</label>
               <input
-                type="text"
+                type="number"
                 value={settingsForm.responseCode}
                 onChange={(e) => setSettingsForm({ ...settingsForm, responseCode: e.target.value })}
                 placeholder="200"
+                min={100}
+                max={599}
+                step={1}
               />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '1rem 0' }}>
               <h4 style={{ color: '#00adb5', margin: 0 }}>振り分け先サーバー</h4>
-              <button className="btn btn-secondary btn-small" onClick={handleServerAdd}>+ サーバー追加</button>
+              <button type="button" className="btn btn-secondary btn-small" onClick={handleServerAdd}>+ サーバー追加</button>
             </div>
             {settingsForm.servers.length === 0 ? (
               <p style={{ color: '#666', fontSize: '0.85rem' }}>サーバーが登録されていません</p>
@@ -433,6 +447,9 @@ export function GSLBDetail({ profile, gslbId }: GSLBDetailProps) {
                     value={server.ipAddress}
                     onChange={(e) => handleServerChange(index, 'ipAddress', e.target.value)}
                     placeholder="IPアドレス"
+                    pattern={IPV4_PATTERN}
+                    title="IPv4アドレスの形式で入力してください"
+                    required
                     style={{ flex: 2 }}
                   />
                   <input
@@ -440,6 +457,9 @@ export function GSLBDetail({ profile, gslbId }: GSLBDetailProps) {
                     value={server.weight}
                     onChange={(e) => handleServerChange(index, 'weight', e.target.value)}
                     placeholder="重み"
+                    min={1}
+                    step={1}
+                    required
                     style={{ flex: 1 }}
                   />
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', whiteSpace: 'nowrap' }}>
@@ -450,7 +470,7 @@ export function GSLBDetail({ profile, gslbId }: GSLBDetailProps) {
                     />
                     有効
                   </label>
-                  <button className="btn btn-danger btn-small" onClick={() => handleServerRemove(index)}>削除</button>
+                  <button type="button" className="btn btn-danger btn-small" onClick={() => handleServerRemove(index)}>削除</button>
                 </div>
               ))
             )}
@@ -461,11 +481,12 @@ export function GSLBDetail({ profile, gslbId }: GSLBDetailProps) {
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleSettingsEditCancel}>キャンセル</button>
-              <button className="btn btn-primary" onClick={handleSettingsSave} disabled={savingSettings}>
+              <button type="button" className="btn btn-secondary" onClick={handleSettingsEditCancel}>キャンセル</button>
+              <button type="submit" className="btn btn-primary" disabled={savingSettings}>
                 {savingSettings ? '保存中...' : '保存する'}
               </button>
             </div>
+            </form>
           </div>
         </div>
       )}

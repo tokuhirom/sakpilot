@@ -106,7 +106,7 @@ describe('GSLBDetail', () => {
     });
   });
 
-  it('shows a validation error when a server IP address is missing', async () => {
+  it('blocks submission via native required validation when a server IP address is missing', async () => {
     vi.mocked(GetGSLBDetail).mockResolvedValueOnce(makeGSLB());
     const user = userEvent.setup();
 
@@ -115,9 +115,10 @@ describe('GSLBDetail', () => {
 
     await user.click(screen.getByRole('button', { name: '監視設定を編集' }));
     await user.click(screen.getByRole('button', { name: '+ サーバー追加' }));
+    const ipInput = screen.getByPlaceholderText('IPアドレス') as HTMLInputElement;
     await user.click(screen.getByRole('button', { name: '保存する' }));
 
-    expect(await screen.findByText('エラー: サーバーのIPアドレスを入力してください')).toBeInTheDocument();
+    expect(ipInput.validity.valid).toBe(false);
     expect(UpdateGSLBSettings).not.toHaveBeenCalled();
   });
 });
