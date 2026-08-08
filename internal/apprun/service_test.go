@@ -615,6 +615,49 @@ func TestService_CreateCluster(t *testing.T) {
 	}
 }
 
+func TestService_CreateAutoScalingGroup(t *testing.T) {
+	srv := mockapprundedicated.NewTestServer(mockapprundedicated.Config{})
+	defer srv.Close()
+	ctx := context.Background()
+
+	clusterID := seedCluster(t, ctx, newRawClient(t, srv.TestURL()))
+	clusterIDStr := uuid.UUID(clusterID).String()
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_APPRUN_DEDICATED", srv.TestURL())
+
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	created, err := service.CreateAutoScalingGroup(ctx, clusterIDStr, apprun.CreateASGParams{
+		Name:                   "new-asg",
+		Zone:                   "is1a",
+		NameServers:            []string{"210.188.224.10"},
+		WorkerServiceClassPath: "cloud/apprun/dedicated/worker/1vcpu_2gb",
+		MinNodes:               1,
+		MaxNodes:               1,
+		Interfaces: []apprun.CreateASGInterfaceParams{
+			{InterfaceIndex: 0, Upstream: "shared", ConnectsToLB: true},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateAutoScalingGroup: %v", err)
+	}
+	if created.Name != "new-asg" {
+		t.Errorf("Name = %q, want %q", created.Name, "new-asg")
+	}
+
+	asgs, err := service.ListAutoScalingGroups(ctx, clusterIDStr)
+	if err != nil {
+		t.Fatalf("ListAutoScalingGroups: %v", err)
+	}
+	if len(asgs) != 1 || asgs[0].ID != created.ID {
+		t.Fatalf("asgs = %+v, want single ASG with ID %q", asgs, created.ID)
+	}
+}
+
 func TestService_UpdateWorkerNodeDraining(t *testing.T) {
 	srv := mockapprundedicated.NewTestServer(mockapprundedicated.Config{})
 	defer srv.Close()

@@ -13,6 +13,7 @@ import {
   CreateAppRunApplicationVersion,
   CreateAppRunApplication,
   CreateAppRunCluster,
+  CreateAppRunASG,
   UpdateAppRunWorkerNodeDraining,
   DeleteAppRunCluster,
   DeleteAppRunApplication,
@@ -94,6 +95,47 @@ function emptyCreateClusterForm(): CreateClusterForm {
   };
 }
 
+const WORKER_SERVICE_CLASS_PATHS = [
+  { value: 'cloud/apprun/dedicated/worker/1vcpu_2gb', label: '1vCPU / 2GB' },
+  { value: 'cloud/apprun/dedicated/worker/2vcpu_2gb', label: '2vCPU / 2GB' },
+  { value: 'cloud/apprun/dedicated/worker/4vcpu_4gb', label: '4vCPU / 4GB' },
+  { value: 'cloud/apprun/dedicated/worker/8vcpu_8gb', label: '8vCPU / 8GB' },
+];
+
+const APPRUN_ZONES = ['is1a', 'is1b', 'tk1a', 'tk1b', 'tk1v'];
+
+type CreateASGInterfaceFormRow = {
+  upstream: string;
+  connectsToLB: boolean;
+  ipPoolStart: string;
+  ipPoolEnd: string;
+  netmaskLen: string;
+  defaultGateway: string;
+  packetFilterID: string;
+};
+
+type CreateASGForm = {
+  name: string;
+  zone: string;
+  nameServers: string[];
+  workerServiceClassPath: string;
+  minNodes: string;
+  maxNodes: string;
+  interfaces: CreateASGInterfaceFormRow[];
+};
+
+function emptyCreateASGForm(): CreateASGForm {
+  return {
+    name: '',
+    zone: 'is1a',
+    nameServers: ['133.242.0.3'],
+    workerServiceClassPath: WORKER_SERVICE_CLASS_PATHS[0].value,
+    minNodes: '1',
+    maxNodes: '1',
+    interfaces: [{ upstream: 'shared', connectsToLB: true, ipPoolStart: '', ipPoolEnd: '', netmaskLen: '', defaultGateway: '', packetFilterID: '' }],
+  };
+}
+
 function emptyDeployForm(): DeployForm {
   return {
     image: '',
@@ -138,6 +180,9 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
   const [createClusterForm, setCreateClusterForm] = useState<CreateClusterForm | null>(null);
   const [creatingCluster, setCreatingCluster] = useState(false);
   const [createClusterError, setCreateClusterError] = useState<string | null>(null);
+  const [createASGForm, setCreateASGForm] = useState<CreateASGForm | null>(null);
+  const [creatingASG, setCreatingASG] = useState(false);
+  const [createASGError, setCreateASGError] = useState<string | null>(null);
 
   const loadClusters = useCallback(async () => {
     if (!profile) return;
@@ -613,6 +658,103 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
     }
   };
 
+  const handleCreateASGOpen = () => {
+    setCreateASGError(null);
+    setCreateASGForm(emptyCreateASGForm());
+  };
+
+  const handleCreateASGCancel = () => {
+    setCreateASGForm(null);
+    setCreateASGError(null);
+  };
+
+  const handleAddASGNameServer = () => {
+    if (!createASGForm) return;
+    setCreateASGForm({ ...createASGForm, nameServers: [...createASGForm.nameServers, ''] });
+  };
+
+  const handleRemoveASGNameServer = (index: number) => {
+    if (!createASGForm) return;
+    setCreateASGForm({ ...createASGForm, nameServers: createASGForm.nameServers.filter((_, i) => i !== index) });
+  };
+
+  const handleASGNameServerChange = (index: number, value: string) => {
+    if (!createASGForm) return;
+    const nameServers = createASGForm.nameServers.map((v, i) => (i === index ? value : v));
+    setCreateASGForm({ ...createASGForm, nameServers });
+  };
+
+  const handleAddASGInterface = () => {
+    if (!createASGForm) return;
+    setCreateASGForm({
+      ...createASGForm,
+      interfaces: [...createASGForm.interfaces, { upstream: '', connectsToLB: false, ipPoolStart: '', ipPoolEnd: '', netmaskLen: '', defaultGateway: '', packetFilterID: '' }],
+    });
+  };
+
+  const handleRemoveASGInterface = (index: number) => {
+    if (!createASGForm) return;
+    setCreateASGForm({ ...createASGForm, interfaces: createASGForm.interfaces.filter((_, i) => i !== index) });
+  };
+
+  const handleASGInterfaceChange = (index: number, field: keyof CreateASGInterfaceFormRow, value: string | boolean) => {
+    if (!createASGForm) return;
+    const interfaces = createASGForm.interfaces.map((iface, i) => (i === index ? { ...iface, [field]: value } : iface));
+    setCreateASGForm({ ...createASGForm, interfaces });
+  };
+
+  const handleCreateASGSubmit = async () => {
+    if (!createASGForm || view.type !== 'cluster') return;
+    if (!createASGForm.name.trim()) {
+      setCreateASGError('ASG名を入力してください');
+      return;
+    }
+    if (createASGForm.nameServers.length === 0 || createASGForm.nameServers.some((ns) => !ns.trim())) {
+      setCreateASGError('ネームサーバーを1つ以上入力してください');
+      return;
+    }
+    const minNodes = Number(createASGForm.minNodes);
+    const maxNodes = Number(createASGForm.maxNodes);
+    if (!minNodes || !maxNodes || minNodes > maxNodes) {
+      setCreateASGError('最小ノード数は1以上、かつ最大ノード数以下で指定してください');
+      return;
+    }
+    if (createASGForm.interfaces.length === 0 || createASGForm.interfaces.some((iface) => !iface.upstream.trim())) {
+      setCreateASGError('インターフェースの接続先(upstream)を入力してください');
+      return;
+    }
+
+    setCreatingASG(true);
+    setCreateASGError(null);
+    try {
+      await CreateAppRunASG(profile, view.clusterId, new apprun.CreateASGParams({
+        name: createASGForm.name.trim(),
+        zone: createASGForm.zone,
+        nameServers: createASGForm.nameServers.map((ns) => ns.trim()),
+        workerServiceClassPath: createASGForm.workerServiceClassPath,
+        minNodes,
+        maxNodes,
+        interfaces: createASGForm.interfaces.map((iface, i) => new apprun.CreateASGInterfaceParams({
+          interfaceIndex: i,
+          upstream: iface.upstream.trim(),
+          connectsToLB: iface.connectsToLB,
+          ipPool: iface.upstream.trim() === 'shared' || (!iface.ipPoolStart.trim() && !iface.ipPoolEnd.trim())
+            ? undefined
+            : [new apprun.CreateIPRangeParams({ start: iface.ipPoolStart.trim(), end: iface.ipPoolEnd.trim() })],
+          netmaskLen: iface.netmaskLen.trim() ? Number(iface.netmaskLen) : undefined,
+          defaultGateway: iface.defaultGateway.trim() || undefined,
+          packetFilterID: iface.packetFilterID.trim() || undefined,
+        })),
+      }));
+      setCreateASGForm(null);
+      await loadClusterDetails(view.clusterId);
+    } catch (e) {
+      setCreateASGError(String(e));
+    } finally {
+      setCreatingASG(false);
+    }
+  };
+
   const handleToggleDraining = async (nodeId: string, draining: boolean) => {
     if (!profile || view.type !== 'asg') return;
     setUpdatingDrainingId(nodeId);
@@ -818,6 +960,198 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
               disabled={creatingCluster || !createClusterForm.name.trim() || !createClusterForm.servicePrincipalID.trim()}
             >
               {creatingCluster ? '作成中...' : '作成する'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCreateASGModal = () => {
+    if (!createASGForm) return null;
+    return (
+      <div className="modal-overlay" onClick={handleCreateASGCancel} style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+      }}>
+        <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+          backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+          padding: '20px', minWidth: '480px', maxWidth: '640px', maxHeight: '85vh', overflowY: 'auto',
+        }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>Auto Scaling Groupを作成</h3>
+          <div className="form-group">
+            <label>ASG名</label>
+            <input
+              type="text"
+              value={createASGForm.name}
+              onChange={(e) => setCreateASGForm({ ...createASGForm, name: e.target.value })}
+              placeholder="my-asg"
+              autoFocus
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label>ゾーン</label>
+              <select
+                value={createASGForm.zone}
+                onChange={(e) => setCreateASGForm({ ...createASGForm, zone: e.target.value })}
+              >
+                {APPRUN_ZONES.map((z) => <option key={z} value={z}>{z}</option>)}
+              </select>
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label>ワーカープラン</label>
+              <select
+                value={createASGForm.workerServiceClassPath}
+                onChange={(e) => setCreateASGForm({ ...createASGForm, workerServiceClassPath: e.target.value })}
+              >
+                {WORKER_SERVICE_CLASS_PATHS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label>最小ノード数</label>
+              <input
+                type="number"
+                value={createASGForm.minNodes}
+                onChange={(e) => setCreateASGForm({ ...createASGForm, minNodes: e.target.value })}
+                min={1}
+                max={10}
+              />
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label>最大ノード数</label>
+              <input
+                type="number"
+                value={createASGForm.maxNodes}
+                onChange={(e) => setCreateASGForm({ ...createASGForm, maxNodes: e.target.value })}
+                min={1}
+                max={10}
+              />
+            </div>
+          </div>
+          <div className="form-group">
+            <label>ネームサーバー</label>
+            {createASGForm.nameServers.map((ns, i) => (
+              <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  value={ns}
+                  onChange={(e) => handleASGNameServerChange(i, e.target.value)}
+                  placeholder="133.242.0.3"
+                />
+                <button
+                  className="btn btn-danger btn-small"
+                  onClick={() => handleRemoveASGNameServer(i)}
+                  disabled={createASGForm.nameServers.length <= 1}
+                >
+                  削除
+                </button>
+              </div>
+            ))}
+            <button
+              className="btn btn-secondary btn-small"
+              onClick={handleAddASGNameServer}
+              disabled={createASGForm.nameServers.length >= 3}
+            >
+              + ネームサーバー追加
+            </button>
+          </div>
+          <div className="form-group">
+            <label>ネットワークインターフェース</label>
+            {createASGForm.interfaces.map((iface, i) => (
+              <div key={i} style={{ border: '1px solid #333', borderRadius: '6px', padding: '0.75rem', marginBottom: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.85rem', color: '#999' }}>eth{i}</span>
+                  <button
+                    className="btn btn-danger btn-small"
+                    onClick={() => handleRemoveASGInterface(i)}
+                    disabled={createASGForm.interfaces.length <= 1}
+                  >
+                    削除
+                  </button>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    value={iface.upstream}
+                    onChange={(e) => handleASGInterfaceChange(i, 'upstream', e.target.value)}
+                    placeholder="shared またはスイッチID"
+                    style={{ flex: 1 }}
+                  />
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+                    <input
+                      type="checkbox"
+                      checked={iface.connectsToLB}
+                      onChange={(e) => handleASGInterfaceChange(i, 'connectsToLB', e.target.checked)}
+                    />
+                    LBに接続
+                  </label>
+                </div>
+                {iface.upstream.trim() !== 'shared' && (
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                    <input
+                      type="text"
+                      value={iface.ipPoolStart}
+                      onChange={(e) => handleASGInterfaceChange(i, 'ipPoolStart', e.target.value)}
+                      placeholder="IPプール開始"
+                      style={{ width: '130px' }}
+                    />
+                    <input
+                      type="text"
+                      value={iface.ipPoolEnd}
+                      onChange={(e) => handleASGInterfaceChange(i, 'ipPoolEnd', e.target.value)}
+                      placeholder="IPプール終了"
+                      style={{ width: '130px' }}
+                    />
+                    <input
+                      type="number"
+                      value={iface.netmaskLen}
+                      onChange={(e) => handleASGInterfaceChange(i, 'netmaskLen', e.target.value)}
+                      placeholder="ネットマスク長"
+                      style={{ width: '110px' }}
+                    />
+                    <input
+                      type="text"
+                      value={iface.defaultGateway}
+                      onChange={(e) => handleASGInterfaceChange(i, 'defaultGateway', e.target.value)}
+                      placeholder="デフォルトゲートウェイ"
+                      style={{ width: '150px' }}
+                    />
+                    <input
+                      type="text"
+                      value={iface.packetFilterID}
+                      onChange={(e) => handleASGInterfaceChange(i, 'packetFilterID', e.target.value)}
+                      placeholder="パケットフィルタID(任意)"
+                      style={{ width: '160px' }}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+            <button
+              className="btn btn-secondary btn-small"
+              onClick={handleAddASGInterface}
+              disabled={createASGForm.interfaces.length >= 5}
+            >
+              + インターフェース追加
+            </button>
+          </div>
+          {createASGError && (
+            <div style={{ marginTop: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+              エラー: {createASGError}
+            </div>
+          )}
+          <div className="confirm-actions" style={{ marginTop: '1.5rem' }}>
+            <button className="btn btn-secondary" onClick={handleCreateASGCancel}>キャンセル</button>
+            <button
+              className="btn btn-primary"
+              onClick={handleCreateASGSubmit}
+              disabled={creatingASG || !createASGForm.name.trim()}
+            >
+              {creatingASG ? '作成中...' : '作成する'}
             </button>
           </div>
         </div>
@@ -1225,7 +1559,10 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
           </table>
         )}
 
-        <h3 style={{ marginTop: '2rem', color: '#00adb5' }}>Auto Scaling Groups</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2rem' }}>
+          <h3 style={{ color: '#00adb5', margin: 0 }}>Auto Scaling Groups</h3>
+          <button className="btn btn-primary btn-small" onClick={handleCreateASGOpen}>+ ASG作成</button>
+        </div>
         {asgs.length === 0 ? (
           <div className="empty-state">ASGがありません</div>
         ) : (
@@ -1272,6 +1609,7 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
           </table>
         )}
         {renderCreateAppModal()}
+        {renderCreateASGModal()}
         {renderConfirmDialog()}
       </>
     );

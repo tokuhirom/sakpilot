@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	apprundedicated "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated"
+	"github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/autoscalinggroup"
 	"github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/cluster"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/version"
@@ -629,6 +630,86 @@ func (s *Service) DeleteLoadBalancer(ctx context.Context, clusterID, asgID, lbID
 
 	lbOp := apprundedicated.NewLoadBalancerOp(s.client, v1.ClusterID(cID), v1.AutoScalingGroupID(aID))
 	return lbOp.Delete(ctx, v1.LoadBalancerID(loadBalancerID))
+}
+
+// CreateIPRangeParams ASGインターフェースのIPプール範囲
+type CreateIPRangeParams struct {
+	Start string `json:"start"`
+	End   string `json:"end"`
+}
+
+// CreateASGInterfaceParams ASG作成時のインターフェース設定
+type CreateASGInterfaceParams struct {
+	InterfaceIndex int16                 `json:"interfaceIndex"`
+	Upstream       string                `json:"upstream"`
+	IPPool         []CreateIPRangeParams `json:"ipPool,omitempty"`
+	NetmaskLen     *int16                `json:"netmaskLen,omitempty"`
+	DefaultGateway *string               `json:"defaultGateway,omitempty"`
+	PacketFilterID *string               `json:"packetFilterID,omitempty"`
+	ConnectsToLB   bool                  `json:"connectsToLB"`
+}
+
+// CreateASGParams ASG作成パラメータ
+type CreateASGParams struct {
+	Name                   string                     `json:"name"`
+	Zone                   string                     `json:"zone"`
+	NameServers            []string                   `json:"nameServers"`
+	WorkerServiceClassPath string                     `json:"workerServiceClassPath"`
+	MinNodes               int32                      `json:"minNodes"`
+	MaxNodes               int32                      `json:"maxNodes"`
+	Interfaces             []CreateASGInterfaceParams `json:"interfaces"`
+}
+
+// CreateAutoScalingGroup ASGを作成
+func (s *Service) CreateAutoScalingGroup(ctx context.Context, clusterID string, params CreateASGParams) (*ASGInfo, error) {
+	cID, err := uuid.Parse(clusterID)
+	if err != nil {
+		return nil, err
+	}
+
+	nameServers := make([]v1.IPv4, 0, len(params.NameServers))
+	for _, ns := range params.NameServers {
+		nameServers = append(nameServers, v1.IPv4(ns))
+	}
+
+	interfaces := make([]autoscalinggroup.NodeInterface, 0, len(params.Interfaces))
+	for _, iface := range params.Interfaces {
+		ipPool := make([]v1.IpRange, 0, len(iface.IPPool))
+		for _, r := range iface.IPPool {
+			ipPool = append(ipPool, v1.IpRange{Start: v1.IPv4(r.Start), End: v1.IPv4(r.End)})
+		}
+		interfaces = append(interfaces, autoscalinggroup.NodeInterface{
+			InterfaceIndex: iface.InterfaceIndex,
+			Upstream:       iface.Upstream,
+			IpPool:         ipPool,
+			NetmaskLen:     iface.NetmaskLen,
+			DefaultGateway: iface.DefaultGateway,
+			PacketFilterID: iface.PacketFilterID,
+			ConnectsToLB:   iface.ConnectsToLB,
+		})
+	}
+
+	asgOp := apprundedicated.NewAutoScalingGroupOp(s.client, v1.ClusterID(cID))
+	created, err := asgOp.Create(ctx, autoscalinggroup.CreateParams{
+		Name:                   params.Name,
+		Zone:                   params.Zone,
+		NameServers:            nameServers,
+		WorkerServiceClassPath: params.WorkerServiceClassPath,
+		MinNodes:               params.MinNodes,
+		MaxNodes:               params.MaxNodes,
+		Interfaces:             interfaces,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &ASGInfo{
+		ID:       uuid.UUID(created.GetAutoScalingGroupID()).String(),
+		Name:     params.Name,
+		Zone:     params.Zone,
+		MinNodes: int(params.MinNodes),
+		MaxNodes: int(params.MaxNodes),
+	}, nil
 }
 
 // ListAutoScalingGroups ASG 一覧を取得
