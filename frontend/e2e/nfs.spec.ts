@@ -101,6 +101,7 @@ test('NFS詳細で名前・説明・タグを編集できる', async ({ page }) 
   await page.getByRole('link', { name: 'NFS' }).click();
   await nfsCard(page, 'e2e-edit-nfs').click();
   await expect(page).toHaveURL(/#\/e2e\/nfs\//);
+  await expect(page.getByRole('heading', { name: /^NFS詳細: / })).toBeVisible();
 
   await page.getByRole('button', { name: '編集' }).click();
   await page.getByPlaceholder('任意', { exact: true }).fill('E2Eで編集した説明');

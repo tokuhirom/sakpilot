@@ -33,6 +33,7 @@ test('コンテナレジストリ詳細で基本情報とユーザーを編集�
   await page.getByRole('link', { name: 'コンテナレジストリ' }).click();
   await registryRow(page, 'e2e-registry-target').click();
   await expect(page).toHaveURL(/#\/e2e\/container-registry\//);
+  await expect(page.getByRole('heading', { name: /^コンテナレジストリ詳細: / })).toBeVisible();
 
   // 基本情報の編集
   await page.getByRole('button', { name: '編集' }).click();

@@ -38,6 +38,7 @@ test('ディスク詳細で名前・説明・タグを編集できる', async ({
   await page.getByRole('link', { name: 'ディスク' }).click();
   await diskCard(page, 'e2e-disk').click();
   await expect(page).toHaveURL(/#\/e2e\/disks\//);
+  await expect(page.getByRole('heading', { name: /^ディスク詳細: / })).toBeVisible();
 
   await page.getByRole('button', { name: '編集' }).click();
   await page.getByPlaceholder('カンマ区切り(任意)').fill('e2e-edited-tag');
@@ -51,6 +52,7 @@ test('ディスクを接続先サーバーに接続できる', async ({ page }) 
   await page.getByRole('link', { name: 'ディスク' }).click();
   await diskCard(page, 'e2e-unconnected-disk').click();
   await expect(page).toHaveURL(/#\/e2e\/disks\//);
+  await expect(page.getByRole('heading', { name: /^ディスク詳細: / })).toBeVisible();
 
   await expect(page.getByText('(未接続)')).toBeVisible();
 
@@ -67,6 +69,7 @@ test('ディスクをサーバーから切断できる', async ({ page }) => {
   await page.getByRole('link', { name: 'ディスク' }).click();
   await diskCard(page, 'e2e-connected-disk').click();
   await expect(page).toHaveURL(/#\/e2e\/disks\//);
+  await expect(page.getByRole('heading', { name: /^ディスク詳細: / })).toBeVisible();
 
   await expect(page.getByText('e2e-web-1')).toBeVisible();
 

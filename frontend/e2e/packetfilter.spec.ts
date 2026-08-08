@@ -34,6 +34,7 @@ test('パケットフィルター詳細でルールを追加・編集・削除�
   await page.getByRole('link', { name: 'パケットフィルター' }).click();
   await pfRow(page, 'e2e-web-filter').click();
   await expect(page).toHaveURL(/#\/e2e\/packetfilters\//);
+  await expect(page.getByRole('heading', { name: /^パケットフィルター詳細: / })).toBeVisible();
 
   // シードされたルールが表示される
   await expect(page.getByRole('cell', { name: '80', exact: true })).toBeVisible();

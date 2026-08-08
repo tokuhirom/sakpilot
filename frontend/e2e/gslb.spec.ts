@@ -33,6 +33,7 @@ test('GSLB詳細で監視設定とサーバーを編集できる', async ({ page
   await page.getByRole('link', { name: 'GSLB' }).click();
   await gslbRow(page, 'e2e-gslb-target').click();
   await expect(page).toHaveURL(/#\/e2e\/gslb\//);
+  await expect(page.getByRole('heading', { name: /^GSLB詳細: / })).toBeVisible();
 
   await page.getByRole('button', { name: '監視設定を編集' }).click();
   await page.locator('.form-group', { hasText: '監視間隔(秒)' }).locator('input').fill('30');
@@ -49,6 +50,7 @@ test('GSLB詳細で名前・説明を編集できる', async ({ page }) => {
   await page.getByRole('link', { name: 'GSLB' }).click();
   await gslbRow(page, 'e2e-gslb-target').click();
   await expect(page).toHaveURL(/#\/e2e\/gslb\//);
+  await expect(page.getByRole('heading', { name: /^GSLB詳細: / })).toBeVisible();
 
   await page.getByRole('button', { name: '編集', exact: true }).click();
   await page.getByPlaceholder('説明').fill('E2Eで編集した説明');
