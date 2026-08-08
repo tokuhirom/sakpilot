@@ -1311,6 +1311,15 @@ func (a *App) GetEnhancedDBs(profileName string) ([]sakura.EnhancedDBInfo, error
 	return service.List(a.ctx)
 }
 
+func (a *App) GetEnhancedDB(profileName, enhancedDBId string) (*sakura.EnhancedDBInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewEnhancedDBService(client)
+	return service.Get(a.ctx, enhancedDBId)
+}
+
 func (a *App) DeleteEnhancedDB(profileName, enhancedDBId string) error {
 	client, err := sakura.NewClientFromProfile(profileName)
 	if err != nil {
@@ -1318,6 +1327,33 @@ func (a *App) DeleteEnhancedDB(profileName, enhancedDBId string) error {
 	}
 	service := sakura.NewEnhancedDBService(client)
 	return service.Delete(a.ctx, enhancedDBId)
+}
+
+func (a *App) CreateEnhancedDB(profileName, name, description string, tags []string, databaseName, databaseType, region string) (*sakura.EnhancedDBInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewEnhancedDBService(client)
+	return service.Create(a.ctx, name, description, tags, databaseName, databaseType, region)
+}
+
+func (a *App) UpdateEnhancedDB(profileName, enhancedDBId, name, description string, tags []string) (*sakura.EnhancedDBInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewEnhancedDBService(client)
+	return service.Update(a.ctx, enhancedDBId, name, description, tags)
+}
+
+func (a *App) SetEnhancedDBPassword(profileName, enhancedDBId, password string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewEnhancedDBService(client)
+	return service.SetPassword(a.ctx, enhancedDBId, password)
 }
 
 // KMS

@@ -32,18 +32,18 @@ import (
 	"time"
 
 	sdkapprunshared "github.com/sacloud/sacloud-sdk-go/api/apprun"
-	sharedv1 "github.com/sacloud/sacloud-sdk-go/api/apprun/apis/v1"
 	sdkapprundedicated "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated"
 	dedicatedv1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/version"
+	sharedv1 "github.com/sacloud/sacloud-sdk-go/api/apprun/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/fake"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	sdkkms "github.com/sacloud/sacloud-sdk-go/api/kms"
 	kmsv1 "github.com/sacloud/sacloud-sdk-go/api/kms/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
-	mockapprundedicated "github.com/sacloud/sakumock/apprundedicated"
 	mockapprunshared "github.com/sacloud/sakumock/apprun"
+	mockapprundedicated "github.com/sacloud/sakumock/apprundedicated"
 	mockkms "github.com/sacloud/sakumock/kms"
 	mockobjectstorage "github.com/sacloud/sakumock/objectstorage"
 	"github.com/zalando/go-keyring"
@@ -104,6 +104,9 @@ func runE2EServer(addr, dist string) error {
 	}
 	if err := seedProxyLBs(); err != nil {
 		return fmt.Errorf("failed to seed ELB/ProxyLBs: %w", err)
+	}
+	if err := seedEnhancedDBs(); err != nil {
+		return fmt.Errorf("failed to seed enhanced DBs: %w", err)
 	}
 
 	kmsSrv := mockkms.NewTestServer(mockkms.Config{})
@@ -731,6 +734,41 @@ func seedProxyLBs() error {
 		Name:        "e2e-doomed-elb",
 		Description: "E2E: 削除シナリオ用",
 		Plan:        types.ProxyLBPlans.CPS100,
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+// seedEnhancedDBs はIaaS fakeドライバのデータストアにE2Eシナリオ用のエンハンスドDBを投入する。
+func seedEnhancedDBs() error {
+	ctx := context.Background()
+	edbOp := iaas.NewEnhancedDBOp(nil)
+
+	if _, err := edbOp.Create(ctx, &iaas.EnhancedDBCreateRequest{
+		Name:         "e2e-enhanceddb-1",
+		Description:  "E2E: 表示・パスワード再設定シナリオ用",
+		DatabaseName: "e2edb1",
+		DatabaseType: types.EnhancedDBTypesTiDB,
+		Region:       types.EnhancedDBRegionsIs1,
+	}); err != nil {
+		return err
+	}
+	if _, err := edbOp.Create(ctx, &iaas.EnhancedDBCreateRequest{
+		Name:         "e2e-doomed-enhanceddb",
+		Description:  "E2E: 削除シナリオ用",
+		DatabaseName: "e2edoomed",
+		DatabaseType: types.EnhancedDBTypesTiDB,
+		Region:       types.EnhancedDBRegionsIs1,
+	}); err != nil {
+		return err
+	}
+	if _, err := edbOp.Create(ctx, &iaas.EnhancedDBCreateRequest{
+		Name:         "e2e-editable-enhanceddb",
+		Description:  "E2E: 編集シナリオ用",
+		DatabaseName: "e2eeditable",
+		DatabaseType: types.EnhancedDBTypesMariaDB,
+		Region:       types.EnhancedDBRegionsIs1,
 	}); err != nil {
 		return err
 	}

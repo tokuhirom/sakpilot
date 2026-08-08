@@ -27,7 +27,7 @@
 | ProxyLB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #88）。証明書管理（Get/Set/Delete/RenewLetsEncrypt）を追加済み |
 | SimpleMonitor | ✅ あり | ✅ | (対象外) | 削除機能に加えCreate/Update（監視設定管理）まで対応済み。読み書き一式が完備 |
 | Database | ✅ あり | ✅ | ✅ | 起動/停止/再起動+削除+Create/Update/UpdateSettings/GetParameter/SetParameter+FEテストを追加済み（PR #81、2026-08-08 Tier2 #11） |
-| EnhancedDB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #87） |
+| EnhancedDB | ✅ あり | ✅ | (対象外) | 削除機能に加えCreate/Update/SetPassword（パスワード再設定）まで対応済み（2026-08-08 Tier2 #13） |
 | NFS | ✅ あり | ✅ | ✅ | 完備。FEテストとResetを追加済み（PR #80） |
 | ObjectStorage | ✅ あり | ✅（バケット・アクセスキー） | (対象外) | バケット作成/削除、アクセスキー作成/削除+FEテストを追加済み |
 | ContainerRegistry | ✅ あり | ✅ | (対象外) | 削除機能+FEテスト(List/Detail)に加え、Create/Update・ユーザー管理(AddUser/UpdateUser/DeleteUser)まで対応済み。読み書き一式が完備 |
@@ -133,10 +133,11 @@
 - SDK比較で残る不足: Config/Monitor系（CPU/Disk/Interface/DB）/Status（未着手、パワーユーザー向け機能のため優先度低）
 
 ### EnhancedDB（強化版DB）
-- テスト: `EnhancedDBList.test.tsx` あり（一覧表示・削除確認フローをカバー）
-- バックエンド: List/**Delete** 実装済み。電源操作は仕様上そもそも不要
+- テスト: `EnhancedDBList.test.tsx`（一覧表示・削除確認・作成フロー・カードクリックでの詳細遷移）、`EnhancedDBDetail.test.tsx`（基本情報表示・編集、パスワード再設定）ともに整備済み。`frontend/e2e/enhanceddb.spec.ts` で作成〜編集〜パスワード再設定〜削除までのE2Eもカバー
+- バックエンド: `internal/sakura/enhanced_db.go` に**Get**/**Create**/**Update**/**SetPassword**を追加。List/Deleteとあわせてapp.goで全て公開
 - ✅ **対応済み（PR #87）**: 削除機能を追加
-- SDK比較で残る不足: Create/Read/Update/SetPassword（パスワード変更）/GetConfig/SetConfig（未着手）
+- ✅ **対応済み（2026-08-08 Tier2 #13）**: DB名・DB種別（TiDB/MariaDB）・リージョン（石狩/東京）を指定した作成（Create）、名前・説明・タグの編集（Update、SettingsHashによる楽観ロックのため事前Read必須）、管理パスワードの再設定（SetPassword）を追加。`EnhancedDBDetail.tsx`を新設し一覧のカードクリックで遷移する導線を追加（従来はDetail画面が存在しなかった）
+- SDK比較で残る不足: GetConfig/SetConfig（最大接続数・接続許可ネットワーク、パワーユーザー向け機能のため優先度低）
 
 ### NFS
 - テスト: `NFSList.test.tsx` あり（確認ダイアログ・ボタン活性制御・ポーリング・再起動・削除フローをカバー）
@@ -228,6 +229,9 @@
 ### ✅ 完了（2026-08-08 追加セッション13、Tier2 #11）
 - DatabaseのCreate/Update/UpdateSettings/GetParameter/SetParameterを実装。`internal/sakura/database.go`にGet/Create/Update/UpdateSettings/GetParameter/SetParameterを追加（Update/UpdateSettingsはGSLB等と同じく事前Readで既存の稼働設定を維持したまま送信、UpdateSettingsのパスワード欄は空欄なら既存値を維持するフォールバックを実装）、`app.go`に対応する6つのRPCを公開。`DatabaseDetail.tsx`を新設（従来Detail画面が存在しなかった）し、`DatabaseList.tsx`に作成モーダル（プラン/接続先スイッチ/IPアドレス/RDBMS種別/管理ユーザー等）とカードクリックでの詳細遷移を追加。冗長化構成（Proxyプラン）・マスター/スレーブのレプリケーション設定は対象外とした。`internal/sakura/database_test.go`、`DatabaseList.test.tsx`/`DatabaseDetail.test.tsx`、`frontend/e2e/database.spec.ts`を追加。あわせてE2Eシード投入時に`Database.Conf`が未設定だとfakeドライバの`GetParameter`がnilポインタ参照でpanicするSDK側バグを発見し、シードデータに`Conf`/`CommonSetting`を設定して回避（詳細は`docs/upstream-issues.md`参照）
 
+### ✅ 完了（2026-08-08 追加セッション21、Tier2 #13）
+- EnhancedDBのCreate/Update/SetPasswordを実装。`internal/sakura/enhanced_db.go`にGet/Create/Update/SetPasswordを追加（UpdateはSettingsHashによる楽観ロックが必要なため事前Read、GSLB/ProxyLB等と同じパターン）、`app.go`に対応する4つのRPCを公開。`EnhancedDBDetail.tsx`を新設（従来Detail画面が存在しなかった）し、`EnhancedDBList.tsx`に作成モーダル（名前/説明/DB名/DB種別[TiDB・MariaDB]/リージョン[石狩・東京]/タグ）とカードクリックでの詳細遷移を追加。パスワード再設定は詳細画面に専用フォーム+確認ダイアログを実装。`EnhancedDBList.test.tsx`拡充、`EnhancedDBDetail.test.tsx`新規追加、`frontend/e2e/enhanceddb.spec.ts`を追加
+
 ### 実装順序（2026-08-08 方針転換後の書き込み系機能ロードマップ）
 
 「閲覧中心」制約の撤廃を受け、各節「SDK比較で残る不足」に列挙された未実装機能（主にCreate/Update系）を、(a) 利用頻度・実用価値、(b) 実装複雑度、(c) 誤操作時のリスク（実インフラ作成・課金発生の有無）で並べ替えたロードマップ。上から順に着手することを推奨するが、各Tier内の順序はユーザーの関心に応じて入れ替えてよい。
@@ -261,7 +265,7 @@
 10. ✅ KMS: Create/Update — 2026-08-08対応済み
 11. ✅ Database: Create/Update/UpdateSettings/GetParameter/SetParameter — 2026-08-08対応済み
 12. NFS: Create/Update
-13. EnhancedDB: Create/Update/SetPassword
+13. ✅ EnhancedDB: Create/Update/SetPassword — 2026-08-08対応済み
 14. AppRun専有型: Cluster/Application/ASG/LoadBalancerのCreate、VersionのDelete、WorkerNodeのUpdate（draining）、Certificate系
 15. AppRun共用型: ApplicationのCreate/Update/Delete、VersionのDelete、TrafficのUpdate、UserのCreate
 
