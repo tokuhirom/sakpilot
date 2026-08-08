@@ -1,5 +1,45 @@
 # Changelog
 
+## [v0.0.17](https://github.com/tokuhirom/sakpilot/compare/v0.0.16...v0.0.17) - 2026-08-08
+- test: DiskList/ArchiveListの削除フローにFEテストを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/92
+- feat: SimpleMonitorの詳細取得(Get)と詳細ページを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/94
+- test: ContainerRegistryDetailにFEテストを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/95
+- feat: KMSキーのGet/Rotate/ChangeStatusを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/96
+- feat: ProxyLBのSSL証明書管理機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/97
+- test: AppRunSharedListとMonitoringMetricDetailにFEテストを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/98
+- test: AppRunDedicatedListにFEテストを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/99
+- feat: ObjectStorageのバケット/アクセスキーCreate/Delete機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/100
+- feat: AppRun専有型にCluster/Application/ASG/LoadBalancerの削除機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/101
+- docs: 閲覧中心制約の撤廃を反映し書き込み系機能の実装順序を整理 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/102
+- docs: E2Eテスト戦略のADRを追加しPLAN.mdにTier 0として最優先化 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/103
+- feat: E2Eテスト基盤を実装(HTTPブリッジ+Playwright+IaaS fake/sakumock) by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/104
+- feat: DNSゾーンの作成・説明編集・レコード管理機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/105
+- feat: パケットフィルターの作成・ルール編集機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/106
+- feat: シンプル監視の作成・監視設定編集機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/107
+- feat: GSLBの作成・監視設定編集機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/108
+- feat: コンテナレジストリの作成・基本情報編集・ユーザー管理機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/109
+- feat: AppRun専有型のバージョン作成(デプロイ)機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/110
+- feat: スイッチの作成・基本情報編集機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/111
+- feat: ディスクの作成・更新・接続先サーバー変更機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/112
+- feat: E2EサーバーのGoカバレッジ計測基盤を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/113
+- test: Server/KMS/DNS/GSLB/SimpleMonitorの拝け埋め + Database/NFSのE2E追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/114
+- test: ObjectStorageのE2Eを追加(バケット/アクセスキー管理) by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/115
+- test: AppRun専有型・共用型のE2Eを追加、CPU単位バグを修正 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/116
+- test: ELB(ProxyLB)のE2Eを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/117
+- docs: sacloud-sdk-go/sakumockへの報告候補メモを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/118
+- feat: ELB(ProxyLB)のCreate/Update/UpdateSettingsを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/119
+- docs: PLAN.mdにProxyLB(Tier2 #9)完了を反映 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/120
+- feat: KMSのCreate/Updateを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/121
+- feat: データベースのCreate/Update/UpdateSettings/GetParameter/SetParameterを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/122
+- feat: エンハンスドDBのCreate/Update/SetPasswordを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/123
+- feat: NFSのCreate/Updateを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/124
+- docs: PLAN.mdにNFS(Tier2 #12)完了を反映 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/125
+- feat: AppRun専有型のVersion Delete機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/126
+- feat: AppRun専有型のApplication CreateとWorkerNode Update(draining)を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/127
+- feat: AppRun共用型のApplication Create/Updateを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/128
+- feat: AppRun共用型のApplication Delete/Version Delete/Traffic Update/User Createを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/129
+- docs: sakumock/apprunのバージョン作成時刻丸めによる最新版判定の不定性を記録 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/130
+
 ## [v0.0.16](https://github.com/tokuhirom/sakpilot/compare/v0.0.15...v0.0.16) - 2026-08-07
 - add disk deletion feature by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/71
 - fix: サイドバーの表示崩れを修正(ウィンドウ高さを超える場合) by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/72
