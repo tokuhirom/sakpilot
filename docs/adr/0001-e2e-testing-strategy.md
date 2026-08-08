@@ -78,3 +78,13 @@ Goバックエンドを起動せず `window.go.main.App.*` をブラウザ側で
 - 自前IaaSモックの実装・保守コストが継続的に発生する。シナリオ駆動で必要な分だけ実装することでコストを抑える。
 - `window.go` シムとHTTP JSON-RPCブリッジは、バインディングの呼び出し規約(メソッド名・引数順)が変わると追従が必要になる。
 - 副次効果として、キーチェーンのフェイク差し替え(インターフェース化)とIaaSエンドポイントの差し替えフックが入ることで、Go単体テストでもIaaS系サービス層をテストしやすくなる。
+
+## 追記 (2026-08-08): Goバックエンドのカバレッジ計測
+
+E2Eサーバー(`app.go` / `internal/sakura` 等)が実際にどれだけE2Eシナリオでカバーされているかを把握するため、`go build -cover` によるカバレッジ計装を追加した。
+
+- `frontend/playwright.config.ts` で `E2E_COVERAGE=1` が設定されている場合のみ、E2EサーバーをGOCOVERDIR付きの計装ビルド(`go run -cover -covermode=atomic -tags e2e .`)で起動する。通常の `npm run test:e2e` はこれまで通り無計装で高速に動く
+- E2Eサーバーは常駐プロセスで `os.Exit` を経由しないため、素の `-cover` 計装だけではPlaywrightのwebServer終了(SIGTERM)時にカバレッジが書き出されない。`e2e_server.go` にSIGINT/SIGTERM用のシグナルハンドラを追加し、`runtime/coverage` パッケージの `WriteMetaDir`/`WriteCountersDir` を明示的に呼び出してからシャットダウンするようにした(`runtime/coverage` はまさにこの「長時間稼働するサーバープロセスからのカバレッジ書き出し」ユースケース向けに用意されているAPI)
+- 計装ビルドは並行アクセスされるため `-covermode=set`(デフォルト)ではなく `-covermode=atomic` が必須(`set`のままだと `WriteCountersDir` がエラーを返す)
+- `npm run test:e2e:coverage` でE2Eスイート一式をカバレッジ計装付きで実行し、`npm run coverage:go:report`(`go tool covdata percent`)や `npm run coverage:go:html`(`go tool cover -html`相当)でレポートを確認できる
+- ローカル専用の位置づけで、現時点ではCIには組み込んでいない。フロントエンド(TSX)側のカバレッジ計測(vite-plugin-istanbul等)は別途検討事項として未着手

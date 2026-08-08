@@ -49,6 +49,7 @@ vendor/
 # Coverage
 coverage.out
 coverage.html
+/covdata/
 
 # Playwright
 frontend/test-results/
