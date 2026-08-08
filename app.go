@@ -627,6 +627,60 @@ func (a *App) DeleteArchive(profileName, zone, archiveID string) error {
 	return service.Delete(a.ctx, zone, archiveID)
 }
 
+func (a *App) CreateArchive(profileName, zone, name, description string, tags []string, sourceDiskID, sourceArchiveID string) (*sakura.ArchiveInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewArchiveService(client)
+	return service.Create(a.ctx, zone, name, description, tags, sourceDiskID, sourceArchiveID)
+}
+
+func (a *App) CreateBlankArchive(profileName, zone, name, description string, tags []string, sizeGB int) (*sakura.ArchiveWithFTP, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewArchiveService(client)
+	return service.CreateBlank(a.ctx, zone, name, description, tags, sizeGB)
+}
+
+func (a *App) OpenArchiveFTP(profileName, zone, archiveID string, changePassword bool) (*sakura.FTPServerInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewArchiveService(client)
+	return service.OpenFTP(a.ctx, zone, archiveID, changePassword)
+}
+
+func (a *App) CloseArchiveFTP(profileName, zone, archiveID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewArchiveService(client)
+	return service.CloseFTP(a.ctx, zone, archiveID)
+}
+
+func (a *App) ShareArchive(profileName, zone, archiveID string) (string, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return "", err
+	}
+	service := sakura.NewArchiveService(client)
+	return service.Share(a.ctx, zone, archiveID)
+}
+
+func (a *App) CreateArchiveFromShared(profileName, destZone, sharedKey, name, description string, tags []string) (*sakura.ArchiveInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewArchiveService(client)
+	return service.CreateFromShared(a.ctx, destZone, sharedKey, name, description, tags)
+}
+
 // Databases
 func (a *App) GetDatabases(profileName, zone string) ([]sakura.DatabaseInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
