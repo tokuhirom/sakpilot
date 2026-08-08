@@ -32,15 +32,14 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - 実害: SakPilot側でこの単位を誤解しており、デプロイフォームの「CPU (vCPU)」欄のデフォルト値 `0.1` をそのまま送信すると `json: cannot unmarshal number 0.1 into ... int64` で必ず失敗するバグになっていた(SakPilot側で修正済み: ミリvCPUに変換してから送るよう修正)。単位がコード上明記されていれば防げたクラスの不具合。
 - 提案: `CPU int64` フィールドに `// CPU ミリvCPU単位のCPU割り当て(例: 1000 = 1 vCPU)` のようなdocコメントを追加してほしい。可能なら `Memory` 等の他の数値フィールドも単位を明記してほしい。
 
-### 3. `sakumock/objectstorage` のS3データプレーン(`--enable-data-plane`)が外部バイナリ依存・control planeキー非検証で、CI/E2Eから使うにはハードルが高い
+### 3. `sakumock/objectstorage` のS3データプレーンが、control planeで発行したアクセスキーを検証しないため、キー発行込みの結合テストができない
 
 - パッケージ: `github.com/sacloud/sakumock/objectstorage`
 - 参照: [README「Data plane (S3)」](https://github.com/sacloud/sakumock/tree/main/objectstorage#data-plane-s3)
-- 内容(誤解のないよう正確に): sakumockはS3互換データプレーン自体は提供しており、`--enable-data-plane`(または `objectstorage.Config{EnableDataPlane: true}`)を指定すると外部プロセス [versitygw](https://github.com/versity/versitygw) を起動してPUT/GET/DELETEオブジェクト等を処理してくれる。ただし設計上意図的に以下の制約がある(README記載の理由: バイナリを同梱すると配布物が肥大化するため):
-  - versitygwはsakumockに同梱されず、`PATH` 上に別途インストールしておく必要がある(無ければ明示的に起動失敗する仕様)。
-  - data planeの認証は固定のルート資格情報(access key `sakumock` / secret `sakumocksecret`)のみで、control plane(`POST /{site}/v2/account/keys`)で発行したアクセスキー/シークレットはdata plane側では検証されない。
-- 実害: 「(SakPilotの実UIフローである)アクセスキーを作成 → そのキーでバケット一覧/オブジェクト一覧を取得する」という一連のS3呼び出しを、外部バイナリなしのCI環境でEnd-to-Endに検証できない。SakPilotではバケット作成リクエスト自体が(control plane経由のため)成功することのみ確認し、一覧反映やオブジェクト操作はE2E対象外にした(`frontend/e2e/objectstorage.spec.ts` 参照)。これはsakumockの不具合ではなく、現状の設計を把握した上でのSakPilot側の判断。
-- 提案(バグ報告ではなく機能要望): 外部バイナリを前提としない、最小限のインメモリS3互換data plane(PUT/GET/DELETE/ListObjectsV2程度でよい)を代替オプションとして用意し、かつcontrol planeで発行したアクセスキーをそのdata planeでも検証してもらえると、`versitygw` を用意できないCI環境でもアクセスキー発行〜オブジェクト操作までを一気通貫でテストできて助かる。
+- 内容: sakumockはS3互換データプレーンを `--enable-data-plane`(または `objectstorage.Config{EnableDataPlane: true}`)で提供しており、外部プロセス [versitygw](https://github.com/versity/versitygw) を起動してPUT/GET/DELETEオブジェクト等を処理する設計になっている。versitygwが `PATH` 上に必要な点はCI側でインストールすれば解決するだけなので、本質的なハードルではない。
+  本質的な制約は認証側: data planeの認証は固定のルート資格情報(access key `sakumock` / secret `sakumocksecret`)のみで、control plane(`POST /{site}/v2/account/keys`)で発行したアクセスキー/シークレットはdata plane側では**検証されない**(README明記の仕様)。sakumockの設計としては「versitygwを使えば結合テストができる」想定だと思われるが、**「アプリがcontrol plane経由で発行したキーを使ってS3操作する」という、SDKユーザーの実際のユースケースそのものは、versitygwを用意しても検証できない**。
+- 実害: SakPilotの実際のUIフロー(アクセスキーを作成 → そのキーでバケット一覧/オブジェクト一覧を取得)をEnd-to-Endに検証できない。versitygwを追加してもキーの紐付けが再現できないため意味がなく、SakPilotではバケット作成リクエスト自体が(control plane経由のため)成功することのみ確認し、一覧反映やオブジェクト操作はE2E対象外にした(`frontend/e2e/objectstorage.spec.ts` 参照)。これはsakumockの不具合ではなく、現状の設計を把握した上でのSakPilot側の判断。
+- 提案(バグ報告ではなく機能要望): data planeがcontrol planeで発行したアクセスキー/シークレットも(固定ルート資格情報に加えて)受け付けるようにしてもらえると、`versitygw` を用意しさえすればキー発行〜オブジェクト操作までを実際のアプリと同じ資格情報で一気通貫にテストできるようになる。
 
 ## その他メモ(バグではないが気づいた点)
 
