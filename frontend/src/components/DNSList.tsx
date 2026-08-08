@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetDNSList, DeleteDNS } from '../../wailsjs/go/main/App';
+import { GetDNSList, DeleteDNS, CreateDNS } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -15,6 +15,11 @@ export function DNSList({ profile, onSelectDNS }: DNSListProps) {
   const [loading, setLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<sakura.DNSInfo | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newZoneName, setNewZoneName] = useState('');
+  const [newZoneDescription, setNewZoneDescription] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const {
     searchQuery,
@@ -82,10 +87,36 @@ export function DNSList({ profile, onSelectDNS }: DNSListProps) {
     }
   };
 
+  const handleCreateOpen = () => {
+    setNewZoneName('');
+    setNewZoneDescription('');
+    setCreateError(null);
+    setShowCreate(true);
+  };
+
+  const handleCreateCancel = () => {
+    setShowCreate(false);
+  };
+
+  const handleCreateSubmit = async () => {
+    setCreating(true);
+    setCreateError(null);
+    try {
+      await CreateDNS(profile, newZoneName, newZoneDescription);
+      setShowCreate(false);
+      await loadDNS();
+    } catch (e) {
+      setCreateError(String(e));
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <>
       <div className="header">
         <h2>DNS</h2>
+        <button className="btn btn-primary btn-small" onClick={handleCreateOpen}>+ ゾーン作成</button>
       </div>
 
       <SearchBar
@@ -143,6 +174,55 @@ export function DNSList({ profile, onSelectDNS }: DNSListProps) {
             <div className="confirm-actions">
               <button className="btn btn-secondary" onClick={handleDeleteCancel}>キャンセル</button>
               <button className="btn btn-danger" onClick={handleDeleteConfirm}>削除する</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreate && (
+        <div className="modal-overlay" onClick={handleCreateCancel} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+            backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+            padding: '20px', minWidth: '320px', maxWidth: '420px',
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>DNSゾーン作成</h3>
+            <div className="form-group">
+              <label>ゾーン名(ドメイン名)</label>
+              <input
+                type="text"
+                value={newZoneName}
+                onChange={(e) => setNewZoneName(e.target.value)}
+                placeholder="example.com"
+                autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <label>説明</label>
+              <input
+                type="text"
+                value={newZoneDescription}
+                onChange={(e) => setNewZoneDescription(e.target.value)}
+                placeholder="任意"
+              />
+            </div>
+            {createError && (
+              <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                エラー: {createError}
+              </div>
+            )}
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleCreateSubmit}
+                disabled={creating || !newZoneName}
+              >
+                {creating ? '作成中...' : '作成する'}
+              </button>
             </div>
           </div>
         </div>

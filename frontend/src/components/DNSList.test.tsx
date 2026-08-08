@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DNSList } from './DNSList';
 import { sakura } from '../../wailsjs/go/models';
-import { GetDNSList, DeleteDNS } from '../../wailsjs/go/main/App';
+import { GetDNSList, DeleteDNS, CreateDNS } from '../../wailsjs/go/main/App';
 
 vi.mock('../../wailsjs/go/main/App');
 
@@ -22,6 +22,7 @@ describe('DNSList', () => {
   beforeEach(() => {
     vi.mocked(GetDNSList).mockReset();
     vi.mocked(DeleteDNS).mockReset();
+    vi.mocked(CreateDNS).mockReset();
   });
 
   it('lists DNS zones returned by GetDNSList', async () => {
@@ -78,5 +79,41 @@ describe('DNSList', () => {
     await waitFor(() => {
       expect(GetDNSList).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it('creates a DNS zone via the create modal', async () => {
+    vi.mocked(GetDNSList)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([makeDNS({ name: 'new-zone', zone: 'new-zone.com' })]);
+    vi.mocked(CreateDNS).mockResolvedValueOnce(makeDNS({ name: 'new-zone', zone: 'new-zone.com' }));
+    const user = userEvent.setup();
+
+    render(<DNSList profile="default" onSelectDNS={() => {}} />);
+    await screen.findByText('DNSゾーンがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ ゾーン作成' }));
+    await user.type(screen.getByPlaceholderText('example.com'), 'new-zone.com');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    await waitFor(() => {
+      expect(CreateDNS).toHaveBeenCalledWith('default', 'new-zone.com', '');
+    });
+    expect(await screen.findByText('new-zone')).toBeInTheDocument();
+  });
+
+  it('shows an error and keeps the modal open when zone creation fails', async () => {
+    vi.mocked(GetDNSList).mockResolvedValueOnce([]);
+    vi.mocked(CreateDNS).mockRejectedValueOnce(new Error('quota exceeded'));
+    const user = userEvent.setup();
+
+    render(<DNSList profile="default" onSelectDNS={() => {}} />);
+    await screen.findByText('DNSゾーンがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ ゾーン作成' }));
+    await user.type(screen.getByPlaceholderText('example.com'), 'bad-zone.com');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    expect(await screen.findByText(/quota exceeded/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('example.com')).toBeInTheDocument();
   });
 });
