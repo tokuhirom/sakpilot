@@ -44,7 +44,7 @@ describe('ServerList', () => {
   it('lists servers returned by GetServers', async () => {
     vi.mocked(GetServers).mockResolvedValueOnce([makeServer()]);
 
-    render(<ServerList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    render(<ServerList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectServer={() => {}} />);
 
     expect(await screen.findByText('my-server')).toBeInTheDocument();
     expect(screen.getByText('2 vCPU / 4 GB', { exact: false })).toBeInTheDocument();
@@ -55,7 +55,7 @@ describe('ServerList', () => {
   it('shows an empty state when there are no servers', async () => {
     vi.mocked(GetServers).mockResolvedValueOnce([]);
 
-    render(<ServerList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    render(<ServerList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectServer={() => {}} />);
 
     expect(await screen.findByText('サーバーがありません')).toBeInTheDocument();
   });
@@ -64,7 +64,7 @@ describe('ServerList', () => {
     vi.mocked(GetServers).mockResolvedValueOnce([makeServer({ status: 'up' })]);
     const user = userEvent.setup();
 
-    render(<ServerList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    render(<ServerList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectServer={() => {}} />);
     await screen.findByText('my-server');
 
     await user.click(screen.getByRole('button', { name: '⋮' }));
@@ -78,7 +78,7 @@ describe('ServerList', () => {
     vi.mocked(GetServers).mockResolvedValueOnce([makeServer({ status: 'down' })]);
     const user = userEvent.setup();
 
-    render(<ServerList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    render(<ServerList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectServer={() => {}} />);
     await screen.findByText('my-server');
 
     await user.click(screen.getByRole('button', { name: '⋮' }));
@@ -93,7 +93,7 @@ describe('ServerList', () => {
     vi.mocked(DeleteServer).mockResolvedValueOnce(undefined);
     const user = userEvent.setup();
 
-    render(<ServerList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    render(<ServerList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectServer={() => {}} />);
     await screen.findByText('my-server');
 
     await user.click(screen.getByRole('button', { name: '⋮' }));
@@ -117,7 +117,7 @@ describe('ServerList', () => {
     vi.mocked(PowerOnServer).mockResolvedValueOnce(undefined);
     vi.mocked(GetServerStatus).mockResolvedValueOnce('up');
 
-    render(<ServerList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    render(<ServerList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectServer={() => {}} />);
     await screen.findByText('my-server');
 
     // userEventはfakeTimers下では内部delayが解決せず固まるため、クリックはfireEventで行う。
@@ -143,7 +143,7 @@ describe('ServerList', () => {
       .mockResolvedValueOnce([makeServer({ status: 'up' })]);
     vi.mocked(ResetServer).mockResolvedValueOnce(undefined);
 
-    render(<ServerList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    render(<ServerList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectServer={() => {}} />);
     await screen.findByText('my-server');
 
     vi.useFakeTimers();
