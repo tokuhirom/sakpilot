@@ -38,6 +38,7 @@ import (
 	kmsv1 "github.com/sacloud/sacloud-sdk-go/api/kms/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 	mockkms "github.com/sacloud/sakumock/kms"
+	mockobjectstorage "github.com/sacloud/sakumock/objectstorage"
 	"github.com/zalando/go-keyring"
 )
 
@@ -101,6 +102,14 @@ func runE2EServer(addr, dist string) error {
 	}
 	if err := seedKMSKeys(); err != nil {
 		return fmt.Errorf("failed to seed KMS keys: %w", err)
+	}
+
+	// ObjectStorageのS3互換データプレーン(オブジェクト一覧・ダウンロード)はsakumockに
+	// 含まれず外部バイナリ(versitygw)依存のためモックしない。バケット/アクセスキーの
+	// 管理API(control plane)のみE2E対象とする。
+	objectStorageSrv := mockobjectstorage.NewTestServer(mockobjectstorage.Config{})
+	if err := os.Setenv("SAKURA_ENDPOINTS_OBJECT_STORAGE", objectStorageSrv.TestURL()); err != nil {
+		return err
 	}
 
 	app := NewApp()
