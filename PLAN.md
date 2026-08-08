@@ -30,7 +30,7 @@
 | EnhancedDB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #87） |
 | NFS | ✅ あり | ✅ | ✅ | 完備。FEテストとResetを追加済み（PR #80） |
 | ObjectStorage | ✅ あり | ✅（バケット・アクセスキー） | (対象外) | バケット作成/削除、アクセスキー作成/削除+FEテストを追加済み |
-| ContainerRegistry | ✅ あり | ✅ | (対象外) | 削除機能+FEテスト(List/Detail)を追加済み（PR #89、#95） |
+| ContainerRegistry | ✅ あり | ✅ | (対象外) | 削除機能+FEテスト(List/Detail)に加え、Create/Update・ユーザー管理(AddUser/UpdateUser/DeleteUser)まで対応済み。読み書き一式が完備 |
 | AppRun (専有/共用) | ✅ あり | 専有型は✅（Cluster/App/ASG/LB） | (対象外) | 専有型・共用型ともFEテスト追加済み。専有型は削除機能を追加。デプロイ（Version Create）は次の対応対象 |
 | Bill | ❌ なし | (対象外) | (対象外) | 読み取り専用リソースなので概ね妥当 |
 
@@ -152,12 +152,12 @@
 ## 4. ContainerRegistry / AppRun / Bill
 
 ### ContainerRegistry（コンテナレジストリ）
-- テスト: `ContainerRegistryList.test.tsx`（一覧表示・詳細遷移・削除確認フロー）、`ContainerRegistryDetail.test.tsx`（基本情報表示・ユーザー一覧・パスワード保存/削除フロー・自動アクティブ化・イメージ/タグ一覧遷移）ともに整備済み
-- バックエンド: List（レジストリ本体・ユーザー）/**Delete** 実装済み。イメージ/タグ取得はOCI Registry APIを直叩きする別実装
+- テスト: `ContainerRegistryList.test.tsx`（一覧表示・詳細遷移・削除確認・作成フロー）、`ContainerRegistryDetail.test.tsx`（基本情報表示・編集、ユーザー一覧・追加/編集/削除、パスワード保存/削除フロー・自動アクティブ化・イメージ/タグ一覧遷移）ともに整備済み。`frontend/e2e/containerregistry.spec.ts` で作成〜基本情報編集〜ユーザー管理〜削除までのE2Eもカバー
+- バックエンド: List/**Create**/**Update**/**Delete**（レジストリ本体）、List/**AddUser**/**UpdateUser**/**DeleteUser**（ユーザー）実装済み。イメージ/タグ取得はOCI Registry APIを直叩きする別実装
 - ✅ **対応済み（PR #89）**: レジストリ削除機能とListのFEテストを追加
 - ✅ **対応済み（PR #95）**: `ContainerRegistryDetail.test.tsx` を追加
-- SDK比較で残る不足: Create/Read（単体）/Update/UpdateSettings/AddUser/UpdateUser/DeleteUser（ユーザー管理、未着手）
-- **TODO**: ユーザー管理機能の追加を検討
+- ✅ **対応済み（2026-08-08 Tier1 #5）**: レジストリ作成（Create）、名前・説明・アクセスレベル・仮想ドメインの編集（Update、SettingsHashによる楽観ロックのため事前Read必須）、ユーザー管理（AddUser/UpdateUser/DeleteUser）を追加。`ContainerRegistryList.tsx`に作成モーダル、`ContainerRegistryDetail.tsx`に基本情報インライン編集とユーザー追加/編集/削除UIを実装。あわせて`ListContainerRegistryUsers`がユーザー0件のレジストリでnilポインタ参照を起こすバグ（fakeドライバがユーザー無しの場合`(nil, nil)`を返すことが原因）をE2Eテストで発見し修正
+- SDK比較で残る不足: なし（Read/Write一式が揃った。AccessLevelは`readonly`/`none`のみが有効値でSDK上deprecated扱いのため`readwrite`は選択不可）
 
 ### AppRun（専有型 / 共用型）
 - テスト: `AppRunSharedList.test.tsx` あり（ユーザー未設定時の案内・一覧表示・エラー表示・詳細遷移とコンポーネント/トラフィック/バージョン履歴表示・戻る操作をカバー）。`AppRunDedicatedList.test.tsx` も整備済み（cluster→app→version遷移とアクティブバージョン設定・ASGのLB/ワーカーノード表示・非アクティブ化/アクティブ化の成功・失敗フロー・Cluster/Application/ASG/LoadBalancerの削除確認〜成功・失敗フローをカバー。`lb` view単体はUI上到達経路が無く未カバー）
@@ -212,6 +212,9 @@
 ### ✅ 完了（2026-08-08 追加セッション9、Tier1 #4）
 - GSLBのCreate/Update/UpdateSettings（振り分け先サーバー・ヘルスチェック管理）を実装。`internal/sakura/global.go`に`CreateGSLB`/`UpdateGSLB`/`UpdateGSLBSettings`を追加（SettingsHashによる楽観ロックのため事前Read必須、`toGSLBInfo`ヘルパーでList/Get/Create/Update間の変換ロジックを共通化）、`app.go`に対応するRPCを公開。`GSLBList.tsx`に作成モーダル、`GSLBDetail.tsx`に名前・説明のインライン編集と監視設定編集モーダル（Sorry Server/監視間隔/重み付け/ヘルスチェック/振り分け先サーバーの追加・編集・削除、UpdateSettings APIが全件置換のためサーバー一覧もフォーム内で一括編集）を実装。`GSLBDetail.test.tsx`を新規作成し、`frontend/e2e/gslb.spec.ts`でE2Eシナリオも追加
 
+### ✅ 完了（2026-08-08 追加セッション10、Tier1 #5）
+- ContainerRegistryのCreate/Update・ユーザー管理（AddUser/UpdateUser/DeleteUser）を実装。`internal/sakura/global.go`に`CreateContainerRegistry`/`UpdateContainerRegistry`（SettingsHashによる楽観ロックのため事前Read必須、`toContainerRegistryInfo`ヘルパーで変換ロジックを共通化）と`AddContainerRegistryUser`/`UpdateContainerRegistryUser`/`DeleteContainerRegistryUser`を追加、`app.go`に対応するRPCを公開。`ContainerRegistryList.tsx`に作成モーダル（名前/説明/アクセスレベル/仮想ドメイン）、`ContainerRegistryDetail.tsx`に基本情報インライン編集とユーザー追加/編集（権限変更・パスワードリセット）/削除UIを実装。`frontend/e2e/containerregistry.spec.ts`でE2Eシナリオを追加した際、ユーザー0件のレジストリで`ListContainerRegistryUsers`がnilポインタ参照を起こす既存バグ（fakeドライバが`(nil, nil)`を返すケースを未考慮）を発見・修正
+
 ### 実装順序（2026-08-08 方針転換後の書き込み系機能ロードマップ）
 
 「閲覧中心」制約の撤廃を受け、各節「SDK比較で残る不足」に列挙された未実装機能（主にCreate/Update系）を、(a) 利用頻度・実用価値、(b) 実装複雑度、(c) 誤操作時のリスク（実インフラ作成・課金発生の有無）で並べ替えたロードマップ。上から順に着手することを推奨するが、各Tier内の順序はユーザーの関心に応じて入れ替えてよい。
@@ -235,7 +238,7 @@
 2. ✅ PacketFilter: Create/Update（ルール追加・編集） — 2026-08-08対応済み
 3. ✅ SimpleMonitor: Create/Update/UpdateSettings（監視対象の追加・設定変更） — 2026-08-08対応済み
 4. ✅ GSLB: Create/Update/UpdateSettings — 2026-08-08対応済み
-5. ContainerRegistry: Create、ユーザー管理（AddUser/UpdateUser/DeleteUser） — 次に着手すべき候補
+5. ✅ ContainerRegistry: Create、Update、ユーザー管理（AddUser/UpdateUser/DeleteUser） — 2026-08-08対応済み
 6. AppRun専有型: Version Create（デプロイ）— 着手する場合はフルデプロイフォーム（image/CPU/メモリ/スケーリング/公開ポート/環境変数）として対応する方針（2026-08-08ユーザーに確認済み）
 
 **Tier 2: リソース新規作成系（入力項目・依存関係が多くフォーム設計コストが高い、または実インフラ作成を伴い課金・削除確認等の設計が必要）**

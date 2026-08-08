@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ContainerRegistryList } from './ContainerRegistryList';
 import { sakura } from '../../wailsjs/go/models';
-import { GetContainerRegistries, DeleteContainerRegistry } from '../../wailsjs/go/main/App';
+import { GetContainerRegistries, DeleteContainerRegistry, CreateContainerRegistry } from '../../wailsjs/go/main/App';
 
 vi.mock('../../wailsjs/go/main/App');
 
@@ -23,6 +23,7 @@ describe('ContainerRegistryList', () => {
   beforeEach(() => {
     vi.mocked(GetContainerRegistries).mockReset();
     vi.mocked(DeleteContainerRegistry).mockReset();
+    vi.mocked(CreateContainerRegistry).mockReset();
   });
 
   it('lists registries returned by GetContainerRegistries', async () => {
@@ -79,5 +80,41 @@ describe('ContainerRegistryList', () => {
     await waitFor(() => {
       expect(GetContainerRegistries).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it('creates a registry via the create modal', async () => {
+    vi.mocked(GetContainerRegistries)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([makeRegistry({ name: 'new-registry' })]);
+    vi.mocked(CreateContainerRegistry).mockResolvedValueOnce(makeRegistry({ name: 'new-registry' }));
+    const user = userEvent.setup();
+
+    render(<ContainerRegistryList profile="default" onSelectRegistry={() => {}} />);
+    await screen.findByText('コンテナレジストリがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ レジストリ作成' }));
+    await user.type(screen.getByPlaceholderText('my-registry'), 'new-registry');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    await waitFor(() => {
+      expect(CreateContainerRegistry).toHaveBeenCalledWith('default', 'new-registry', '', 'none', '');
+    });
+    expect(await screen.findByText('new-registry')).toBeInTheDocument();
+  });
+
+  it('shows an error and keeps the modal open when registry creation fails', async () => {
+    vi.mocked(GetContainerRegistries).mockResolvedValueOnce([]);
+    vi.mocked(CreateContainerRegistry).mockRejectedValueOnce(new Error('quota exceeded'));
+    const user = userEvent.setup();
+
+    render(<ContainerRegistryList profile="default" onSelectRegistry={() => {}} />);
+    await screen.findByText('コンテナレジストリがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ レジストリ作成' }));
+    await user.type(screen.getByPlaceholderText('my-registry'), 'bad-registry');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    expect(await screen.findByText(/quota exceeded/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('my-registry')).toBeInTheDocument();
   });
 });
