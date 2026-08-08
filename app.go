@@ -737,6 +737,33 @@ func (a *App) GetNFSStatus(profileName, zone, nfsID string) (string, error) {
 	return service.GetStatus(a.ctx, zone, nfsID)
 }
 
+func (a *App) GetNFSDetail(profileName, zone, nfsID string) (*sakura.NFSInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewNFSService(client)
+	return service.Get(a.ctx, zone, nfsID)
+}
+
+func (a *App) CreateNFS(profileName, zone string, params sakura.NFSCreateParams) (*sakura.NFSInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewNFSService(client)
+	return service.Create(a.ctx, zone, params)
+}
+
+func (a *App) UpdateNFS(profileName, zone, nfsID, name, description string, tags []string) (*sakura.NFSInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewNFSService(client)
+	return service.Update(a.ctx, zone, nfsID, name, description, tags)
+}
+
 // DNS Detail
 func (a *App) GetDNSDetail(profileName, dnsId string) (*sakura.DNSInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)

@@ -488,6 +488,7 @@ func seedNFS() {
 	seeds := []seed{
 		{930000000001, "e2e-nfs-1", "E2E: 起動中NFS(電源操作シナリオ用)", types.ServerInstanceStatuses.Up},
 		{930000000002, "e2e-doomed-nfs", "E2E: 削除シナリオ用NFS", types.ServerInstanceStatuses.Down},
+		{930000000003, "e2e-edit-nfs", "E2E: 編集シナリオ用NFS", types.ServerInstanceStatuses.Up},
 	}
 	for _, s := range seeds {
 		fake.DataStore.Put(fake.ResourceNFS, e2eZone, s.id, &iaas.NFS{

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { GetNFSList, PowerOnNFS, PowerOffNFS, DeleteNFS, GetNFSStatus, ResetNFS } from '../../wailsjs/go/main/App';
+import { GetNFSList, PowerOnNFS, PowerOffNFS, DeleteNFS, GetNFSStatus, ResetNFS, CreateNFS, GetSwitches } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -10,6 +10,28 @@ interface NFSListProps {
   zone: string;
   zones: sakura.ZoneInfo[];
   onZoneChange: (zone: string) => void;
+  onSelectNFS: (id: string) => void;
+}
+
+const HDD_SIZES = [100, 500, 1024, 2048, 4096, 8192, 12288];
+const SSD_SIZES = [20, 100, 500, 1024, 2048, 4096];
+
+function formatSizeLabel(sizeGB: number) {
+  return sizeGB >= 1024 ? `${sizeGB / 1024}TB` : `${sizeGB}GB`;
+}
+
+function emptyCreateForm() {
+  return {
+    name: '',
+    description: '',
+    tags: '',
+    switchId: '',
+    ipAddress: '',
+    networkMaskLen: '24',
+    defaultRoute: '',
+    planClass: 'hdd',
+    sizeGB: String(HDD_SIZES[0]),
+  };
 }
 
 interface ConfirmDialog {
@@ -20,13 +42,19 @@ interface ConfirmDialog {
   action: 'powerOn' | 'powerOff' | 'reset' | 'delete';
 }
 
-export function NFSList({ profile, zone, zones, onZoneChange }: NFSListProps) {
+export function NFSList({ profile, zone, zones, onZoneChange, onSelectNFS }: NFSListProps) {
   const [nfsList, setNfsList] = useState<sakura.NFSInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog | null>(null);
   const [pendingNFS, setPendingNFS] = useState<Map<string, 'powerOn' | 'powerOff' | 'reset'>>(new Map());
   const pollingIntervalRef = useRef<Record<string, number>>({});
+
+  const [showCreate, setShowCreate] = useState(false);
+  const [switches, setSwitches] = useState<sakura.SwitchInfo[]>([]);
+  const [createForm, setCreateForm] = useState(emptyCreateForm());
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const loadNFSList = useCallback(async () => {
     if (!profile || !zone) {
@@ -144,6 +172,54 @@ export function NFSList({ profile, zone, zones, onZoneChange }: NFSListProps) {
     }
   };
 
+  const handleCreateOpen = async () => {
+    setCreateForm(emptyCreateForm());
+    setCreateError(null);
+    setShowCreate(true);
+    try {
+      const list = await GetSwitches(profile, zone);
+      setSwitches(list || []);
+    } catch (err) {
+      console.error('[NFSList] GetSwitches error:', err);
+      setSwitches([]);
+    }
+  };
+
+  const handleCreateCancel = () => {
+    setShowCreate(false);
+  };
+
+  const handlePlanClassChange = (planClass: string) => {
+    const sizes = planClass === 'ssd' ? SSD_SIZES : HDD_SIZES;
+    setCreateForm(prev => ({ ...prev, planClass, sizeGB: String(sizes[0]) }));
+  };
+
+  const handleCreateSubmit = async () => {
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const tags = createForm.tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
+      const params = new sakura.NFSCreateParams({
+        Name: createForm.name,
+        Description: createForm.description,
+        Tags: tags,
+        SwitchID: createForm.switchId,
+        IPAddress: createForm.ipAddress,
+        NetworkMaskLen: parseInt(createForm.networkMaskLen, 10) || 0,
+        DefaultRoute: createForm.defaultRoute,
+        PlanClass: createForm.planClass,
+        SizeGB: parseInt(createForm.sizeGB, 10) || 0,
+      });
+      await CreateNFS(profile, zone, params);
+      setShowCreate(false);
+      await loadNFSList();
+    } catch (e) {
+      setCreateError(String(e));
+    } finally {
+      setCreating(false);
+    }
+  };
+
   // 検索機能
   const {
     searchQuery,
@@ -192,6 +268,7 @@ export function NFSList({ profile, zone, zones, onZoneChange }: NFSListProps) {
       <div className="header">
         <h2>NFS</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <button className="btn btn-primary btn-small" onClick={handleCreateOpen}>+ NFS作成</button>
           <select
             className="zone-select"
             value={zone}
@@ -223,7 +300,7 @@ export function NFSList({ profile, zone, zones, onZoneChange }: NFSListProps) {
         </div>
       ) : (
         filteredNFS.map((n) => (
-          <div key={n.id} className="card">
+          <div key={n.id} className="card" onClick={() => onSelectNFS(n.id)} style={{ cursor: 'pointer' }}>
             <div className="card-header">
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -388,6 +465,115 @@ export function NFSList({ profile, zone, zones, onZoneChange }: NFSListProps) {
                 }}
               >
                 {confirmDialog.action === 'powerOn' ? '起動する' : confirmDialog.action === 'powerOff' ? '停止する' : confirmDialog.action === 'reset' ? '再起動する' : '削除する'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreate && (
+        <div className="modal-overlay" onClick={handleCreateCancel} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+            backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+            padding: '20px', minWidth: '320px', maxWidth: '420px', maxHeight: '80vh', overflowY: 'auto',
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>NFS作成</h3>
+            <div className="form-group">
+              <label>名前</label>
+              <input
+                type="text"
+                value={createForm.name}
+                onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                placeholder="my-nfs"
+                autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <label>説明</label>
+              <input
+                type="text"
+                value={createForm.description}
+                onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
+                placeholder="任意"
+              />
+            </div>
+            <div className="form-group">
+              <label>タグ</label>
+              <input
+                type="text"
+                value={createForm.tags}
+                onChange={(e) => setCreateForm({ ...createForm, tags: e.target.value })}
+                placeholder="任意(カンマ区切り)"
+              />
+            </div>
+            <div className="form-group">
+              <label>プラン</label>
+              <select value={createForm.planClass} onChange={(e) => handlePlanClassChange(e.target.value)}>
+                <option value="hdd">HDD</option>
+                <option value="ssd">SSD</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>サイズ</label>
+              <select value={createForm.sizeGB} onChange={(e) => setCreateForm({ ...createForm, sizeGB: e.target.value })}>
+                {(createForm.planClass === 'ssd' ? SSD_SIZES : HDD_SIZES).map((size) => (
+                  <option key={size} value={size}>{formatSizeLabel(size)}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label htmlFor="nfs-create-switch">接続スイッチ</label>
+              <select id="nfs-create-switch" value={createForm.switchId} onChange={(e) => setCreateForm({ ...createForm, switchId: e.target.value })}>
+                <option value="">選択してください</option>
+                {switches.map((sw) => (
+                  <option key={sw.id} value={sw.id}>{sw.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>IPアドレス</label>
+              <input
+                type="text"
+                value={createForm.ipAddress}
+                onChange={(e) => setCreateForm({ ...createForm, ipAddress: e.target.value })}
+                placeholder="例: 192.168.0.11"
+              />
+            </div>
+            <div className="form-group">
+              <label>ネットワークマスク長</label>
+              <input
+                type="number"
+                value={createForm.networkMaskLen}
+                onChange={(e) => setCreateForm({ ...createForm, networkMaskLen: e.target.value })}
+                placeholder="例: 24"
+              />
+            </div>
+            <div className="form-group">
+              <label>デフォルトルート</label>
+              <input
+                type="text"
+                value={createForm.defaultRoute}
+                onChange={(e) => setCreateForm({ ...createForm, defaultRoute: e.target.value })}
+                placeholder="任意(例: 192.168.0.1)"
+              />
+            </div>
+            {createError && (
+              <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                エラー: {createError}
+              </div>
+            )}
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleCreateSubmit}
+                disabled={creating || !createForm.name || !createForm.switchId || !createForm.ipAddress}
+              >
+                {creating ? '作成中...' : '作成する'}
               </button>
             </div>
           </div>
