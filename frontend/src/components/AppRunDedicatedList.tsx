@@ -362,16 +362,18 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
   const handleDeploySubmit = async () => {
     if (!deployForm || view.type !== 'app') return;
 
-    const cpu = parseFloat(deployForm.cpu);
+    const cpuVCPU = parseFloat(deployForm.cpu);
     const memory = parseInt(deployForm.memory, 10);
     if (!deployForm.image.trim()) {
       setDeployError('コンテナイメージを入力してください');
       return;
     }
-    if (isNaN(cpu) || isNaN(memory)) {
+    if (isNaN(cpuVCPU) || isNaN(memory)) {
       setDeployError('CPU・メモリを正しく入力してください');
       return;
     }
+    // APIはCPUをミリvCPU単位(1000 = 1vCPU)の整数で受け取る
+    const cpu = Math.round(cpuVCPU * 1000);
     if (deployForm.exposedPorts.some((p) => !p.targetPort)) {
       setDeployError('公開ポートのターゲットポートを入力してください');
       return;
@@ -1279,7 +1281,7 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                     </tr>
                     <tr>
                       <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>CPU</td>
-                      <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{versionDetail.cpu} vCPU</td>
+                      <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{versionDetail.cpu / 1000} vCPU</td>
                     </tr>
                     <tr>
                       <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>メモリ</td>
