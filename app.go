@@ -180,6 +180,78 @@ func (a *App) GetServerStatus(profileName, zone, serverID string) (string, error
 	return service.GetStatus(a.ctx, zone, serverID)
 }
 
+func (a *App) GetServerDetail(profileName, zone, serverID string) (*sakura.ServerInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewServerService(client)
+	return service.Get(a.ctx, zone, serverID)
+}
+
+func (a *App) ChangeServerPlan(profileName, zone, serverID string, cpu, memoryGB int) (*sakura.ServerInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewServerService(client)
+	return service.ChangePlan(a.ctx, zone, serverID, cpu, memoryGB)
+}
+
+func (a *App) GetCDROMs(profileName, zone string) ([]sakura.CDROMInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewCDROMService(client)
+	return service.List(a.ctx, zone)
+}
+
+func (a *App) InsertServerCDROM(profileName, zone, serverID, cdromID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewServerService(client)
+	return service.InsertCDROM(a.ctx, zone, serverID, cdromID)
+}
+
+func (a *App) EjectServerCDROM(profileName, zone, serverID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewServerService(client)
+	return service.EjectCDROM(a.ctx, zone, serverID)
+}
+
+func (a *App) SendServerKey(profileName, zone, serverID, key string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewServerService(client)
+	return service.SendKey(a.ctx, zone, serverID, key)
+}
+
+func (a *App) SendServerNMI(profileName, zone, serverID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewServerService(client)
+	return service.SendNMI(a.ctx, zone, serverID)
+}
+
+func (a *App) GetServerVNCProxy(profileName, zone, serverID string) (*sakura.VNCProxyInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewServerService(client)
+	return service.GetVNCProxy(a.ctx, zone, serverID)
+}
+
 // Global resources (zone-independent)
 func (a *App) GetDNSList(profileName string) ([]sakura.DNSInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)

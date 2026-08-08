@@ -288,12 +288,12 @@
 15. ✅ AppRun共用型: ApplicationのDelete、VersionのDelete、TrafficのUpdate、UserのCreate — 2026-08-08対応済み（ApplicationのCreate/Updateも2026-08-08対応済み、Tier2 #15完了）
 
 **Tier 3: 低優先度・ニッチ or 複雑度が高い機能**
-16. Server: ChangePlan/InsertCDROM/EjectCDROM/SendKey/SendNMI/GetVNCProxy等パワーユーザー向け機能（複雑さ・利用頻度の観点で後回し。読み取り専用方針による除外ではない）
+16. ✅ Server: ChangePlan/InsertCDROM/EjectCDROM/SendKey/SendNMI/GetVNCProxy等パワーユーザー向け機能 — 2026-08-08対応済み
 17. Archive: Create/CreateBlank/CreateFromShared/Share/OpenFTP/CloseFTP
 18. ObjectStorage: AccountのRead/Delete、PermissionsAPI全般、暗号化/レプリケーション/クォータ設定、S3側のPutObject/DeleteObject
 19. Monitoring Suite: ストレージ・アクセスキーのCreate/Update/Destroy
 20. ProxyLB: ChangePlan/MonitorConnection（トラフィックグラフ）
 21. Bill: ByContractYear/ByContractYearMonth（期間絞り込み）/DetailsCSV
 
-### その他
-- `internal/sakura/server.go` の `println` デバッグ文の削除（別issueとして切り出し推奨、未着手）
+### ✅ 完了（2026-08-08 追加セッション26、Tier3 #16）
+- ServerのChangePlan/InsertCDROM/EjectCDROM/SendKey/SendNMI/GetVNCProxyを実装。`internal/sakura/server.go`に各メソッドを追加（ChangePlanはAPI仕様上サーバーIDが再採番されるため戻り値のIDが変わる点に注意、CD-ROM一覧取得用に`internal/sakura/cdrom.go`を新設）、`app.go`に対応する7つのRPCを公開。`ServerDetail.tsx`を新設（従来Detail画面が存在しなかった）し、`ServerList.tsx`のカードクリックで遷移するようにした。プラン変更フォーム、CD-ROM挿入/排出、コンソールキー送信（プリセット+NMI確認ダイアログ）、VNC接続情報取得UIを実装。あわせて`internal/sakura/server.go`に残っていた`println`デバッグ文を削除。`internal/sakura/server_test.go`、`ServerDetail.test.tsx`、`frontend/e2e/server-detail.spec.ts`を追加

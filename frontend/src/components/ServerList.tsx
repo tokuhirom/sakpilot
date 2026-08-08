@@ -10,6 +10,7 @@ interface ServerListProps {
   zone: string;
   zones: sakura.ZoneInfo[];
   onZoneChange: (zone: string) => void;
+  onSelectServer: (id: string) => void;
 }
 
 interface ConfirmDialog {
@@ -20,7 +21,7 @@ interface ConfirmDialog {
   action: 'powerOn' | 'powerOff' | 'reset' | 'delete';
 }
 
-export function ServerList({ profile, zone, zones, onZoneChange }: ServerListProps) {
+export function ServerList({ profile, zone, zones, onZoneChange, onSelectServer }: ServerListProps) {
   const [servers, setServers] = useState<sakura.ServerInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
@@ -226,7 +227,7 @@ export function ServerList({ profile, zone, zones, onZoneChange }: ServerListPro
         </div>
       ) : (
         filteredServers.map((server) => (
-          <div key={server.id} className="card">
+          <div key={server.id} className="card" onClick={() => onSelectServer(server.id)} style={{ cursor: 'pointer' }}>
             <div className="card-header">
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

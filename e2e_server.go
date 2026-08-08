@@ -240,6 +240,7 @@ func seedServers() {
 	seeds := []seed{
 		{900000000001, "e2e-web-1", "E2E: 起動中サーバー(電源操作シナリオ用)", 2, 4, types.ServerInstanceStatuses.Up, "192.0.2.1"},
 		{900000000002, "e2e-doomed-1", "E2E: 削除シナリオ用サーバー", 1, 2, types.ServerInstanceStatuses.Down, "192.0.2.2"},
+		{900000000003, "e2e-poweruser-1", "E2E: パワーユーザー機能シナリオ用サーバー", 1, 1, types.ServerInstanceStatuses.Down, "192.0.2.3"},
 	}
 	for i, s := range seeds {
 		ifaceID := types.ID(910000000001 + i)
@@ -262,6 +263,15 @@ func seedServers() {
 			CreatedAt:      now,
 		})
 	}
+
+	fake.DataStore.Put(fake.ResourceCDROM, e2eZone, types.ID(900000000101), &iaas.CDROM{
+		ID:           900000000101,
+		Name:         "e2e-iso-1",
+		Description:  "E2E: CD-ROM挿入シナリオ用ISOイメージ",
+		SizeMB:       1024,
+		Availability: types.Availabilities.Available,
+		CreatedAt:    now,
+	})
 }
 
 // seedAppRunDedicated はAppRun専有型(sakumock apprundedicated)にE2Eシナリオ用の

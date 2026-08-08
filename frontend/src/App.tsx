@@ -17,6 +17,7 @@ import {
 } from '../wailsjs/go/main/App';
 import { sakura, main } from '../wailsjs/go/models';
 import { ServerList } from './components/ServerList';
+import { ServerDetail } from './components/ServerDetail';
 import { DiskList } from './components/DiskList';
 import { DiskDetail } from './components/DiskDetail';
 import { DNSList } from './components/DNSList';
@@ -175,6 +176,7 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
           <div className="breadcrumb">
             <Routes>
               <Route path="servers" element={<span className="breadcrumb-item active">サーバー</span>} />
+              <Route path="servers/:id" element={<ServerBreadcrumb profile={profile} />} />
               <Route path="disks" element={<span className="breadcrumb-item active">ディスク</span>} />
               <Route path="disks/:id" element={<DiskBreadcrumb profile={profile} />} />
               <Route path="archives" element={<span className="breadcrumb-item active">アーカイブ</span>} />
@@ -232,7 +234,10 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
 
         <Routes>
           <Route path="servers" element={
-            <ServerList profile={profile} zone={selectedZone} zones={zones} onZoneChange={setSelectedZone} />
+            <ServerListWrapper profile={profile} zone={selectedZone} zones={zones} onZoneChange={setSelectedZone} />
+          } />
+          <Route path="servers/:id" element={
+            <ServerDetailWrapper profile={profile} zone={selectedZone} />
           } />
           <Route path="disks" element={
             <DiskListWrapper profile={profile} zone={selectedZone} zones={zones} onZoneChange={setSelectedZone} />
@@ -320,6 +325,38 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
 }
 
 // Wrapper components for navigation
+function ServerListWrapper({ profile, zone, zones, onZoneChange }: { profile: string; zone: string; zones: sakura.ZoneInfo[]; onZoneChange: (zone: string) => void }) {
+  const navigate = useNavigate();
+  return (
+    <ServerList
+      profile={profile}
+      zone={zone}
+      zones={zones}
+      onZoneChange={onZoneChange}
+      onSelectServer={(id) => navigate(`/${profile}/servers/${id}`)}
+    />
+  );
+}
+
+function ServerDetailWrapper({ profile, zone }: { profile: string; zone: string }) {
+  const { id } = useParams<{ id: string }>();
+  if (!id) return null;
+  return <ServerDetail profile={profile} zone={zone} serverId={id} />;
+}
+
+function ServerBreadcrumb({ profile }: { profile: string }) {
+  const navigate = useNavigate();
+  return (
+    <>
+      <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/${profile}/servers`)}>
+        サーバー
+      </span>
+      <span className="breadcrumb-separator">/</span>
+      <span className="breadcrumb-item active">詳細</span>
+    </>
+  );
+}
+
 function DiskListWrapper({ profile, zone, zones, onZoneChange }: { profile: string; zone: string; zones: sakura.ZoneInfo[]; onZoneChange: (zone: string) => void }) {
   const navigate = useNavigate();
   return (
