@@ -12,6 +12,7 @@ import {
   SetAppRunActiveVersion,
   CreateAppRunApplicationVersion,
   CreateAppRunApplication,
+  CreateAppRunCluster,
   UpdateAppRunWorkerNodeDraining,
   DeleteAppRunCluster,
   DeleteAppRunApplication,
@@ -72,6 +73,27 @@ type DeployForm = {
   envVars: EnvVarFormRow[];
 };
 
+type CreateClusterPortFormRow = {
+  port: string;
+  protocol: 'http' | 'https' | 'tcp';
+};
+
+type CreateClusterForm = {
+  name: string;
+  letsEncryptEmail: string;
+  servicePrincipalID: string;
+  ports: CreateClusterPortFormRow[];
+};
+
+function emptyCreateClusterForm(): CreateClusterForm {
+  return {
+    name: '',
+    letsEncryptEmail: '',
+    servicePrincipalID: '',
+    ports: [{ port: '443', protocol: 'https' }],
+  };
+}
+
 function emptyDeployForm(): DeployForm {
   return {
     image: '',
@@ -113,6 +135,9 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
   const [creatingApp, setCreatingApp] = useState(false);
   const [createAppError, setCreateAppError] = useState<string | null>(null);
   const [updatingDrainingId, setUpdatingDrainingId] = useState<string | null>(null);
+  const [createClusterForm, setCreateClusterForm] = useState<CreateClusterForm | null>(null);
+  const [creatingCluster, setCreatingCluster] = useState(false);
+  const [createClusterError, setCreateClusterError] = useState<string | null>(null);
 
   const loadClusters = useCallback(async () => {
     if (!profile) return;
@@ -520,6 +545,74 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
     }
   };
 
+  const handleCreateClusterOpen = () => {
+    setCreateClusterError(null);
+    setCreateClusterForm(emptyCreateClusterForm());
+  };
+
+  const handleCreateClusterCancel = () => {
+    setCreateClusterForm(null);
+    setCreateClusterError(null);
+  };
+
+  const handleAddClusterPort = () => {
+    if (!createClusterForm) return;
+    setCreateClusterForm({
+      ...createClusterForm,
+      ports: [...createClusterForm.ports, { port: '', protocol: 'https' }],
+    });
+  };
+
+  const handleRemoveClusterPort = (index: number) => {
+    if (!createClusterForm) return;
+    setCreateClusterForm({
+      ...createClusterForm,
+      ports: createClusterForm.ports.filter((_, i) => i !== index),
+    });
+  };
+
+  const handleClusterPortChange = (index: number, field: 'port' | 'protocol', value: string) => {
+    if (!createClusterForm) return;
+    const ports = createClusterForm.ports.map((p, i) => (i === index ? { ...p, [field]: value } : p));
+    setCreateClusterForm({ ...createClusterForm, ports } as CreateClusterForm);
+  };
+
+  const handleCreateClusterSubmit = async () => {
+    if (!createClusterForm) return;
+    if (!createClusterForm.name.trim()) {
+      setCreateClusterError('クラスタ名を入力してください');
+      return;
+    }
+    if (!createClusterForm.servicePrincipalID.trim()) {
+      setCreateClusterError('サービスプリンシパルIDを入力してください');
+      return;
+    }
+    if (createClusterForm.ports.length === 0 || createClusterForm.ports.some((p) => !p.port.trim())) {
+      setCreateClusterError('待ち受けポートを1つ以上指定してください');
+      return;
+    }
+
+    setCreatingCluster(true);
+    setCreateClusterError(null);
+    try {
+      await CreateAppRunCluster(profile, new apprun.CreateClusterParams({
+        name: createClusterForm.name.trim(),
+        letsEncryptEmail: createClusterForm.letsEncryptEmail.trim() || undefined,
+        servicePrincipalID: createClusterForm.servicePrincipalID.trim(),
+        ports: createClusterForm.ports.map((p) => new apprun.CreateClusterPortParams({
+          port: Number(p.port),
+          protocol: p.protocol,
+        })),
+      }));
+      setCreateClusterForm(null);
+      await loadClusters();
+    } catch (e) {
+      setCreateClusterError(String(e));
+    } finally {
+      setCreatingCluster(false);
+    }
+  };
+
   const handleToggleDraining = async (nodeId: string, draining: boolean) => {
     if (!profile || view.type !== 'asg') return;
     setUpdatingDrainingId(nodeId);
@@ -635,6 +728,97 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
           <div className="confirm-actions">
             <button className="btn btn-secondary" onClick={handleDeleteCancel}>キャンセル</button>
             <button className="btn btn-danger" onClick={handleDeleteConfirm}>削除する</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCreateClusterModal = () => {
+    if (!createClusterForm) return null;
+    return (
+      <div className="modal-overlay" onClick={handleCreateClusterCancel} style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+      }}>
+        <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+          backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+          padding: '20px', minWidth: '420px', maxWidth: '560px', maxHeight: '85vh', overflowY: 'auto',
+        }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>クラスタを作成</h3>
+          <div className="form-group">
+            <label>クラスタ名</label>
+            <input
+              type="text"
+              value={createClusterForm.name}
+              onChange={(e) => setCreateClusterForm({ ...createClusterForm, name: e.target.value })}
+              placeholder="my-cluster"
+              autoFocus
+            />
+          </div>
+          <div className="form-group">
+            <label>サービスプリンシパルID</label>
+            <input
+              type="text"
+              value={createClusterForm.servicePrincipalID}
+              onChange={(e) => setCreateClusterForm({ ...createClusterForm, servicePrincipalID: e.target.value })}
+              placeholder="123456789012"
+            />
+          </div>
+          <div className="form-group">
+            <label>Let's Encryptメールアドレス（任意）</label>
+            <input
+              type="text"
+              value={createClusterForm.letsEncryptEmail}
+              onChange={(e) => setCreateClusterForm({ ...createClusterForm, letsEncryptEmail: e.target.value })}
+              placeholder="admin@example.com"
+            />
+          </div>
+          <div className="form-group">
+            <label>待ち受けポート</label>
+            {createClusterForm.ports.map((p, i) => (
+              <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                <input
+                  type="number"
+                  value={p.port}
+                  onChange={(e) => handleClusterPortChange(i, 'port', e.target.value)}
+                  placeholder="443"
+                  style={{ width: '100px' }}
+                />
+                <select
+                  value={p.protocol}
+                  onChange={(e) => handleClusterPortChange(i, 'protocol', e.target.value)}
+                >
+                  <option value="http">http</option>
+                  <option value="https">https</option>
+                  <option value="tcp">tcp</option>
+                </select>
+                <button
+                  className="btn btn-danger btn-small"
+                  onClick={() => handleRemoveClusterPort(i)}
+                  disabled={createClusterForm.ports.length <= 1}
+                >
+                  削除
+                </button>
+              </div>
+            ))}
+            <button className="btn btn-secondary btn-small" onClick={handleAddClusterPort}>+ ポート追加</button>
+          </div>
+          {createClusterError && (
+            <div style={{ marginTop: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+              エラー: {createClusterError}
+            </div>
+          )}
+          <div className="confirm-actions" style={{ marginTop: '1.5rem' }}>
+            <button className="btn btn-secondary" onClick={handleCreateClusterCancel}>キャンセル</button>
+            <button
+              className="btn btn-primary"
+              onClick={handleCreateClusterSubmit}
+              disabled={creatingCluster || !createClusterForm.name.trim() || !createClusterForm.servicePrincipalID.trim()}
+            >
+              {creatingCluster ? '作成中...' : '作成する'}
+            </button>
           </div>
         </div>
       </div>
@@ -939,6 +1123,9 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
           <h2>AppRun専有型</h2>
         </div>
         {renderBreadcrumb()}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+          <button className="btn btn-primary btn-small" onClick={handleCreateClusterOpen}>+ クラスタ作成</button>
+        </div>
         {clusters.length === 0 ? (
           <div className="empty-state">クラスタがありません</div>
         ) : (
@@ -975,6 +1162,7 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
           </table>
         )}
         {renderConfirmDialog()}
+        {renderCreateClusterModal()}
       </>
     );
   }

@@ -579,6 +579,42 @@ func TestService_CreateApplication(t *testing.T) {
 	}
 }
 
+func TestService_CreateCluster(t *testing.T) {
+	srv := mockapprundedicated.NewTestServer(mockapprundedicated.Config{})
+	defer srv.Close()
+	ctx := context.Background()
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_APPRUN_DEDICATED", srv.TestURL())
+
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	created, err := service.CreateCluster(ctx, apprun.CreateClusterParams{
+		Name:               "new-cluster",
+		ServicePrincipalID: "123456789012",
+		Ports: []apprun.CreateClusterPortParams{
+			{Port: 443, Protocol: "https"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateCluster: %v", err)
+	}
+	if created.Name != "new-cluster" {
+		t.Errorf("Name = %q, want %q", created.Name, "new-cluster")
+	}
+
+	clusters, err := service.ListClusters(ctx)
+	if err != nil {
+		t.Fatalf("ListClusters: %v", err)
+	}
+	if len(clusters) != 1 || clusters[0].ID != created.ID {
+		t.Fatalf("clusters = %+v, want single cluster with ID %q", clusters, created.ID)
+	}
+}
+
 func TestService_UpdateWorkerNodeDraining(t *testing.T) {
 	srv := mockapprundedicated.NewTestServer(mockapprundedicated.Config{})
 	defer srv.Close()
