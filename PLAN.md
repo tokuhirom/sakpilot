@@ -17,7 +17,7 @@
 | リソース | FEテスト | 削除機能 | 電源操作 | 総評 |
 |---|---|---|---|---|
 | Server | ✅ あり | ✅ | ✅ | 完備。Resetも追加済み（PR #80） |
-| Disk | ✅ あり | ✅ | (対象外) | 削除フローのFEテストを追加済み。Create/Update/接続変更は引き続き未実装 |
+| Disk | ✅ あり | ✅ | (対象外) | Create/Update/接続先サーバー変更（ConnectToServer/DisconnectFromServer）まで対応済み |
 | Archive | ✅ あり | ✅ | (対象外) | 削除フロー・busy状態のFEテストを追加済み。Create/共有/FTP転送は引き続き未実装 |
 | Switch | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #82）。共有スコープは削除不可でボタン無効化 |
 | PacketFilter | ✅ あり | ✅ | (対象外) | 削除機能に加えCreate/Update（ルール管理）まで対応済み。読み書き一式が完備 |
@@ -48,10 +48,10 @@
 - 備考: `server.go` に `println` デバッグ文が複数残存（要クリーンアップ、別issue化推奨）
 
 ### Disk
-- テスト: `DiskList.test.tsx` あり（一覧表示・削除確認フロー・キャンセル・未接続表示をカバー）
-- バックエンド: List/Delete のみ。Get/Create/Update、サーバーへの接続/切断（ConnectToServer/DisconnectFromServer）は未実装
-- ✅ **対応済み**: `DiskList.test.tsx` を追加
-- SDK比較で残る不足: Create/CreateWithConfig/Update/Config（OSインストール設定）/ConnectToServer/DisconnectFromServer/ResizePartition/Monitor系（未着手）
+- テスト: `DiskList.test.tsx`（一覧表示・削除確認フロー・キャンセル・未接続表示・作成モーダルの成功/失敗・カード クリックでの詳細遷移）、`DiskDetail.test.tsx`（基本情報表示・名前説明タグの編集・接続先サーバーへの接続/切断）ともに整備済み。`frontend/e2e/disk.spec.ts` で作成〜基本情報編集〜接続〜切断〜削除までのE2Eもカバー
+- バックエンド: List/**Get**/**Create**/**Update**/**ConnectToServer**/**DisconnectFromServer**/Delete 実装済み
+- ✅ **対応済み（2026-08-08 Tier2 #8）**: ディスクの新規作成（サイズ/プラン[SSD・HDD]/接続方式[virtio・ide]/コピー元アーカイブ/接続先サーバーを選択可能）、名前・説明・タグの編集、接続先サーバーの変更（ConnectToServer/DisconnectFromServer、Updateとは別APIのため専用UIを用意）を追加。`DiskDetail.tsx`を新設し一覧のカードクリックで遷移する導線を追加（従来はDetail画面が存在しなかった）
+- SDK比較で残る不足: CreateWithConfig/Config（OSインストール設定）/ResizePartition/Monitor系（未着手、パワーユーザー向け機能のため優先度低）
 
 ### Archive
 - テスト: `ArchiveList.test.tsx` あり（一覧表示・削除確認フロー・キャンセル・`availability`(uploading/migrating)に応じたボタン活性制御をカバー）
@@ -219,6 +219,9 @@
 ### ✅ 完了（2026-08-08 追加セッション11、Tier1 #6）
 - AppRun専有型のVersion Create（デプロイ）を実装。フルデプロイフォーム（イメージ/コマンド/CPU・メモリ/スケーリングモード[固定 or CPU使用率]/公開ポート・ヘルスチェック/環境変数）で対応。バックエンド・フロント双方の実装詳細は上記「AppRun（専有型 / 共用型）」節を参照。`internal/apprun/service_test.go`に`sakumock/apprundedicated`テストサーバーを使った実APIリクエストの検証テストを追加
 
+### ✅ 完了（2026-08-08 追加セッション12、Tier2 #8）
+- DiskのCreate/Update/ConnectToServer/DisconnectFromServerを実装。`internal/sakura/disk.go`にGet/Create/Update/ConnectToServer/DisconnectFromServerを追加（DiskUpdateRequestに楽観ロック用フィールドはないため事前Read不要）、`app.go`に対応する5つのRPCを公開。`DiskDetail.tsx`を新設（従来Detail画面が存在しなかった）し、`DiskList.tsx`に作成モーダル（サイズ/プラン/接続方式/コピー元アーカイブ/接続先サーバー）とカードクリックでの詳細遷移を追加。接続先サーバー変更はUpdate APIではなくConnectToServer/DisconnectFromServerという別APIのため、Detail画面に専用の「接続先サーバー」編集UIを実装。`internal/sakura/disk_test.go`（fakeドライバ、`fake.InitDataStore`がプロセス内で一度しか初期化されない点に注意しテスト間で共有されるデータストアを前提に記述）、`DiskList.test.tsx`/`DiskDetail.test.tsx`、`frontend/e2e/disk.spec.ts`を追加
+
 ### 実装順序（2026-08-08 方針転換後の書き込み系機能ロードマップ）
 
 「閲覧中心」制約の撤廃を受け、各節「SDK比較で残る不足」に列挙された未実装機能（主にCreate/Update系）を、(a) 利用頻度・実用価値、(b) 実装複雑度、(c) 誤操作時のリスク（実インフラ作成・課金発生の有無）で並べ替えたロードマップ。上から順に着手することを推奨するが、各Tier内の順序はユーザーの関心に応じて入れ替えてよい。
@@ -247,7 +250,7 @@
 
 **Tier 2: リソース新規作成系（入力項目・依存関係が多くフォーム設計コストが高い、または実インフラ作成を伴い課金・削除確認等の設計が必要）**
 7. ✅ Switch: Create/Update — 2026-08-08対応済み
-8. Disk: Create/CreateWithConfig/Update/ConnectToServer/DisconnectFromServer
+8. ✅ Disk: Create/Update/ConnectToServer/DisconnectFromServer — 2026-08-08対応済み（CreateWithConfigは対象外、Tier3相当として保留）
 9. ProxyLB: Create/Update/UpdateSettings
 10. KMS: Create/Update
 11. Database: Create/Update/UpdateSettings/GetParameter/SetParameter

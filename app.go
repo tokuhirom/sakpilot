@@ -491,6 +491,51 @@ func (a *App) DeleteDisk(profileName, zone, diskID string) error {
 	return service.Delete(a.ctx, zone, diskID)
 }
 
+func (a *App) GetDiskDetail(profileName, zone, diskID string) (*sakura.DiskInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewDiskService(client)
+	return service.Get(a.ctx, zone, diskID)
+}
+
+func (a *App) CreateDisk(profileName, zone, name, description string, tags []string, sizeGB int, diskPlan, connection, sourceArchiveID, serverID string) (*sakura.DiskInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewDiskService(client)
+	return service.Create(a.ctx, zone, name, description, tags, sizeGB, diskPlan, connection, sourceArchiveID, serverID)
+}
+
+func (a *App) UpdateDisk(profileName, zone, diskID, name, description string, tags []string) (*sakura.DiskInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewDiskService(client)
+	return service.Update(a.ctx, zone, diskID, name, description, tags)
+}
+
+func (a *App) ConnectDiskToServer(profileName, zone, diskID, serverID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewDiskService(client)
+	return service.ConnectToServer(a.ctx, zone, diskID, serverID)
+}
+
+func (a *App) DisconnectDiskFromServer(profileName, zone, diskID string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewDiskService(client)
+	return service.DisconnectFromServer(a.ctx, zone, diskID)
+}
+
 // Archives
 func (a *App) GetArchives(profileName, zone string) ([]sakura.ArchiveInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
