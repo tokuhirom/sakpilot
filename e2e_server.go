@@ -114,9 +114,11 @@ func runE2EServer(addr, dist string) error {
 		return fmt.Errorf("failed to seed KMS keys: %w", err)
 	}
 
-	// ObjectStorageのS3互換データプレーン(オブジェクト一覧・ダウンロード)はsakumockに
-	// 含まれず外部バイナリ(versitygw)依存のためモックしない。バケット/アクセスキーの
-	// 管理API(control plane)のみE2E対象とする。
+	// ObjectStorageのS3互換データプレーン(オブジェクト一覧・ダウンロード)はsakumock側で
+	// `--enable-data-plane`により提供可能だが、外部プロセス(versitygw、PATH上に別途
+	// インストールが必要)への委譲であり、かつcontrol planeで発行したアクセスキーが
+	// data plane側では検証されない設計のため、ここでは有効化せずバケット/アクセスキーの
+	// 管理API(control plane)のみE2E対象とする。詳細は docs/upstream-issues.md 参照。
 	objectStorageSrv := mockobjectstorage.NewTestServer(mockobjectstorage.Config{})
 	if err := os.Setenv("SAKURA_ENDPOINTS_OBJECT_STORAGE", objectStorageSrv.TestURL()); err != nil {
 		return err
