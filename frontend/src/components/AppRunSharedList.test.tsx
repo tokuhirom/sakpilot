@@ -11,6 +11,10 @@ import {
   HasAppRunSharedUser,
   CreateAppRunSharedApplication,
   UpdateAppRunSharedApplication,
+  DeleteAppRunSharedApplication,
+  DeleteAppRunSharedVersion,
+  UpdateAppRunSharedTraffics,
+  CreateAppRunSharedUser,
 } from '../../wailsjs/go/main/App';
 
 vi.mock('../../wailsjs/go/main/App');
@@ -70,6 +74,10 @@ describe('AppRunSharedList', () => {
     vi.mocked(GetAppRunSharedTraffics).mockReset();
     vi.mocked(CreateAppRunSharedApplication).mockReset();
     vi.mocked(UpdateAppRunSharedApplication).mockReset();
+    vi.mocked(DeleteAppRunSharedApplication).mockReset();
+    vi.mocked(DeleteAppRunSharedVersion).mockReset();
+    vi.mocked(UpdateAppRunSharedTraffics).mockReset();
+    vi.mocked(CreateAppRunSharedUser).mockReset();
 
     vi.mocked(HasAppRunSharedUser).mockResolvedValue(true);
     vi.mocked(GetAppRunSharedApplications).mockResolvedValue([]);
@@ -78,6 +86,10 @@ describe('AppRunSharedList', () => {
     vi.mocked(GetAppRunSharedTraffics).mockResolvedValue([]);
     vi.mocked(CreateAppRunSharedApplication).mockResolvedValue(makeAppDetail());
     vi.mocked(UpdateAppRunSharedApplication).mockResolvedValue(makeAppDetail());
+    vi.mocked(DeleteAppRunSharedApplication).mockResolvedValue();
+    vi.mocked(DeleteAppRunSharedVersion).mockResolvedValue();
+    vi.mocked(UpdateAppRunSharedTraffics).mockResolvedValue([]);
+    vi.mocked(CreateAppRunSharedUser).mockResolvedValue();
   });
 
   it('shows a guidance message when no shared user is configured', async () => {
@@ -224,5 +236,99 @@ describe('AppRunSharedList', () => {
       }));
     });
     expect(screen.queryByText('スケール・タイムアウト設定を編集')).not.toBeInTheDocument();
+  });
+
+  it('deletes an application from the list after confirmation', async () => {
+    vi.mocked(GetAppRunSharedApplications).mockResolvedValue([makeApp()]);
+    const user = userEvent.setup();
+
+    render(<AppRunSharedList profile="default" />);
+    await screen.findByText('my-app');
+
+    await user.click(screen.getByRole('button', { name: '削除' }));
+    expect(await screen.findByText('「my-app」を削除しますか？')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '削除する' }));
+
+    await waitFor(() => {
+      expect(DeleteAppRunSharedApplication).toHaveBeenCalledWith('default', 'app-1');
+    });
+    expect(GetAppRunSharedApplications).toHaveBeenCalledTimes(2);
+  });
+
+  it('cancels application deletion without calling the API', async () => {
+    vi.mocked(GetAppRunSharedApplications).mockResolvedValue([makeApp()]);
+    const user = userEvent.setup();
+
+    render(<AppRunSharedList profile="default" />);
+    await screen.findByText('my-app');
+
+    await user.click(screen.getByRole('button', { name: '削除' }));
+    await user.click(screen.getByRole('button', { name: 'キャンセル' }));
+
+    expect(screen.queryByText('「my-app」を削除しますか？')).not.toBeInTheDocument();
+    expect(DeleteAppRunSharedApplication).not.toHaveBeenCalled();
+  });
+
+  it('deletes a version from the detail view after confirmation', async () => {
+    vi.mocked(GetAppRunSharedApplications).mockResolvedValue([makeApp()]);
+    vi.mocked(GetAppRunSharedVersions).mockResolvedValue([makeVersion()]);
+    const user = userEvent.setup();
+
+    render(<AppRunSharedList profile="default" />);
+    await user.click(await screen.findByText('my-app'));
+    await screen.findByRole('heading', { name: 'my-app' });
+
+    await user.click(screen.getByRole('button', { name: '削除' }));
+    expect(await screen.findByText('バージョン「v1」を削除しますか？')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '削除する' }));
+
+    await waitFor(() => {
+      expect(DeleteAppRunSharedVersion).toHaveBeenCalledWith('default', 'app-1', 'ver-1');
+    });
+  });
+
+  it('updates traffic distribution via the edit modal', async () => {
+    vi.mocked(GetAppRunSharedApplications).mockResolvedValue([makeApp()]);
+    vi.mocked(GetAppRunSharedTraffics).mockResolvedValue([
+      makeTraffic({ percent: 50 }),
+      makeTraffic({ versionName: 'v0', isLatestVersion: false, percent: 50 }),
+    ]);
+    const user = userEvent.setup();
+
+    render(<AppRunSharedList profile="default" />);
+    await user.click(await screen.findByText('my-app'));
+    await screen.findByRole('heading', { name: 'my-app' });
+
+    const editButtons = screen.getAllByRole('button', { name: '編集' });
+    await user.click(editButtons[1]);
+    const percentInputs = screen.getAllByDisplayValue('50');
+    await user.clear(percentInputs[0]);
+    await user.type(percentInputs[0], '60');
+    await user.clear(percentInputs[1]);
+    await user.type(percentInputs[1], '40');
+    await user.click(screen.getByRole('button', { name: '保存する' }));
+
+    await waitFor(() => {
+      expect(UpdateAppRunSharedTraffics).toHaveBeenCalledWith('default', 'app-1', [
+        expect.objectContaining({ isLatestVersion: true, percent: 60 }),
+        expect.objectContaining({ versionName: 'v0', percent: 40 }),
+      ]);
+    });
+    expect(screen.queryByText('トラフィック分散を編集')).not.toBeInTheDocument();
+  });
+
+  it('signs up for AppRun shared when no user is configured', async () => {
+    vi.mocked(HasAppRunSharedUser).mockResolvedValueOnce(false);
+    const user = userEvent.setup();
+
+    render(<AppRunSharedList profile="default" />);
+    await screen.findByText(/AppRun共用型のユーザーが設定されていません/);
+
+    await user.click(screen.getByRole('button', { name: 'AppRun共用型を利用開始する' }));
+
+    await waitFor(() => {
+      expect(CreateAppRunSharedUser).toHaveBeenCalledWith('default');
+    });
+    expect(await screen.findByText('アプリケーションがありません')).toBeInTheDocument();
   });
 });

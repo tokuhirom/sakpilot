@@ -376,6 +376,83 @@ func (s *Service) UpdateApplication(ctx context.Context, appID string, params Up
 	return s.GetApplication(ctx, appID)
 }
 
+// DeleteApplication アプリケーションを削除
+func (s *Service) DeleteApplication(ctx context.Context, appID string) error {
+	fmt.Printf("[AppRunShared] DeleteApplication: id=%s\n", appID)
+	applicationOp := apprun.NewApplicationOp(s.client)
+	if err := applicationOp.Delete(ctx, appID); err != nil {
+		fmt.Printf("[AppRunShared] DeleteApplication: error=%v\n", err)
+		return err
+	}
+	return nil
+}
+
+// DeleteVersion アプリケーションバージョンを削除
+func (s *Service) DeleteVersion(ctx context.Context, appID, versionID string) error {
+	fmt.Printf("[AppRunShared] DeleteVersion: appID=%s, versionID=%s\n", appID, versionID)
+	versionOp := apprun.NewVersionOp(s.client)
+	if err := versionOp.Delete(ctx, appID, versionID); err != nil {
+		fmt.Printf("[AppRunShared] DeleteVersion: error=%v\n", err)
+		return err
+	}
+	return nil
+}
+
+// UpdateTrafficParams トラフィック分散の変更対象1件分
+type UpdateTrafficParams struct {
+	VersionName     string `json:"versionName"`
+	IsLatestVersion bool   `json:"isLatestVersion"`
+	Percent         int    `json:"percent"`
+}
+
+// UpdateTraffics トラフィック分散比率を変更
+func (s *Service) UpdateTraffics(ctx context.Context, appID string, params []UpdateTrafficParams) ([]TrafficInfo, error) {
+	fmt.Printf("[AppRunShared] UpdateTraffics: appID=%s\n", appID)
+	trafficOp := apprun.NewTrafficOp(s.client)
+
+	body := make(v1.PutTrafficsBody, 0, len(params))
+	for _, p := range params {
+		if p.IsLatestVersion {
+			body = append(body, v1.NewPutTrafficsBodyItem0PutTrafficsBodyItem(v1.PutTrafficsBodyItem0{
+				IsLatestVersion: true,
+				Percent:         p.Percent,
+			}))
+		} else {
+			body = append(body, v1.NewPutTrafficsBodyItem1PutTrafficsBodyItem(v1.PutTrafficsBodyItem1{
+				VersionName: p.VersionName,
+				Percent:     p.Percent,
+			}))
+		}
+	}
+
+	result, err := trafficOp.Update(ctx, appID, &body)
+	if err != nil {
+		fmt.Printf("[AppRunShared] UpdateTraffics: error=%v\n", err)
+		return nil, err
+	}
+
+	traffics := make([]TrafficInfo, 0, len(result.Data))
+	for _, t := range result.Data {
+		traffics = append(traffics, TrafficInfo{
+			VersionName:     t.VersionName,
+			IsLatestVersion: t.IsLatestVersion,
+			Percent:         t.Percent,
+		})
+	}
+	return traffics, nil
+}
+
+// CreateUser さくらのAppRun(共用型)にサインアップする
+func (s *Service) CreateUser(ctx context.Context) error {
+	fmt.Printf("[AppRunShared] CreateUser: signing up...\n")
+	userOp := apprun.NewUserOp(s.client)
+	if _, err := userOp.Create(ctx); err != nil {
+		fmt.Printf("[AppRunShared] CreateUser: error=%v\n", err)
+		return err
+	}
+	return nil
+}
+
 // HasUser ユーザーが存在するか確認
 func (s *Service) HasUser(ctx context.Context) (bool, error) {
 	fmt.Printf("[AppRunShared] HasUser: checking...\n")
