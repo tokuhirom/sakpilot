@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SwitchList } from './SwitchList';
 import { sakura } from '../../wailsjs/go/models';
-import { GetSwitches, DeleteSwitch } from '../../wailsjs/go/main/App';
+import { GetSwitches, DeleteSwitch, CreateSwitch } from '../../wailsjs/go/main/App';
 
 vi.mock('../../wailsjs/go/main/App');
 
@@ -29,6 +29,7 @@ describe('SwitchList', () => {
   beforeEach(() => {
     vi.mocked(GetSwitches).mockReset();
     vi.mocked(DeleteSwitch).mockReset();
+    vi.mocked(CreateSwitch).mockReset();
   });
 
   it('lists switches returned by GetSwitches', async () => {
@@ -94,5 +95,41 @@ describe('SwitchList', () => {
     await waitFor(() => {
       expect(GetSwitches).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it('creates a switch via the create modal', async () => {
+    vi.mocked(GetSwitches)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([makeSwitch({ name: 'new-switch' })]);
+    vi.mocked(CreateSwitch).mockResolvedValueOnce(makeSwitch({ name: 'new-switch' }));
+    const user = userEvent.setup();
+
+    render(<SwitchList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectSwitch={() => {}} />);
+    await screen.findByText('スイッチがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ スイッチ作成' }));
+    await user.type(screen.getByPlaceholderText('my-switch'), 'new-switch');
+
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    await waitFor(() => {
+      expect(CreateSwitch).toHaveBeenCalledWith('default', 'is1a', 'new-switch', '', 0, '');
+    });
+    expect(await screen.findByText('new-switch')).toBeInTheDocument();
+  });
+
+  it('shows an error message when switch creation fails', async () => {
+    vi.mocked(GetSwitches).mockResolvedValueOnce([]);
+    vi.mocked(CreateSwitch).mockRejectedValueOnce(new Error('boom'));
+    const user = userEvent.setup();
+
+    render(<SwitchList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectSwitch={() => {}} />);
+    await screen.findByText('スイッチがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ スイッチ作成' }));
+    await user.type(screen.getByPlaceholderText('my-switch'), 'new-switch');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    expect(await screen.findByText(/エラー: Error: boom/)).toBeInTheDocument();
   });
 });

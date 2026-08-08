@@ -92,3 +92,49 @@ func (s *SwitchService) Delete(ctx context.Context, zone string, id string) erro
 	swOp := iaas.NewSwitchOp(s.client.Caller())
 	return swOp.Delete(ctx, zone, types.StringID(id))
 }
+
+func (s *SwitchService) Create(ctx context.Context, zone string, name string, description string, networkMaskLen int, defaultRoute string) (*SwitchInfo, error) {
+	swOp := iaas.NewSwitchOp(s.client.Caller())
+	sw, err := swOp.Create(ctx, zone, &iaas.SwitchCreateRequest{
+		Name:           name,
+		Description:    description,
+		NetworkMaskLen: networkMaskLen,
+		DefaultRoute:   defaultRoute,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &SwitchInfo{
+		ID:             sw.ID.String(),
+		Name:           sw.Name,
+		Description:    sw.Description,
+		ServerCount:    sw.ServerCount,
+		NetworkMaskLen: sw.NetworkMaskLen,
+		DefaultRoute:   sw.DefaultRoute,
+		Scope:          string(sw.Scope),
+	}, nil
+}
+
+func (s *SwitchService) Update(ctx context.Context, zone string, id string, name string, description string, networkMaskLen int, defaultRoute string) (*SwitchInfo, error) {
+	swOp := iaas.NewSwitchOp(s.client.Caller())
+	sw, err := swOp.Update(ctx, zone, types.StringID(id), &iaas.SwitchUpdateRequest{
+		Name:           name,
+		Description:    description,
+		NetworkMaskLen: networkMaskLen,
+		DefaultRoute:   defaultRoute,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &SwitchInfo{
+		ID:             sw.ID.String(),
+		Name:           sw.Name,
+		Description:    sw.Description,
+		ServerCount:    sw.ServerCount,
+		NetworkMaskLen: sw.NetworkMaskLen,
+		DefaultRoute:   sw.DefaultRoute,
+		Scope:          string(sw.Scope),
+	}, nil
+}

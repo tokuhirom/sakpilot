@@ -246,7 +246,7 @@
 6. ✅ AppRun専有型: Version Create（デプロイ） — 2026-08-08対応済み
 
 **Tier 2: リソース新規作成系（入力項目・依存関係が多くフォーム設計コストが高い、または実インフラ作成を伴い課金・削除確認等の設計が必要）**
-7. Switch: Create/Update
+7. ✅ Switch: Create/Update — 2026-08-08対応済み
 8. Disk: Create/CreateWithConfig/Update/ConnectToServer/DisconnectFromServer
 9. ProxyLB: Create/Update/UpdateSettings
 10. KMS: Create/Update
