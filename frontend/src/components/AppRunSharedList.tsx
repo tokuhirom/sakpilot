@@ -7,6 +7,10 @@ import {
   HasAppRunSharedUser,
   CreateAppRunSharedApplication,
   UpdateAppRunSharedApplication,
+  DeleteAppRunSharedApplication,
+  DeleteAppRunSharedVersion,
+  UpdateAppRunSharedTraffics,
+  CreateAppRunSharedUser,
 } from '../../wailsjs/go/main/App';
 import { apprunshared } from '../../wailsjs/go/models';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -60,6 +64,12 @@ interface EditApplicationForm {
   timeoutSeconds: string;
 }
 
+interface TrafficEditForm {
+  versionName: string;
+  isLatestVersion: boolean;
+  percent: string;
+}
+
 export function AppRunSharedList({ profile }: AppRunSharedListProps) {
   const [view, setView] = useState<View>({ type: 'list' });
   const [hasUser, setHasUser] = useState<boolean | null>(null);
@@ -77,6 +87,18 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
   const [editForm, setEditForm] = useState<EditApplicationForm | null>(null);
   const [editing, setEditing] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+
+  const [confirmDeleteApp, setConfirmDeleteApp] = useState<apprunshared.AppInfo | null>(null);
+  const [confirmDeleteVersion, setConfirmDeleteVersion] = useState<apprunshared.VersionInfo | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const [trafficForm, setTrafficForm] = useState<TrafficEditForm[] | null>(null);
+  const [savingTraffics, setSavingTraffics] = useState(false);
+  const [trafficError, setTrafficError] = useState<string | null>(null);
+
+  const [signingUp, setSigningUp] = useState(false);
+  const [signUpError, setSignUpError] = useState<string | null>(null);
 
   const checkUser = useCallback(async () => {
     if (!profile) return;
@@ -286,6 +308,124 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
       setEditError(String(e));
     } finally {
       setEditing(false);
+    }
+  };
+
+  const handleDeleteAppClick = (e: React.MouseEvent, app: apprunshared.AppInfo) => {
+    e.stopPropagation();
+    setDeleteError(null);
+    setConfirmDeleteApp(app);
+  };
+
+  const handleDeleteAppCancel = () => {
+    setConfirmDeleteApp(null);
+  };
+
+  const handleDeleteAppConfirm = async () => {
+    if (!confirmDeleteApp || !profile) return;
+    const target = confirmDeleteApp;
+    setConfirmDeleteApp(null);
+    setDeletingId(target.id);
+    setDeleteError(null);
+    try {
+      await DeleteAppRunSharedApplication(profile, target.id);
+      await loadApps();
+    } catch (e) {
+      setDeleteError(String(e));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleDeleteVersionClick = (version: apprunshared.VersionInfo) => {
+    setDeleteError(null);
+    setConfirmDeleteVersion(version);
+  };
+
+  const handleDeleteVersionCancel = () => {
+    setConfirmDeleteVersion(null);
+  };
+
+  const handleDeleteVersionConfirm = async () => {
+    if (!confirmDeleteVersion || !profile || view.type !== 'detail') return;
+    const target = confirmDeleteVersion;
+    setConfirmDeleteVersion(null);
+    setDeletingId(target.id);
+    setDeleteError(null);
+    try {
+      await DeleteAppRunSharedVersion(profile, view.appId, target.id);
+      await loadAppDetail(view.appId);
+    } catch (e) {
+      setDeleteError(String(e));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleTrafficEditOpen = () => {
+    setTrafficError(null);
+    setTrafficForm(
+      traffics.map((t) => ({
+        versionName: t.versionName,
+        isLatestVersion: t.isLatestVersion,
+        percent: String(t.percent),
+      }))
+    );
+  };
+
+  const handleTrafficEditCancel = () => {
+    setTrafficForm(null);
+    setTrafficError(null);
+  };
+
+  const handleTrafficPercentChange = (index: number, value: string) => {
+    if (!trafficForm) return;
+    setTrafficForm(trafficForm.map((t, i) => (i === index ? { ...t, percent: value } : t)));
+  };
+
+  const handleTrafficEditSubmit = async () => {
+    if (!trafficForm || !profile || view.type !== 'detail') return;
+    const percents = trafficForm.map((t) => parseInt(t.percent, 10));
+    if (percents.some(isNaN)) {
+      setTrafficError('割合は数値で入力してください');
+      return;
+    }
+    if (percents.reduce((sum, p) => sum + p, 0) !== 100) {
+      setTrafficError('割合の合計は100%にしてください');
+      return;
+    }
+
+    setSavingTraffics(true);
+    setTrafficError(null);
+    try {
+      await UpdateAppRunSharedTraffics(
+        profile,
+        view.appId,
+        trafficForm.map((t, i) => new apprunshared.UpdateTrafficParams({
+          versionName: t.versionName,
+          isLatestVersion: t.isLatestVersion,
+          percent: percents[i],
+        }))
+      );
+      setTrafficForm(null);
+      await loadAppDetail(view.appId);
+    } catch (e) {
+      setTrafficError(String(e));
+    } finally {
+      setSavingTraffics(false);
+    }
+  };
+
+  const handleSignUp = async () => {
+    setSigningUp(true);
+    setSignUpError(null);
+    try {
+      await CreateAppRunSharedUser(profile);
+      await checkUser();
+    } catch (e) {
+      setSignUpError(String(e));
+    } finally {
+      setSigningUp(false);
     }
   };
 
@@ -525,6 +665,91 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
     );
   };
 
+  const renderDeleteAppConfirm = () => {
+    if (!confirmDeleteApp) return null;
+    return (
+      <div className="confirm-overlay" onClick={handleDeleteAppCancel}>
+        <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+          <p>「{confirmDeleteApp.name}」を削除しますか？</p>
+          <div className="confirm-actions">
+            <button className="btn btn-secondary" onClick={handleDeleteAppCancel}>キャンセル</button>
+            <button className="btn btn-danger" onClick={handleDeleteAppConfirm}>削除する</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderDeleteVersionConfirm = () => {
+    if (!confirmDeleteVersion) return null;
+    return (
+      <div className="confirm-overlay" onClick={handleDeleteVersionCancel}>
+        <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+          <p>バージョン「{confirmDeleteVersion.name}」を削除しますか？</p>
+          <div className="confirm-actions">
+            <button className="btn btn-secondary" onClick={handleDeleteVersionCancel}>キャンセル</button>
+            <button className="btn btn-danger" onClick={handleDeleteVersionConfirm}>削除する</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderTrafficEditModal = () => {
+    if (!trafficForm) return null;
+    const total = trafficForm.reduce((sum, t) => sum + (parseInt(t.percent, 10) || 0), 0);
+    return (
+      <div className="modal-overlay" onClick={handleTrafficEditCancel} style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+      }}>
+        <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+          backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+          padding: '20px', minWidth: '360px',
+        }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>トラフィック分散を編集</h3>
+
+          {trafficForm.map((t, index) => (
+            <div key={index} className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <label htmlFor={`apprun-shared-traffic-${index}`} style={{ flex: 1, margin: 0, fontFamily: 'monospace' }}>
+                {t.isLatestVersion ? '(最新)' : t.versionName}
+              </label>
+              <input
+                id={`apprun-shared-traffic-${index}`}
+                type="text"
+                value={t.percent}
+                onChange={(e) => handleTrafficPercentChange(index, e.target.value)}
+                style={{ width: '70px' }}
+              />
+              <span>%</span>
+            </div>
+          ))}
+
+          <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: total === 100 ? '#888' : '#ff6b6b' }}>
+            合計: {total}%
+          </div>
+
+          {trafficError && (
+            <div style={{ marginTop: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+              エラー: {trafficError}
+            </div>
+          )}
+          <div className="confirm-actions" style={{ marginTop: '1.5rem' }}>
+            <button className="btn btn-secondary" onClick={handleTrafficEditCancel}>キャンセル</button>
+            <button
+              className="btn btn-primary"
+              onClick={handleTrafficEditSubmit}
+              disabled={savingTraffics}
+            >
+              {savingTraffics ? '保存中...' : '保存する'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // User not set up
   if (hasUser === false) {
     return (
@@ -535,7 +760,19 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
         <div className="empty-state">
           AppRun共用型のユーザーが設定されていません。
           <br />
-          さくらのクラウドコントロールパネルからAppRun共用型のユーザーを作成してください。
+          <button
+            className="btn btn-primary btn-small"
+            style={{ marginTop: '1rem' }}
+            onClick={handleSignUp}
+            disabled={signingUp}
+          >
+            {signingUp ? '登録中...' : 'AppRun共用型を利用開始する'}
+          </button>
+          {signUpError && (
+            <div style={{ marginTop: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+              エラー: {signUpError}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -569,6 +806,19 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
             <h2>{view.appName}</h2>
           </div>
         </div>
+
+        {deleteError && (
+          <div style={{
+            marginBottom: '1rem',
+            padding: '0.75rem',
+            backgroundColor: '#3d1f1f',
+            borderRadius: '4px',
+            color: '#ff6b6b',
+            fontSize: '0.85rem'
+          }}>
+            エラー: {deleteError}
+          </div>
+        )}
 
         {error && (
           <div style={{
@@ -664,7 +914,10 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
 
             {traffics.length > 0 && (
               <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem', background: '#2a2a2a', borderRadius: '8px' }}>
-                <h4 style={{ color: '#00adb5', marginTop: 0, marginBottom: '1rem' }}>トラフィック分散</h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h4 style={{ color: '#00adb5', margin: 0 }}>トラフィック分散</h4>
+                  <button className="btn btn-secondary btn-small" onClick={handleTrafficEditOpen}>編集</button>
+                </div>
                 <table className="table">
                   <thead>
                     <tr>
@@ -695,6 +948,7 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
                       <th>名前</th>
                       <th>ステータス</th>
                       <th>作成日時</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -707,6 +961,15 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
                           </span>
                         </td>
                         <td>{version.createdAt}</td>
+                        <td>
+                          <button
+                            className="btn btn-danger btn-small"
+                            onClick={() => handleDeleteVersionClick(version)}
+                            disabled={deletingId === version.id}
+                          >
+                            {deletingId === version.id ? '削除中...' : '削除'}
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -716,6 +979,8 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
           </>
         ) : null}
         {renderEditModal()}
+        {renderDeleteVersionConfirm()}
+        {renderTrafficEditModal()}
       </div>
     );
   }
@@ -728,7 +993,7 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
         <button className="btn btn-primary btn-small" onClick={handleCreateOpen}>+ アプリ作成</button>
       </div>
 
-      {error && (
+      {(error || deleteError) && (
         <div style={{
           marginBottom: '1rem',
           padding: '0.75rem',
@@ -737,7 +1002,7 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
           color: '#ff6b6b',
           fontSize: '0.85rem'
         }}>
-          エラー: {error}
+          エラー: {error || deleteError}
         </div>
       )}
 
@@ -753,6 +1018,7 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
               <th>ステータス</th>
               <th>公開URL</th>
               <th>作成日時</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -782,12 +1048,22 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
                   ) : '-'}
                 </td>
                 <td>{app.createdAt}</td>
+                <td>
+                  <button
+                    className="btn btn-danger btn-small"
+                    onClick={(e) => handleDeleteAppClick(e, app)}
+                    disabled={deletingId === app.id}
+                  >
+                    {deletingId === app.id ? '削除中...' : '削除'}
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
       {renderCreateModal()}
+      {renderDeleteAppConfirm()}
     </div>
   );
 }

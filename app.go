@@ -1216,6 +1216,38 @@ func (a *App) HasAppRunSharedUser(profileName string) (bool, error) {
 	return service.HasUser(a.ctx)
 }
 
+func (a *App) DeleteAppRunSharedApplication(profileName, appID string) error {
+	service, err := apprunshared.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteApplication(a.ctx, appID)
+}
+
+func (a *App) DeleteAppRunSharedVersion(profileName, appID, versionID string) error {
+	service, err := apprunshared.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteVersion(a.ctx, appID, versionID)
+}
+
+func (a *App) UpdateAppRunSharedTraffics(profileName, appID string, params []apprunshared.UpdateTrafficParams) ([]apprunshared.TrafficInfo, error) {
+	service, err := apprunshared.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateTraffics(a.ctx, appID, params)
+}
+
+func (a *App) CreateAppRunSharedUser(profileName string) error {
+	service, err := apprunshared.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.CreateUser(a.ctx)
+}
+
 // Bills
 func (a *App) GetBills(profileName, accountID string) ([]sakura.BillInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
