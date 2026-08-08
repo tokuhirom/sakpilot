@@ -11,6 +11,8 @@ import {
   ClearAppRunActiveVersion,
   SetAppRunActiveVersion,
   CreateAppRunApplicationVersion,
+  CreateAppRunApplication,
+  UpdateAppRunWorkerNodeDraining,
   DeleteAppRunCluster,
   DeleteAppRunApplication,
   DeleteAppRunASG,
@@ -107,6 +109,10 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
   const [deployForm, setDeployForm] = useState<DeployForm | null>(null);
   const [deploying, setDeploying] = useState(false);
   const [deployError, setDeployError] = useState<string | null>(null);
+  const [createAppName, setCreateAppName] = useState<string | null>(null);
+  const [creatingApp, setCreatingApp] = useState(false);
+  const [createAppError, setCreateAppError] = useState<string | null>(null);
+  const [updatingDrainingId, setUpdatingDrainingId] = useState<string | null>(null);
 
   const loadClusters = useCallback(async () => {
     if (!profile) return;
@@ -484,6 +490,50 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
     }
   };
 
+  const handleCreateAppOpen = () => {
+    setCreateAppError(null);
+    setCreateAppName('');
+  };
+
+  const handleCreateAppCancel = () => {
+    setCreateAppName(null);
+    setCreateAppError(null);
+  };
+
+  const handleCreateAppSubmit = async () => {
+    if (createAppName === null || view.type !== 'cluster') return;
+    if (!createAppName.trim()) {
+      setCreateAppError('アプリ名を入力してください');
+      return;
+    }
+
+    setCreatingApp(true);
+    setCreateAppError(null);
+    try {
+      await CreateAppRunApplication(profile, view.clusterId, createAppName.trim());
+      setCreateAppName(null);
+      await loadClusterDetails(view.clusterId);
+    } catch (e) {
+      setCreateAppError(String(e));
+    } finally {
+      setCreatingApp(false);
+    }
+  };
+
+  const handleToggleDraining = async (nodeId: string, draining: boolean) => {
+    if (!profile || view.type !== 'asg') return;
+    setUpdatingDrainingId(nodeId);
+    try {
+      await UpdateAppRunWorkerNodeDraining(profile, view.clusterId, view.asgId, nodeId, draining);
+      await loadASGDetails(view.clusterId, view.asgId);
+    } catch (err) {
+      console.error('[AppRunList] handleToggleDraining error:', err);
+      alert(`Draining状態の変更に失敗しました: ${err}`);
+    } finally {
+      setUpdatingDrainingId(null);
+    }
+  };
+
   const handleGlobalReload = useCallback(() => {
     if (view.type === 'clusters') {
       loadClusters();
@@ -585,6 +635,49 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
           <div className="confirm-actions">
             <button className="btn btn-secondary" onClick={handleDeleteCancel}>キャンセル</button>
             <button className="btn btn-danger" onClick={handleDeleteConfirm}>削除する</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCreateAppModal = () => {
+    if (createAppName === null) return null;
+    return (
+      <div className="modal-overlay" onClick={handleCreateAppCancel} style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+      }}>
+        <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+          backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+          padding: '20px', minWidth: '360px',
+        }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>アプリケーションを作成</h3>
+          <div className="form-group">
+            <label>アプリ名</label>
+            <input
+              type="text"
+              value={createAppName}
+              onChange={(e) => setCreateAppName(e.target.value)}
+              placeholder="my-app"
+              autoFocus
+            />
+          </div>
+          {createAppError && (
+            <div style={{ marginTop: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+              エラー: {createAppError}
+            </div>
+          )}
+          <div className="confirm-actions" style={{ marginTop: '1.5rem' }}>
+            <button className="btn btn-secondary" onClick={handleCreateAppCancel}>キャンセル</button>
+            <button
+              className="btn btn-primary"
+              onClick={handleCreateAppSubmit}
+              disabled={creatingApp || !createAppName.trim()}
+            >
+              {creatingApp ? '作成中...' : '作成する'}
+            </button>
           </div>
         </div>
       </div>
@@ -895,7 +988,10 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
         </div>
         {renderBreadcrumb()}
 
-        <h3 style={{ marginTop: '1rem', color: '#00adb5' }}>アプリケーション</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem' }}>
+          <h3 style={{ color: '#00adb5', margin: 0 }}>アプリケーション</h3>
+          <button className="btn btn-primary btn-small" onClick={handleCreateAppOpen}>+ アプリ作成</button>
+        </div>
         {apps.length === 0 ? (
           <div className="empty-state">アプリケーションがありません</div>
         ) : (
@@ -987,6 +1083,7 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
             </tbody>
           </table>
         )}
+        {renderCreateAppModal()}
         {renderConfirmDialog()}
       </>
     );
@@ -1173,6 +1270,7 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                 <th>状態</th>
                 <th>Draining</th>
                 <th>IPアドレス</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -1193,6 +1291,15 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                           eth{iface.index}: {iface.addresses?.join(', ') || '-'}
                         </div>
                       ))}
+                    </td>
+                    <td style={{ textAlign: 'left' }}>
+                      <button
+                        className="btn btn-secondary btn-small"
+                        onClick={() => handleToggleDraining(node.id, !node.draining)}
+                        disabled={updatingDrainingId === node.id}
+                      >
+                        {updatingDrainingId === node.id ? '処理中...' : node.draining ? 'Draining解除' : 'Draining開始'}
+                      </button>
                     </td>
                   </tr>
                 );

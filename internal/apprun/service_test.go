@@ -542,6 +542,102 @@ func TestService_DeleteLoadBalancer(t *testing.T) {
 	}
 }
 
+func TestService_CreateApplication(t *testing.T) {
+	srv := mockapprundedicated.NewTestServer(mockapprundedicated.Config{})
+	defer srv.Close()
+	ctx := context.Background()
+	rawClient := newRawClient(t, srv.TestURL())
+
+	clusterID := seedCluster(t, ctx, rawClient)
+	clusterIDStr := uuid.UUID(clusterID).String()
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_APPRUN_DEDICATED", srv.TestURL())
+
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	created, err := service.CreateApplication(ctx, "new-app", clusterIDStr)
+	if err != nil {
+		t.Fatalf("CreateApplication: %v", err)
+	}
+	if created.Name != "new-app" {
+		t.Errorf("Name = %q, want %q", created.Name, "new-app")
+	}
+	if created.ClusterID != clusterIDStr {
+		t.Errorf("ClusterID = %q, want %q", created.ClusterID, clusterIDStr)
+	}
+
+	apps, err := service.ListApplications(ctx, clusterIDStr)
+	if err != nil {
+		t.Fatalf("ListApplications: %v", err)
+	}
+	if len(apps) != 1 || apps[0].ID != created.ID {
+		t.Fatalf("apps = %+v, want single app with ID %q", apps, created.ID)
+	}
+}
+
+func TestService_UpdateWorkerNodeDraining(t *testing.T) {
+	srv := mockapprundedicated.NewTestServer(mockapprundedicated.Config{})
+	defer srv.Close()
+	ctx := context.Background()
+	rawClient := newRawClient(t, srv.TestURL())
+
+	clusterID := seedCluster(t, ctx, rawClient)
+
+	asgResp, err := rawClient.CreateAutoScalingGroup(ctx, &v1.CreateAutoScalingGroup{
+		Name:                   "test-asg",
+		Zone:                   "is1a",
+		WorkerServiceClassPath: "cloud/apprun/dedicated/worker/1vcpu_2gb",
+		MinNodes:               1,
+		MaxNodes:               1,
+		NameServers:            []v1.IPv4{"210.188.224.10"},
+		Interfaces: []v1.AutoScalingGroupNodeInterface{
+			{InterfaceIndex: 0, Upstream: "shared"},
+		},
+	}, v1.CreateAutoScalingGroupParams{ClusterID: clusterID})
+	if err != nil {
+		t.Fatalf("seed CreateAutoScalingGroup: %v", err)
+	}
+	asgID := asgResp.AutoScalingGroup.GetAutoScalingGroupID()
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_APPRUN_DEDICATED", srv.TestURL())
+
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	clusterIDStr := uuid.UUID(clusterID).String()
+	asgIDStr := uuid.UUID(asgID).String()
+
+	nodes, err := service.ListWorkerNodes(ctx, clusterIDStr, asgIDStr)
+	if err != nil {
+		t.Fatalf("ListWorkerNodes: %v", err)
+	}
+	if len(nodes) != 1 {
+		t.Fatalf("got %d worker nodes, want 1: %+v", len(nodes), nodes)
+	}
+	if nodes[0].Draining {
+		t.Fatalf("worker node draining = true before update, want false")
+	}
+
+	if err := service.UpdateWorkerNodeDraining(ctx, clusterIDStr, asgIDStr, nodes[0].ID, true); err != nil {
+		t.Fatalf("UpdateWorkerNodeDraining: %v", err)
+	}
+
+	nodes, err = service.ListWorkerNodes(ctx, clusterIDStr, asgIDStr)
+	if err != nil {
+		t.Fatalf("ListWorkerNodes after update: %v", err)
+	}
+	if len(nodes) != 1 || !nodes[0].Draining {
+		t.Fatalf("nodes = %+v, want single node with draining=true", nodes)
+	}
+}
+
 func TestService_ListAutoScalingGroups_Empty(t *testing.T) {
 	srv := mockapprundedicated.NewTestServer(mockapprundedicated.Config{})
 	defer srv.Close()

@@ -1103,6 +1103,22 @@ func (a *App) DeleteAppRunApplicationVersion(profileName, applicationID string, 
 	return service.DeleteApplicationVersion(a.ctx, applicationID, version)
 }
 
+func (a *App) CreateAppRunApplication(profileName, clusterID, name string) (*apprun.AppInfo, error) {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateApplication(a.ctx, name, clusterID)
+}
+
+func (a *App) UpdateAppRunWorkerNodeDraining(profileName, clusterID, asgID, workerNodeID string, draining bool) error {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.UpdateWorkerNodeDraining(a.ctx, clusterID, asgID, workerNodeID, draining)
+}
+
 func (a *App) DeleteAppRunCluster(profileName, clusterID string) error {
 	service, err := apprun.NewService(profileName)
 	if err != nil {
