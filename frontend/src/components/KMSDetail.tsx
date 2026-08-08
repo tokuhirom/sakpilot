@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetKMSKey, RotateKMSKey, ChangeKMSKeyStatus } from '../../wailsjs/go/main/App';
+import { GetKMSKey, RotateKMSKey, ChangeKMSKeyStatus, UpdateKMSKey } from '../../wailsjs/go/main/App';
 import { kms } from '../../wailsjs/go/models';
 import { useGlobalReload } from '../hooks/useGlobalReload';
 
@@ -32,8 +32,8 @@ const getStatusName = (status: string) => {
 
 const getKeyOriginName = (origin: string) => {
   switch (origin) {
-    case 'sakura_kms': return 'さくらKMS';
-    case 'external': return '外部';
+    case 'generated': return '生成';
+    case 'imported': return 'インポート';
     default: return origin;
   }
 };
@@ -64,6 +64,13 @@ export function KMSDetail({ profile, keyId }: KMSDetailProps) {
   const [runningAction, setRunningAction] = useState<PendingAction['type'] | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
 
+  const [editingBasic, setEditingBasic] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [descriptionInput, setDescriptionInput] = useState('');
+  const [tagsInput, setTagsInput] = useState('');
+  const [savingBasic, setSavingBasic] = useState(false);
+  const [basicError, setBasicError] = useState<string | null>(null);
+
   const loadKey = useCallback(async () => {
     if (!profile || !keyId) return;
 
@@ -83,6 +90,35 @@ export function KMSDetail({ profile, keyId }: KMSDetailProps) {
   useEffect(() => {
     loadKey();
   }, [loadKey]);
+
+  const handleBasicEditStart = () => {
+    if (!key) return;
+    setNameInput(key.name);
+    setDescriptionInput(key.description || '');
+    setTagsInput((key.tags || []).join(', '));
+    setBasicError(null);
+    setEditingBasic(true);
+  };
+
+  const handleBasicEditCancel = () => {
+    setEditingBasic(false);
+    setBasicError(null);
+  };
+
+  const handleBasicSave = async () => {
+    setSavingBasic(true);
+    setBasicError(null);
+    try {
+      const tags = tagsInput.split(',').map(t => t.trim()).filter(t => t);
+      const updated = await UpdateKMSKey(profile, keyId, nameInput, descriptionInput, tags);
+      setKey(updated);
+      setEditingBasic(false);
+    } catch (e) {
+      setBasicError(String(e));
+    } finally {
+      setSavingBasic(false);
+    }
+  };
 
   const handleActionCancel = () => setPendingAction(null);
 
@@ -127,60 +163,108 @@ export function KMSDetail({ profile, keyId }: KMSDetailProps) {
       </div>
 
       <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem', background: '#2a2a2a', borderRadius: '8px' }}>
-        <h4 style={{ color: '#00adb5', marginTop: 0, marginBottom: '1rem' }}>基本情報</h4>
-        <table style={{ borderCollapse: 'collapse' }}>
-          <tbody>
-            <tr>
-              <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>ID</td>
-              <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{key.id}</td>
-            </tr>
-            <tr>
-              <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>説明</td>
-              <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{key.description || '-'}</td>
-            </tr>
-            <tr>
-              <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>ステータス</td>
-              <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>
-                <span className={`status ${getStatusColor(key.status)}`}>
-                  {getStatusName(key.status)}
-                </span>
-              </td>
-            </tr>
-            <tr>
-              <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>キー起源</td>
-              <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{getKeyOriginName(key.keyOrigin)}</td>
-            </tr>
-            <tr>
-              <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>バージョン</td>
-              <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{key.latestVersion}</td>
-            </tr>
-            <tr>
-              <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>作成日</td>
-              <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{formatDate(key.createdAt)}</td>
-            </tr>
-            {key.tags && key.tags.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h4 style={{ color: '#00adb5', margin: 0 }}>基本情報</h4>
+          {!editingBasic && (
+            <button className="btn btn-secondary btn-small" onClick={handleBasicEditStart}>編集</button>
+          )}
+        </div>
+        {editingBasic ? (
+          <div>
+            <div className="form-group">
+              <label>名前</label>
+              <input
+                type="text"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <label>説明</label>
+              <input
+                type="text"
+                value={descriptionInput}
+                onChange={(e) => setDescriptionInput(e.target.value)}
+                placeholder="任意"
+              />
+            </div>
+            <div className="form-group">
+              <label>タグ</label>
+              <input
+                type="text"
+                value={tagsInput}
+                onChange={(e) => setTagsInput(e.target.value)}
+                placeholder="任意(カンマ区切り、例: env:prod,team:sre)"
+              />
+            </div>
+            {basicError && (
+              <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                エラー: {basicError}
+              </div>
+            )}
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleBasicEditCancel} disabled={savingBasic}>キャンセル</button>
+              <button className="btn btn-primary" onClick={handleBasicSave} disabled={savingBasic || !nameInput}>
+                {savingBasic ? '保存中...' : '保存する'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <table style={{ borderCollapse: 'collapse' }}>
+            <tbody>
               <tr>
-                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>タグ</td>
+                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>ID</td>
+                <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{key.id}</td>
+              </tr>
+              <tr>
+                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>説明</td>
+                <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{key.description || '-'}</td>
+              </tr>
+              <tr>
+                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>ステータス</td>
                 <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>
-                  <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
-                    {key.tags.map(tag => (
-                      <span key={tag} className="tag" style={{
-                        backgroundColor: '#e2e8f0',
-                        padding: '0px 6px',
-                        borderRadius: '3px',
-                        fontSize: '0.65rem',
-                        color: '#4a5568',
-                        border: '1px solid #cbd5e0'
-                      }}>
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
+                  <span className={`status ${getStatusColor(key.status)}`}>
+                    {getStatusName(key.status)}
+                  </span>
                 </td>
               </tr>
-            )}
-          </tbody>
-        </table>
+              <tr>
+                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>キー起源</td>
+                <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{getKeyOriginName(key.keyOrigin)}</td>
+              </tr>
+              <tr>
+                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>バージョン</td>
+                <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{key.latestVersion}</td>
+              </tr>
+              <tr>
+                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>作成日</td>
+                <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{formatDate(key.createdAt)}</td>
+              </tr>
+              {key.tags && key.tags.length > 0 && (
+                <tr>
+                  <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>タグ</td>
+                  <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>
+                    <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                      {key.tags.map(tag => (
+                        <span key={tag} className="tag" style={{
+                          backgroundColor: '#e2e8f0',
+                          padding: '0px 6px',
+                          borderRadius: '3px',
+                          fontSize: '0.65rem',
+                          color: '#4a5568',
+                          border: '1px solid #cbd5e0'
+                        }}>
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <div className="card" style={{ padding: '1rem', background: '#2a2a2a', borderRadius: '8px' }}>

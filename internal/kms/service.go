@@ -104,6 +104,45 @@ func (s *Service) DeleteKey(ctx context.Context, id string) error {
 	return s.keyOp.Delete(ctx, id)
 }
 
+// CreateKey KMSキーを新規作成する。keyOriginは"generated"(自動生成)または"imported"(既存キーのインポート、plainKeyが必須)
+func (s *Service) CreateKey(ctx context.Context, name string, description string, keyOrigin string, plainKey string, tags []string) (*KeyInfo, error) {
+	req := v1.CreateKey{
+		Name:      name,
+		KeyOrigin: v1.KeyOriginEnum(keyOrigin),
+		Tags:      tags,
+	}
+	if description != "" {
+		req.Description = v1.NewOptString(description)
+	}
+	if plainKey != "" {
+		req.PlainKey = v1.NewOptString(plainKey)
+	}
+	created, err := s.keyOp.Create(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return s.GetKey(ctx, created.ID)
+}
+
+// UpdateKey KMSキーの名前・説明・タグを更新する。KeyOrigin(生成元)は不変のため事前Readで現在値を引き継ぐ
+func (s *Service) UpdateKey(ctx context.Context, id string, name string, description string, tags []string) (*KeyInfo, error) {
+	current, err := s.keyOp.Read(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	updated, err := s.keyOp.Update(ctx, id, v1.Key{
+		Name:        name,
+		Description: description,
+		KeyOrigin:   current.KeyOrigin,
+		Status:      current.Status,
+		Tags:        tags,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return toKeyInfo(updated), nil
+}
+
 // RotateKey KMSキーをローテーションし、更新後の情報を返す
 func (s *Service) RotateKey(ctx context.Context, id string) (*KeyInfo, error) {
 	k, err := s.keyOp.Rotate(ctx, id)

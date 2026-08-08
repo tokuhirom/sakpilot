@@ -73,12 +73,13 @@
 - SDK比較で残る不足: なし（Read/Write一式が揃った）
 
 ### KMS
-- テスト: `KMSList.test.tsx`（一覧表示・詳細遷移・削除確認フロー）、`KMSDetail.test.tsx`（基本情報表示・ローテーション・ステータス変更・キャンセル・失敗時のalert）ともに整備済み
-- バックエンド: `internal/kms/service.go` に分離実装。List/**Get**/**Delete**/**Rotate**/**ChangeStatus** 実装済み（Goテスト `service_test.go` に対応する各テスト追加済み）
-- app.go: `GetKMSKeys`/`GetKMSKey`/`DeleteKMSKey`/`RotateKMSKey`/`ChangeKMSKeyStatus` を公開
+- テスト: `KMSList.test.tsx`（一覧表示・詳細遷移・削除確認・作成フロー）、`KMSDetail.test.tsx`（基本情報表示・編集・ローテーション・ステータス変更・キャンセル・失敗時のalert）ともに整備済み。`frontend/e2e/kms.spec.ts` で作成〜編集〜ローテーション/ステータス変更〜削除までのE2Eもカバー
+- バックエンド: `internal/kms/service.go` に分離実装。List/**Get**/**Create**/**Update**/**Delete**/**Rotate**/**ChangeStatus** 実装済み（Goテスト `service_test.go` に対応する各テスト追加済み）
+- app.go: `GetKMSKeys`/`GetKMSKey`/`CreateKMSKey`/`UpdateKMSKey`/`DeleteKMSKey`/`RotateKMSKey`/`ChangeKMSKeyStatus` を公開
 - ✅ **対応済み（PR #90）**: 削除機能を追加
 - ✅ **対応済み**: Get（詳細取得）/Rotate（ローテーション）/ChangeStatus（active/restricted/suspended切り替え）を追加。`KMSDetail.tsx`を新設し一覧の行クリックで遷移。あわせて`KMSList.tsx`のステータス表示が実際のAPI値（active/restricted/suspended/pending_destruction）と一致していなかった表示バグを修正
-- SDK比較で残る不足: Create/Update/ScheduleDestruction（削除予約）/Encrypt/Decrypt（未着手）
+- ✅ **対応済み（2026-08-08 Tier2 #10）**: Create（名前・説明・キー起源[生成/インポート]・タグ）、Update（名前・説明・タグ編集）を追加。UpdateはKeyOrigin/Statusが不変かつAPIリクエストに必須のため、事前Readで現在値を引き継いでから送信する（GSLB/ProxyLB等と同じ設計）。あわせて`getKeyOriginName`が実際のAPI値（generated/imported）ではなく架空の値（sakura_kms/external）をチェックしており常にフォールバック表示になっていた表示バグを修正
+- SDK比較で残る不足: ScheduleDestruction（削除予約）/Encrypt/Decrypt（未着手、暗号化APIは利用頻度が低いためTier3相当として保留）
 
 ---
 
@@ -253,7 +254,7 @@
 7. ✅ Switch: Create/Update — 2026-08-08対応済み
 8. ✅ Disk: Create/Update/ConnectToServer/DisconnectFromServer — 2026-08-08対応済み（CreateWithConfigは対象外、Tier3相当として保留）
 9. ✅ ProxyLB: Create/Update/UpdateSettings — 2026-08-08対応済み
-10. KMS: Create/Update
+10. ✅ KMS: Create/Update — 2026-08-08対応済み
 11. Database: Create/Update/UpdateSettings/GetParameter/SetParameter
 12. NFS: Create/Update
 13. EnhancedDB: Create/Update/SetPassword

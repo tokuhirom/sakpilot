@@ -212,6 +212,94 @@ func TestService_RotateKey(t *testing.T) {
 	}
 }
 
+func TestService_CreateKey(t *testing.T) {
+	srv := mockkms.NewTestServer(mockkms.Config{})
+	defer srv.Close()
+
+	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy")
+	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_KMS", srv.TestURL())
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+
+	service, err := kms.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	got, err := service.CreateKey(context.Background(), "test-key", "a test key", "generated", "", []string{"env:test"})
+	if err != nil {
+		t.Fatalf("CreateKey: %v", err)
+	}
+	if got.Name != "test-key" {
+		t.Errorf("Name = %q, want %q", got.Name, "test-key")
+	}
+	if got.Description != "a test key" {
+		t.Errorf("Description = %q, want %q", got.Description, "a test key")
+	}
+	if got.KeyOrigin != "generated" {
+		t.Errorf("KeyOrigin = %q, want %q", got.KeyOrigin, "generated")
+	}
+	if len(got.Tags) != 1 || got.Tags[0] != "env:test" {
+		t.Errorf("Tags = %v, want [env:test]", got.Tags)
+	}
+
+	keys, err := service.ListKeys(context.Background())
+	if err != nil {
+		t.Fatalf("ListKeys: %v", err)
+	}
+	if len(keys) != 1 {
+		t.Fatalf("got %d keys after create, want 1: %+v", len(keys), keys)
+	}
+}
+
+func TestService_UpdateKey(t *testing.T) {
+	srv := mockkms.NewTestServer(mockkms.Config{})
+	defer srv.Close()
+
+	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy")
+	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_KMS", srv.TestURL())
+
+	sc := newTestSaclient(t, srv.TestURL())
+	rawClient, err := sdkkms.NewClient(sc)
+	if err != nil {
+		t.Fatalf("sdkkms.NewClient: %v", err)
+	}
+	keyOp := sdkkms.NewKeyOp(rawClient)
+	created, err := keyOp.Create(context.Background(), v1.CreateKey{
+		Name:      "test-key",
+		KeyOrigin: v1.KeyOriginEnumGenerated,
+	})
+	if err != nil {
+		t.Fatalf("seed Create: %v", err)
+	}
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+
+	service, err := kms.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	got, err := service.UpdateKey(context.Background(), created.ID, "test-key-renamed", "updated description", []string{"env:prod"})
+	if err != nil {
+		t.Fatalf("UpdateKey: %v", err)
+	}
+	if got.Name != "test-key-renamed" {
+		t.Errorf("Name = %q, want %q", got.Name, "test-key-renamed")
+	}
+	if got.Description != "updated description" {
+		t.Errorf("Description = %q, want %q", got.Description, "updated description")
+	}
+	if got.KeyOrigin != "generated" {
+		t.Errorf("KeyOrigin = %q, want %q", got.KeyOrigin, "generated")
+	}
+	if len(got.Tags) != 1 || got.Tags[0] != "env:prod" {
+		t.Errorf("Tags = %v, want [env:prod]", got.Tags)
+	}
+}
+
 func TestService_ChangeKeyStatus(t *testing.T) {
 	srv := mockkms.NewTestServer(mockkms.Config{})
 	defer srv.Close()
