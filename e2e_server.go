@@ -23,9 +23,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"reflect"
+	"runtime/coverage"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
@@ -117,8 +120,34 @@ func runE2EServer(addr, dist string) error {
 		_, _ = w.Write(indexHTML)
 	})
 
+	srv := &http.Server{Addr: addr, Handler: mux}
+
+	// `go run -cover`でビルドされた場合、カウンタはプロセスの正常終了時にしか
+	// 書き出されない。PlaywrightのwebServerはSIGTERM/SIGINTでこのプロセスを
+	// 止めるため、シグナルを受けて明示的にカバレッジデータをフラッシュしてから
+	// シャットダウンする(GOCOVERDIR未設定/非計装ビルド時はWriteXxxDirがエラーを
+	// 返すだけなので無視してよい)。
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		sig := <-sigCh
+		log.Printf("received signal %v, shutting down", sig)
+		if dir := os.Getenv("GOCOVERDIR"); dir != "" {
+			if err := coverage.WriteMetaDir(dir); err != nil {
+				log.Printf("coverage.WriteMetaDir: %v", err)
+			}
+			if err := coverage.WriteCountersDir(dir); err != nil {
+				log.Printf("coverage.WriteCountersDir: %v", err)
+			}
+		}
+		_ = srv.Close()
+	}()
+
 	log.Printf("sakpilot e2e server listening on http://%s", addr)
-	return http.ListenAndServe(addr, mux)
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		return err
+	}
+	return nil
 }
 
 // setupFakeHome はHOMEを一時ディレクトリに差し替え、usacloud互換の
