@@ -252,7 +252,7 @@ export function DNSDetail({ profile, dnsId }: DNSDetailProps) {
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>{editingIndex !== null ? 'レコード編集' : 'レコード追加'}</h3>
             <form onSubmit={handleRecordFormSubmit}>
             <div className="form-group">
-              <label>名前 *</label>
+              <label>名前<span className="required-mark">*</span></label>
               <input
                 type="text"
                 value={recordForm.name}
@@ -272,7 +272,7 @@ export function DNSDetail({ profile, dnsId }: DNSDetailProps) {
               </select>
             </div>
             <div className="form-group">
-              <label>データ *</label>
+              <label>データ<span className="required-mark">*</span></label>
               <input
                 type="text"
                 value={recordForm.rdata}
@@ -283,7 +283,7 @@ export function DNSDetail({ profile, dnsId }: DNSDetailProps) {
               />
             </div>
             <div className="form-group">
-              <label>TTL(秒) *</label>
+              <label>TTL(秒)<span className="required-mark">*</span></label>
               <input
                 type="number"
                 value={recordForm.ttl}

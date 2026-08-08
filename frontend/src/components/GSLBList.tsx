@@ -217,7 +217,7 @@ export function GSLBList({ profile, onSelectGSLB }: GSLBListProps) {
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>GSLB作成</h3>
             <form onSubmit={handleCreateSubmit}>
             <div className="form-group">
-              <label>名前 *</label>
+              <label>名前<span className="required-mark">*</span></label>
               <input
                 type="text"
                 value={newName}
