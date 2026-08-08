@@ -301,13 +301,20 @@
 **Tier 5: フォームUX見直し（横断的な品質改善、2026-08-09ユーザー指摘により追加）**
 
 23. Create/Update系フォームの入力ガイダンス・バリデーション見直し — 現状、`frontend/src/components/*.tsx`の作成・編集モーダル/フォーム（DNS/GSLB/ProxyLB/SimpleMonitor/Switch/Disk/Database/NFS/EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/AppRun専有・共用型/Server等、Tier1〜Tier3で実装した全リソース）は、**どの項目が必須か・どんな形式の値を期待しているかが画面から読み取れないものが多い**とユーザーから指摘あり。個別実装時にその場のスコープでしか見ておらず、フォーム全体を横断した使いやすさの観点でのレビューをしていなかったため。着手時は以下の観点で全フォームを棚卸しすること:
-    - 必須項目にHTML5の`required`属性を付与し、視覚的にも必須であることが分かるようにする（未入力のまま送信しようとした際にブラウザネイティブのバリデーションメッセージが出る状態にする）
+    - 必須項目にHTML5の`required`属性を付与し、視覚的にも必須であることが分かるようにする（未入力のまま送信しようとした際にブラウザネイティブのバリデーションメッセージが出る状態にする）。具体的な実装ルール（`<form>`化・ラベル有無での視覚マーカーの付け方・HTML5化で不要になったJSバリデーションの削除等）は`docs/ui-implementation-patterns.md`の「必須項目のフォームバリデーション」節に確立済みのため、以降のリソース対応では必ずこれに従うこと
     - 数値項目は`type="number"`+`min`/`max`（例: ポート番号1-65535、監視間隔の下限値等、SDK/API側の制約に合わせる）を付与する
     - 形式が決まっている項目（IPアドレス、ネットワークマスク長、ドメイン名、タグの命名規則等）は`pattern`属性やplaceholderの入力例で期待値を明示する
     - 各フォームの入力欄に「何を入力すればよいか」が分かるplaceholderやヘルプテキストが無い箇所を洗い出し追加する（現状はラベルのみで単位や制約の説明が無い項目が多い）
     - 見直し対象はTier1〜Tier3で実装した機能に限らず、既存の全Create/Updateフォームが対象。範囲が広いため、着手時にリソース単位で区切って段階的にPRを分けるか、ユーザーと相談してスコープを決めること
     - フォームごとに前提（SDK側のバリデーション仕様、必須/任意の別）を確認した上で実装すること。SDK側で判明した制約や挙動の不明点は[[sakpilot-upstream-issues-doc]]の運用に従いdocs/upstream-issues.mdに記録する
     - **進捗**: DNS/GSLB対応済み（下記セッション31）。残り: ProxyLB/SimpleMonitor/Switch/Disk/Database/NFS/EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/AppRun専有・共用型/Server等
+
+### ✅ 完了（2026-08-09 追加セッション32、Tier5 #23 ルール整備・視覚マーカー統一）
+- セッション31実装後、ユーザーから「required項目が視覚的に分かるか」を指摘され確認したところ、ラベル付きフィールドは`名前 *`のようにラベルにアスタリスクを付けていた一方、`GSLBDetail.tsx`のラベル無しフィールド（基本情報インライン編集の名前欄、振り分け先サーバー行のIPアドレス・重み）は`required`属性のみでplaceholderにも視覚マーカーが無く、一貫していなかったことが判明。
+- 今後全フォームで統一的に守るべきルールとして`docs/ui-implementation-patterns.md`の「必須項目のフォームバリデーション」節に明文化: (1)モーダル/インライン編集は`<form onSubmit>`+`<button type="submit">`で実装する、(2)必須項目は`required`を必ず付与、(3)視覚マーカーは`<label>`がある項目はラベル末尾に`<span className="required-mark">*</span>`、`<label>`が無い項目（インライン編集や動的追加行等）はplaceholder末尾に半角スペース+`*`を付与して統一する、(4)HTML5属性で代替可能になった手書きバリデーションは削除しテストも`input.validity.valid`ベースに書き換える。`.required-mark`はApp.cssに共通定義（エラー表示と同系色`#ff6b6b`）
+- 上記ルールに合わせてDNS/GSLBの表記を統一: ラベル付きフィールドはspanベースのマーカーに置換、`GSLBDetail.tsx`の名前インライン編集(`placeholder="名前 *"`)とサーバー行(`placeholder="IPアドレス *"`/`"重み *"`)にも追加。placeholder変更に伴い`GSLBDetail.test.tsx`/`frontend/e2e/gslb.spec.ts`の該当箇所も更新
+- PLAN.md本項目にも`docs/ui-implementation-patterns.md`の当該節への参照を追記し、以降のリソース対応で同じルールに従うことを明示
+- `tsc --noEmit`/`npm run test`(264件全パス)/`npm run build`+`npx playwright test e2e/dns.spec.ts e2e/gslb.spec.ts`(10件全パス、E2Eはdist再ビルドが必要な点に注意)を確認してから作成
 
 ### ✅ 完了（2026-08-09 追加セッション31、Tier5 #23 一部・DNS/GSLB）
 - 対象範囲が広いため、リソース単位で段階的にPRを分ける方針とし、まずDNS/GSLBから着手。

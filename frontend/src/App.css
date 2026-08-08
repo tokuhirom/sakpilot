@@ -299,6 +299,11 @@ body {
   color: #aaa;
 }
 
+.required-mark {
+  color: #ff6b6b;
+  margin-left: 0.2rem;
+}
+
 .form-group input,
 .form-group select {
   width: 100%;

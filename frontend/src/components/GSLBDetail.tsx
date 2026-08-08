@@ -221,7 +221,7 @@ export function GSLBDetail({ profile, gslbId }: GSLBDetailProps) {
                       type="text"
                       value={nameInput}
                       onChange={(e) => setNameInput(e.target.value)}
-                      placeholder="名前"
+                      placeholder="名前 *"
                       required
                       autoFocus
                     />
@@ -355,7 +355,7 @@ export function GSLBDetail({ profile, gslbId }: GSLBDetailProps) {
               />
             </div>
             <div className="form-group">
-              <label>監視間隔(秒) *</label>
+              <label>監視間隔(秒)<span className="required-mark">*</span></label>
               <input
                 type="number"
                 value={settingsForm.delayLoop}
@@ -446,7 +446,7 @@ export function GSLBDetail({ profile, gslbId }: GSLBDetailProps) {
                     type="text"
                     value={server.ipAddress}
                     onChange={(e) => handleServerChange(index, 'ipAddress', e.target.value)}
-                    placeholder="IPアドレス"
+                    placeholder="IPアドレス *"
                     pattern={IPV4_PATTERN}
                     title="IPv4アドレスの形式で入力してください"
                     required
@@ -456,7 +456,7 @@ export function GSLBDetail({ profile, gslbId }: GSLBDetailProps) {
                     type="number"
                     value={server.weight}
                     onChange={(e) => handleServerChange(index, 'weight', e.target.value)}
-                    placeholder="重み"
+                    placeholder="重み *"
                     min={1}
                     step={1}
                     required

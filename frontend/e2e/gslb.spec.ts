@@ -38,7 +38,7 @@ test('GSLB詳細で監視設定とサーバーを編集できる', async ({ page
   await page.getByRole('button', { name: '監視設定を編集' }).click();
   await page.locator('.form-group', { hasText: '監視間隔(秒)' }).locator('input').fill('30');
   await page.getByRole('button', { name: '+ サーバー追加' }).click();
-  await page.getByPlaceholder('IPアドレス').last().fill('192.0.2.20');
+  await page.getByPlaceholder('IPアドレス *').last().fill('192.0.2.20');
   await page.getByRole('button', { name: '保存する' }).click();
 
   await expect(page.getByText('30秒')).toBeVisible();

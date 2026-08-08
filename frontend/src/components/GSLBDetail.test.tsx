@@ -92,7 +92,7 @@ describe('GSLBDetail', () => {
 
     await user.click(screen.getByRole('button', { name: '監視設定を編集' }));
     await user.click(screen.getByRole('button', { name: '+ サーバー追加' }));
-    await user.type(screen.getByPlaceholderText('IPアドレス'), '192.0.2.20');
+    await user.type(screen.getByPlaceholderText('IPアドレス *'), '192.0.2.20');
     await user.click(screen.getByRole('button', { name: '保存する' }));
 
     await waitFor(() => {
@@ -115,7 +115,7 @@ describe('GSLBDetail', () => {
 
     await user.click(screen.getByRole('button', { name: '監視設定を編集' }));
     await user.click(screen.getByRole('button', { name: '+ サーバー追加' }));
-    const ipInput = screen.getByPlaceholderText('IPアドレス') as HTMLInputElement;
+    const ipInput = screen.getByPlaceholderText('IPアドレス *') as HTMLInputElement;
     await user.click(screen.getByRole('button', { name: '保存する' }));
 
     expect(ipInput.validity.valid).toBe(false);

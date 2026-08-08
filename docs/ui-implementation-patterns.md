@@ -66,6 +66,44 @@ Goメソッドの戻り値が`(値1, 値2, error)`のように非error値を2つ
 
 参照実装: `DNSList.tsx`(最もシンプルな例)、`ArchiveList.tsx`(セレクトによる分岐が複雑な例)
 
+### 必須項目のフォームバリデーション(HTML5 `required` + `<form>`化 + 視覚マーカー)
+
+PLAN.md Tier5(フォームUX見直し)対応の一環で確立したルール。新規に作成/編集フォームを実装・改修する際は必ず以下を満たすこと。
+
+1. **モーダル/インライン編集は`<div>`+ボタン`onClick`ではなく`<form onSubmit>`で実装する**。既存の多くのモーダルは`<div className="modal-content">`の中でボタンに`onClick`ハンドラを付けて送信処理を呼ぶ構造になっているが、これでは`required`属性を付けてもブラウザネイティブバリデーション(未入力での送信ブロック・吹き出し表示)が機能しない。送信ボタンは`type="submit"`、キャンセルボタンは`type="button"`にする(`type="button"`を忘れると意図せず送信されてしまう)。
+   ```tsx
+   <form onSubmit={handleSubmit}>
+     {/* form-group群 */}
+     <div className="confirm-actions">
+       <button type="button" className="btn btn-secondary" onClick={handleCancel}>キャンセル</button>
+       <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? '保存中...' : '保存する'}</button>
+     </div>
+   </form>
+   ```
+   `handleSubmit`は`(e: React.FormEvent) => { e.preventDefault(); ... }`の形にする。
+2. **必須項目には`required`属性を必ず付与する。** 数値項目は`type="number"`+`min`/`max`(SDK/APIの制約に合わせる。制約が不明な場合はSDKの`DefaultValue`等から妥当な下限のみ設定し、根拠のない上限は付けない)。形式が一意な項目(IPv4アドレス等)には`pattern`を付与する。形式にバリエーションがある項目(DNSレコードのrdata等、レコードタイプによって書式が変わる)は誤って正当な入力を弾くリスクがあるため、`pattern`で縛らずplaceholderで入力例を示すに留める。
+3. **必須項目は`required`属性だけでなく、必ず見た目でも分かるようにする。** アンカーの有無で付け方を使い分ける:
+   - `<label>`がある項目: ラベル末尾に`<span className="required-mark">*</span>`を付与する。
+     ```tsx
+     <label>名前<span className="required-mark">*</span></label>
+     ```
+   - `<label>`が無い項目(インライン編集フォームや、サーバー一覧のような動的追加行でplaceholderのみ運用している箇所): `placeholder`の末尾に半角スペース+`*`を付与する(表記を統一するため、labelと同じ`*`を使い「(必須)」等の別表記は使わない)。
+     ```tsx
+     <input placeholder="IPアドレス *" required ... />
+     ```
+   - 任意項目には何も付けない(無印=任意という前提を崩さない)。
+   - `.required-mark`は`App.css`で共通定義済み(エラーメッセージと同系色`#ff6b6b`)。
+4. **HTML5属性で代替可能になった手書きバリデーションは削除する。** `required`/`pattern`/`min`/`max`がブラウザ側で送信をブロックするようになった結果、フォーム送信ハンドラ内に残っていた同趣旨のJSバリデーション分岐(例:「IPアドレスが空なら独自エラーメッセージを出す」)は実質到達不能になる。到達不能と判断したら削除し、対応するテストはカスタムエラーメッセージの表示確認ではなく、`input.validity.valid`がfalseであること・送信APIが呼ばれないことを確認する形に書き換える。
+   ```tsx
+   const ipInput = screen.getByPlaceholderText('IPアドレス *') as HTMLInputElement;
+   await user.click(screen.getByRole('button', { name: '保存する' }));
+   expect(ipInput.validity.valid).toBe(false);
+   expect(UpdateXxx).not.toHaveBeenCalled();
+   ```
+5. Placeholderの文字列を変更した場合、`getByPlaceholderText`/`getByPlaceholder`で参照しているVitest/Playwrightテストも合わせて更新すること。
+
+参照実装: `DNSDetail.tsx`(レコード追加/編集モーダル)、`GSLBList.tsx`(作成モーダル)、`GSLBDetail.tsx`(基本情報インライン編集・監視設定編集モーダル、ラベル無しの動的行にplaceholderマーカーを使う例)
+
 ### 削除確認ダイアログ
 
 `confirm-overlay` + `confirm-dialog`(モーダルよりCSSクラスが異なる、軽量な確認専用)。「削除中...」のようなin-flight表示でボタンをdisabledにし、二重送信を防ぐ。
