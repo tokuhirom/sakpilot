@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetKMSKeys, DeleteKMSKey } from '../../wailsjs/go/main/App';
+import { GetKMSKeys, DeleteKMSKey, CreateKMSKey } from '../../wailsjs/go/main/App';
 import { kms } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -15,6 +15,14 @@ export function KMSList({ profile, onSelectKey }: KMSListProps) {
   const [loading, setLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<kms.KeyInfo | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [newKeyOrigin, setNewKeyOrigin] = useState<'generated' | 'imported'>('generated');
+  const [newPlainKey, setNewPlainKey] = useState('');
+  const [newTags, setNewTags] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const {
     searchQuery,
@@ -109,9 +117,38 @@ export function KMSList({ profile, onSelectKey }: KMSListProps) {
 
   const getKeyOriginName = (origin: string) => {
     switch (origin) {
-      case 'sakura_kms': return 'さくらKMS';
-      case 'external': return '外部';
+      case 'generated': return '生成';
+      case 'imported': return 'インポート';
       default: return origin;
+    }
+  };
+
+  const handleCreateOpen = () => {
+    setNewName('');
+    setNewDescription('');
+    setNewKeyOrigin('generated');
+    setNewPlainKey('');
+    setNewTags('');
+    setCreateError(null);
+    setShowCreate(true);
+  };
+
+  const handleCreateCancel = () => {
+    setShowCreate(false);
+  };
+
+  const handleCreateSubmit = async () => {
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const tags = newTags.split(',').map(t => t.trim()).filter(t => t);
+      await CreateKMSKey(profile, newName, newDescription, newKeyOrigin, newPlainKey, tags);
+      setShowCreate(false);
+      await loadKeys();
+    } catch (e) {
+      setCreateError(String(e));
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -119,6 +156,7 @@ export function KMSList({ profile, onSelectKey }: KMSListProps) {
     <>
       <div className="header">
         <h2>KMS</h2>
+        <button className="btn btn-primary btn-small" onClick={handleCreateOpen}>+ キー作成</button>
       </div>
 
       <SearchBar
@@ -205,6 +243,85 @@ export function KMSList({ profile, onSelectKey }: KMSListProps) {
             <div className="confirm-actions">
               <button className="btn btn-secondary" onClick={handleDeleteCancel}>キャンセル</button>
               <button className="btn btn-danger" onClick={handleDeleteConfirm}>削除する</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreate && (
+        <div className="modal-overlay" onClick={handleCreateCancel} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+            backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+            padding: '20px', minWidth: '320px', maxWidth: '420px',
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>KMSキー作成</h3>
+            <div className="form-group">
+              <label>名前</label>
+              <input
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="my-key"
+                autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <label>説明</label>
+              <input
+                type="text"
+                value={newDescription}
+                onChange={(e) => setNewDescription(e.target.value)}
+                placeholder="任意"
+              />
+            </div>
+            <div className="form-group">
+              <label>キー起源</label>
+              <select
+                value={newKeyOrigin}
+                onChange={(e) => setNewKeyOrigin(e.target.value as 'generated' | 'imported')}
+              >
+                <option value="generated">生成(自動生成)</option>
+                <option value="imported">インポート(既存キーを取り込む)</option>
+              </select>
+            </div>
+            {newKeyOrigin === 'imported' && (
+              <div className="form-group">
+                <label>キー素材(Base64)</label>
+                <input
+                  type="text"
+                  value={newPlainKey}
+                  onChange={(e) => setNewPlainKey(e.target.value)}
+                  placeholder="インポートする鍵データ"
+                />
+              </div>
+            )}
+            <div className="form-group">
+              <label>タグ</label>
+              <input
+                type="text"
+                value={newTags}
+                onChange={(e) => setNewTags(e.target.value)}
+                placeholder="任意(カンマ区切り、例: env:prod,team:sre)"
+              />
+            </div>
+            {createError && (
+              <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                エラー: {createError}
+              </div>
+            )}
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleCreateSubmit}
+                disabled={creating || !newName || (newKeyOrigin === 'imported' && !newPlainKey)}
+              >
+                {creating ? '作成中...' : '作成する'}
+              </button>
             </div>
           </div>
         </div>

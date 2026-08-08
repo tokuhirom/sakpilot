@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { KMSDetail } from './KMSDetail';
 import { kms } from '../../wailsjs/go/models';
-import { GetKMSKey, RotateKMSKey, ChangeKMSKeyStatus } from '../../wailsjs/go/main/App';
+import { GetKMSKey, RotateKMSKey, ChangeKMSKeyStatus, UpdateKMSKey } from '../../wailsjs/go/main/App';
 
 vi.mock('../../wailsjs/go/main/App');
 
@@ -13,7 +13,7 @@ function makeKey(overrides: Partial<kms.KeyInfo> = {}): kms.KeyInfo {
     name: 'my-kms-key',
     description: '',
     status: 'active',
-    keyOrigin: 'sakura_kms',
+    keyOrigin: 'generated',
     latestVersion: 1,
     tags: [],
     createdAt: '2026-01-01T00:00:00+09:00',
@@ -26,6 +26,7 @@ describe('KMSDetail', () => {
     vi.mocked(GetKMSKey).mockReset();
     vi.mocked(RotateKMSKey).mockReset();
     vi.mocked(ChangeKMSKeyStatus).mockReset();
+    vi.mocked(UpdateKMSKey).mockReset();
   });
 
   it('shows key basic info', async () => {
@@ -36,7 +37,53 @@ describe('KMSDetail', () => {
     expect(await screen.findByText('KMSキー詳細: my-kms-key')).toBeInTheDocument();
     expect(GetKMSKey).toHaveBeenCalledWith('default', '123456789012');
     expect(screen.getByText('アクティブ')).toBeInTheDocument();
-    expect(screen.getByText('さくらKMS')).toBeInTheDocument();
+    expect(screen.getByText('生成')).toBeInTheDocument();
+  });
+
+  it('edits name, description and tags', async () => {
+    vi.mocked(GetKMSKey).mockResolvedValueOnce(makeKey({ description: 'old desc', tags: ['old-tag'] }));
+    vi.mocked(UpdateKMSKey).mockResolvedValueOnce(
+      makeKey({ name: 'renamed-key', description: 'new desc', tags: ['new-tag'] })
+    );
+    const user = userEvent.setup();
+
+    render(<KMSDetail profile="default" keyId="123456789012" />);
+    await screen.findByText('KMSキー詳細: my-kms-key');
+
+    await user.click(screen.getByRole('button', { name: '編集' }));
+
+    const nameInput = screen.getByDisplayValue('my-kms-key');
+    await user.clear(nameInput);
+    await user.type(nameInput, 'renamed-key');
+
+    const descriptionInput = screen.getByDisplayValue('old desc');
+    await user.clear(descriptionInput);
+    await user.type(descriptionInput, 'new desc');
+
+    const tagsInput = screen.getByDisplayValue('old-tag');
+    await user.clear(tagsInput);
+    await user.type(tagsInput, 'new-tag');
+
+    await user.click(screen.getByRole('button', { name: '保存する' }));
+
+    await waitFor(() => {
+      expect(UpdateKMSKey).toHaveBeenCalledWith('default', '123456789012', 'renamed-key', 'new desc', ['new-tag']);
+    });
+    expect(await screen.findByText('KMSキー詳細: renamed-key')).toBeInTheDocument();
+  });
+
+  it('shows an error and stays in edit mode when update fails', async () => {
+    vi.mocked(GetKMSKey).mockResolvedValueOnce(makeKey());
+    vi.mocked(UpdateKMSKey).mockRejectedValueOnce(new Error('name is required'));
+    const user = userEvent.setup();
+
+    render(<KMSDetail profile="default" keyId="123456789012" />);
+    await screen.findByText('KMSキー詳細: my-kms-key');
+
+    await user.click(screen.getByRole('button', { name: '編集' }));
+    await user.click(screen.getByRole('button', { name: '保存する' }));
+
+    expect(await screen.findByText(/エラー: Error: name is required/)).toBeInTheDocument();
   });
 
   it('disables the status button matching the current status', async () => {

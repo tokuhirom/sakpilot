@@ -742,7 +742,7 @@ func seedKMSKeys() error {
 	}
 	keyOp := sdkkms.NewKeyOp(client)
 
-	for _, name := range []string{"e2e-key-1", "e2e-doomed-key"} {
+	for _, name := range []string{"e2e-key-1", "e2e-doomed-key", "e2e-editable-key"} {
 		if _, err := keyOp.Create(context.Background(), kmsv1.CreateKey{
 			Name:      name,
 			KeyOrigin: kmsv1.KeyOriginEnumGenerated,

@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { KMSList } from './KMSList';
 import { kms } from '../../wailsjs/go/models';
-import { GetKMSKeys, DeleteKMSKey } from '../../wailsjs/go/main/App';
+import { GetKMSKeys, DeleteKMSKey, CreateKMSKey } from '../../wailsjs/go/main/App';
 
 vi.mock('../../wailsjs/go/main/App');
 
@@ -13,7 +13,7 @@ function makeKey(overrides: Partial<kms.KeyInfo> = {}): kms.KeyInfo {
     name: 'my-kms-key',
     description: '',
     status: 'active',
-    keyOrigin: 'sakura_kms',
+    keyOrigin: 'generated',
     latestVersion: 1,
     tags: [],
     createdAt: '2026-01-01T00:00:00+09:00',
@@ -25,6 +25,7 @@ describe('KMSList', () => {
   beforeEach(() => {
     vi.mocked(GetKMSKeys).mockReset();
     vi.mocked(DeleteKMSKey).mockReset();
+    vi.mocked(CreateKMSKey).mockReset();
   });
 
   it('lists KMS keys returned by GetKMSKeys', async () => {
@@ -82,5 +83,48 @@ describe('KMSList', () => {
     await waitFor(() => {
       expect(GetKMSKeys).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it('creates a key with the entered fields, then reloads the list', async () => {
+    vi.mocked(GetKMSKeys)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([makeKey({ name: 'new-key' })]);
+    vi.mocked(CreateKMSKey).mockResolvedValueOnce(makeKey({ name: 'new-key' }));
+    const user = userEvent.setup();
+
+    render(<KMSList profile="default" onSelectKey={() => {}} />);
+    await screen.findByText('KMSキーがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ キー作成' }));
+    await user.type(screen.getByPlaceholderText('my-key'), 'new-key');
+    await user.type(screen.getByPlaceholderText('任意', { exact: true }), 'a new key');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    await waitFor(() => {
+      expect(CreateKMSKey).toHaveBeenCalledWith('default', 'new-key', 'a new key', 'generated', '', []);
+    });
+    await waitFor(() => {
+      expect(GetKMSKeys).toHaveBeenCalledTimes(2);
+    });
+    expect(await screen.findByText('new-key')).toBeInTheDocument();
+  });
+
+  it('requires a plain key when importing a key', async () => {
+    vi.mocked(GetKMSKeys).mockResolvedValueOnce([]);
+    const user = userEvent.setup();
+
+    render(<KMSList profile="default" onSelectKey={() => {}} />);
+    await screen.findByText('KMSキーがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ キー作成' }));
+    await user.type(screen.getByPlaceholderText('my-key'), 'imported-key');
+    await user.selectOptions(screen.getByRole('combobox'), 'imported');
+
+    expect(screen.getByRole('button', { name: '作成する' })).toBeDisabled();
+
+    await user.type(screen.getByPlaceholderText('インポートする鍵データ'), 'base64keydata');
+
+    expect(screen.getByRole('button', { name: '作成する' })).not.toBeDisabled();
+    expect(CreateKMSKey).not.toHaveBeenCalled();
   });
 });

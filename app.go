@@ -1307,6 +1307,22 @@ func (a *App) ChangeKMSKeyStatus(profileName, keyId, status string) error {
 	return service.ChangeKeyStatus(a.ctx, keyId, status)
 }
 
+func (a *App) CreateKMSKey(profileName, name, description, keyOrigin, plainKey string, tags []string) (*kms.KeyInfo, error) {
+	service, err := kms.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateKey(a.ctx, name, description, keyOrigin, plainKey, tags)
+}
+
+func (a *App) UpdateKMSKey(profileName, keyId, name, description string, tags []string) (*kms.KeyInfo, error) {
+	service, err := kms.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateKey(a.ctx, keyId, name, description, tags)
+}
+
 // ProxyLB (Enhanced Load Balancer)
 func (a *App) GetProxyLBs(profileName string) ([]sakura.ProxyLBInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
