@@ -26,7 +26,7 @@
 | GSLB | ✅ あり | ✅ | (対象外) | 削除機能に加えCreate/Update/UpdateSettings（振り分け先サーバー管理）まで対応済み。読み書き一式が完備 |
 | ProxyLB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #88）。証明書管理（Get/Set/Delete/RenewLetsEncrypt）を追加済み |
 | SimpleMonitor | ✅ あり | ✅ | (対象外) | 削除機能に加えCreate/Update（監視設定管理）まで対応済み。読み書き一式が完備 |
-| Database | ✅ あり | ✅ | ✅ | 起動/停止/再起動+削除+FEテストを追加済み（PR #81） |
+| Database | ✅ あり | ✅ | ✅ | 起動/停止/再起動+削除+Create/Update/UpdateSettings/GetParameter/SetParameter+FEテストを追加済み（PR #81、2026-08-08 Tier2 #11） |
 | EnhancedDB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #87） |
 | NFS | ✅ あり | ✅ | ✅ | 完備。FEテストとResetを追加済み（PR #80） |
 | ObjectStorage | ✅ あり | ✅（バケット・アクセスキー） | (対象外) | バケット作成/削除、アクセスキー作成/削除+FEテストを追加済み |
@@ -126,10 +126,11 @@
 ## 3. Database / EnhancedDB / NFS / ObjectStorage
 
 ### Database（データベースアプライアンス）
-- テスト: `DatabaseList.test.tsx` あり（一覧表示・ボタン活性制御・起動ポーリング・再起動・削除フローをカバー）
-- バックエンド: List/PowerOn(Boot)/PowerOff(Shutdown)/ForceStop/**Reset**/**Delete**/GetStatus 実装済み、app.goで全て公開
+- テスト: `DatabaseList.test.tsx`（一覧表示・ボタン活性制御・起動ポーリング・再起動・削除・作成フロー・カードクリックでの詳細遷移）、`DatabaseDetail.test.tsx`（基本情報表示・編集、稼働設定の表示・編集、DBパラメータの設定・リセット）ともに整備済み。`frontend/e2e/database.spec.ts` で作成〜基本情報/稼働設定編集〜DBパラメータ操作〜削除までのE2Eもカバー
+- バックエンド: `internal/sakura/database.go` に**Get**/**Create**/**Update**/**UpdateSettings**/**GetParameter**/**SetParameter**を追加。List/PowerOn(Boot)/PowerOff(Shutdown)/ForceStop/Reset/Delete/GetStatusとあわせてapp.goで全て公開
 - ✅ **対応済み（PR #81）**: NFS/Server相当の電源操作（起動/停止/再起動）と削除機能、FEテストを追加
-- SDK比較で残る不足: Create/Read（単体Get）/Update/UpdateSettings/Config/Monitor系/Status/GetParameter/SetParameter（未着手）
+- ✅ **対応済み（2026-08-08 Tier2 #11）**: プラン（10G〜1TB）・接続先スイッチ・IPアドレス・RDBMS種別（MariaDB/PostgreSQL）・管理ユーザーを指定した作成（Create）、名前・説明・タグの編集（Update、稼働設定は事前Readで維持したまま送信）、稼働設定（管理ユーザー・レプリカユーザー・ポート番号・接続許可ネットワーク・拡張監視機能）編集（UpdateSettings、パスワードは空欄なら既存値を維持）、DBパラメータの一覧・設定・リセット（GetParameter/SetParameter）を追加。`DatabaseDetail.tsx`を新設し一覧のカードクリックで遷移する導線を追加（従来はDetail画面が存在しなかった）。冗長化構成（Proxyプラン）やマスター/スレーブのレプリケーション設定は対象外とし、非冗長化の単体構成のみサポートする
+- SDK比較で残る不足: Config/Monitor系（CPU/Disk/Interface/DB）/Status（未着手、パワーユーザー向け機能のため優先度低）
 
 ### EnhancedDB（強化版DB）
 - テスト: `EnhancedDBList.test.tsx` あり（一覧表示・削除確認フローをカバー）
@@ -224,6 +225,9 @@
 ### ✅ 完了（2026-08-08 追加セッション12、Tier2 #8）
 - DiskのCreate/Update/ConnectToServer/DisconnectFromServerを実装。`internal/sakura/disk.go`にGet/Create/Update/ConnectToServer/DisconnectFromServerを追加（DiskUpdateRequestに楽観ロック用フィールドはないため事前Read不要）、`app.go`に対応する5つのRPCを公開。`DiskDetail.tsx`を新設（従来Detail画面が存在しなかった）し、`DiskList.tsx`に作成モーダル（サイズ/プラン/接続方式/コピー元アーカイブ/接続先サーバー）とカードクリックでの詳細遷移を追加。接続先サーバー変更はUpdate APIではなくConnectToServer/DisconnectFromServerという別APIのため、Detail画面に専用の「接続先サーバー」編集UIを実装。`internal/sakura/disk_test.go`（fakeドライバ、`fake.InitDataStore`がプロセス内で一度しか初期化されない点に注意しテスト間で共有されるデータストアを前提に記述）、`DiskList.test.tsx`/`DiskDetail.test.tsx`、`frontend/e2e/disk.spec.ts`を追加
 
+### ✅ 完了（2026-08-08 追加セッション13、Tier2 #11）
+- DatabaseのCreate/Update/UpdateSettings/GetParameter/SetParameterを実装。`internal/sakura/database.go`にGet/Create/Update/UpdateSettings/GetParameter/SetParameterを追加（Update/UpdateSettingsはGSLB等と同じく事前Readで既存の稼働設定を維持したまま送信、UpdateSettingsのパスワード欄は空欄なら既存値を維持するフォールバックを実装）、`app.go`に対応する6つのRPCを公開。`DatabaseDetail.tsx`を新設（従来Detail画面が存在しなかった）し、`DatabaseList.tsx`に作成モーダル（プラン/接続先スイッチ/IPアドレス/RDBMS種別/管理ユーザー等）とカードクリックでの詳細遷移を追加。冗長化構成（Proxyプラン）・マスター/スレーブのレプリケーション設定は対象外とした。`internal/sakura/database_test.go`、`DatabaseList.test.tsx`/`DatabaseDetail.test.tsx`、`frontend/e2e/database.spec.ts`を追加。あわせてE2Eシード投入時に`Database.Conf`が未設定だとfakeドライバの`GetParameter`がnilポインタ参照でpanicするSDK側バグを発見し、シードデータに`Conf`/`CommonSetting`を設定して回避（詳細は`docs/upstream-issues.md`参照）
+
 ### 実装順序（2026-08-08 方針転換後の書き込み系機能ロードマップ）
 
 「閲覧中心」制約の撤廃を受け、各節「SDK比較で残る不足」に列挙された未実装機能（主にCreate/Update系）を、(a) 利用頻度・実用価値、(b) 実装複雑度、(c) 誤操作時のリスク（実インフラ作成・課金発生の有無）で並べ替えたロードマップ。上から順に着手することを推奨するが、各Tier内の順序はユーザーの関心に応じて入れ替えてよい。
@@ -255,7 +259,7 @@
 8. ✅ Disk: Create/Update/ConnectToServer/DisconnectFromServer — 2026-08-08対応済み（CreateWithConfigは対象外、Tier3相当として保留）
 9. ✅ ProxyLB: Create/Update/UpdateSettings — 2026-08-08対応済み
 10. ✅ KMS: Create/Update — 2026-08-08対応済み
-11. Database: Create/Update/UpdateSettings/GetParameter/SetParameter
+11. ✅ Database: Create/Update/UpdateSettings/GetParameter/SetParameter — 2026-08-08対応済み
 12. NFS: Create/Update
 13. EnhancedDB: Create/Update/SetPassword
 14. AppRun専有型: Cluster/Application/ASG/LoadBalancerのCreate、VersionのDelete、WorkerNodeのUpdate（draining）、Certificate系

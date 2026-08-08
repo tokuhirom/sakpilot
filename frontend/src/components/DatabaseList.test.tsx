@@ -3,7 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DatabaseList } from './DatabaseList';
 import { sakura } from '../../wailsjs/go/models';
-import { GetDatabases, PowerOnDatabase, PowerOffDatabase, DeleteDatabase, GetDatabaseStatus, ResetDatabase } from '../../wailsjs/go/main/App';
+import { GetDatabases, PowerOnDatabase, PowerOffDatabase, DeleteDatabase, GetDatabaseStatus, ResetDatabase, CreateDatabase, GetSwitches } from '../../wailsjs/go/main/App';
 
 vi.mock('../../wailsjs/go/main/App');
 
@@ -36,6 +36,8 @@ describe('DatabaseList', () => {
     vi.mocked(DeleteDatabase).mockReset();
     vi.mocked(GetDatabaseStatus).mockReset();
     vi.mocked(ResetDatabase).mockReset();
+    vi.mocked(CreateDatabase).mockReset();
+    vi.mocked(GetSwitches).mockReset();
   });
 
   afterEach(() => {
@@ -45,7 +47,7 @@ describe('DatabaseList', () => {
   it('lists databases returned by GetDatabases', async () => {
     vi.mocked(GetDatabases).mockResolvedValueOnce([makeDatabase()]);
 
-    render(<DatabaseList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    render(<DatabaseList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectDatabase={() => {}} />);
 
     expect(await screen.findByText('my-database')).toBeInTheDocument();
     expect(screen.getByText('192.168.0.31', { exact: false })).toBeInTheDocument();
@@ -55,7 +57,7 @@ describe('DatabaseList', () => {
   it('shows an empty state when there are no databases', async () => {
     vi.mocked(GetDatabases).mockResolvedValueOnce([]);
 
-    render(<DatabaseList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    render(<DatabaseList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectDatabase={() => {}} />);
 
     expect(await screen.findByText('データベースがありません')).toBeInTheDocument();
   });
@@ -64,7 +66,7 @@ describe('DatabaseList', () => {
     vi.mocked(GetDatabases).mockResolvedValueOnce([makeDatabase({ status: 'up' })]);
     const user = userEvent.setup();
 
-    render(<DatabaseList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    render(<DatabaseList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectDatabase={() => {}} />);
     await screen.findByText('my-database');
 
     await user.click(screen.getByRole('button', { name: '⋮' }));
@@ -78,7 +80,7 @@ describe('DatabaseList', () => {
     vi.mocked(GetDatabases).mockResolvedValueOnce([makeDatabase({ status: 'down' })]);
     const user = userEvent.setup();
 
-    render(<DatabaseList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    render(<DatabaseList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectDatabase={() => {}} />);
     await screen.findByText('my-database');
 
     await user.click(screen.getByRole('button', { name: '⋮' }));
@@ -93,7 +95,7 @@ describe('DatabaseList', () => {
     vi.mocked(DeleteDatabase).mockResolvedValueOnce(undefined);
     const user = userEvent.setup();
 
-    render(<DatabaseList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    render(<DatabaseList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectDatabase={() => {}} />);
     await screen.findByText('my-database');
 
     await user.click(screen.getByRole('button', { name: '⋮' }));
@@ -117,7 +119,7 @@ describe('DatabaseList', () => {
     vi.mocked(PowerOnDatabase).mockResolvedValueOnce(undefined);
     vi.mocked(GetDatabaseStatus).mockResolvedValueOnce('up');
 
-    render(<DatabaseList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    render(<DatabaseList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectDatabase={() => {}} />);
     await screen.findByText('my-database');
 
     // userEventはfakeTimers下では内部delayが解決せず固まるため、クリックはfireEventで行う。
@@ -143,7 +145,7 @@ describe('DatabaseList', () => {
       .mockResolvedValueOnce([makeDatabase({ status: 'up' })]);
     vi.mocked(ResetDatabase).mockResolvedValueOnce(undefined);
 
-    render(<DatabaseList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    render(<DatabaseList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectDatabase={() => {}} />);
     await screen.findByText('my-database');
 
     vi.useFakeTimers();
@@ -163,6 +165,58 @@ describe('DatabaseList', () => {
     expect(GetDatabases).toHaveBeenCalledTimes(2);
     await vi.waitFor(() => {
       expect(screen.queryByText('再起動中...')).not.toBeInTheDocument();
+    });
+  });
+
+  it('navigates to the detail page when a card is clicked', async () => {
+    vi.mocked(GetDatabases).mockResolvedValueOnce([makeDatabase()]);
+    const onSelectDatabase = vi.fn();
+    const user = userEvent.setup();
+
+    render(<DatabaseList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectDatabase={onSelectDatabase} />);
+    await user.click(await screen.findByText('my-database'));
+
+    expect(onSelectDatabase).toHaveBeenCalledWith('123456789012');
+  });
+
+  it('creates a database via the create modal', async () => {
+    vi.mocked(GetDatabases)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([makeDatabase()]);
+    vi.mocked(GetSwitches).mockResolvedValueOnce([
+      new sakura.SwitchInfo({ id: 'sw-1', name: 'my-switch' }),
+    ]);
+    vi.mocked(CreateDatabase).mockResolvedValueOnce(makeDatabase());
+    const user = userEvent.setup();
+
+    render(<DatabaseList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectDatabase={() => {}} />);
+    await screen.findByText('データベースがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ データベース作成' }));
+    expect(await screen.findByText('データベース作成')).toBeInTheDocument();
+    expect(GetSwitches).toHaveBeenCalledWith('default', 'is1a');
+
+    await user.type(screen.getByPlaceholderText('my-database'), 'new-db');
+    await user.selectOptions(screen.getByLabelText('接続先スイッチ'), 'sw-1');
+    await user.type(screen.getByPlaceholderText('192.168.0.11'), '192.168.0.11');
+    await user.type(screen.getByPlaceholderText('192.168.0.1'), '192.168.0.1');
+    await user.type(screen.getByLabelText('管理ユーザー名'), 'dbadmin');
+    await user.type(screen.getByLabelText('管理ユーザーパスワード'), 'TestPassword01');
+
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    await waitFor(() => {
+      expect(CreateDatabase).toHaveBeenCalledWith('default', 'is1a', expect.objectContaining({
+        Name: 'new-db',
+        SwitchID: 'sw-1',
+        IPAddress: '192.168.0.11',
+        DefaultRoute: '192.168.0.1',
+        DefaultUser: 'dbadmin',
+        UserPassword: 'TestPassword01',
+      }));
+    });
+    await waitFor(() => {
+      expect(GetDatabases).toHaveBeenCalledTimes(2);
     });
   });
 });

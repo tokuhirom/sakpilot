@@ -22,9 +22,18 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - SakPilotでの回避: E2Eテストの対象から証明書設定フロー(`SetCertificates`/それに依存する`証明書を更新`・`証明書を削除`ボタン)を除外した(`frontend/e2e/proxylb.spec.ts` 参照)。Go単体テスト・vitestレベルでは影響を受けないため `ProxyLBList.test.tsx` で引き続きカバーしている。
 - 報告時の提案: `copySameNameField` を `mapconv` 対応にするか、少なくとも `ProxyLBOp.SetCertificates` 内で `cert.PrimaryCert` がnilの場合はガードする(他のリクエスト/レスポンスの構造体ペアでも同種のフィールド名不一致(単数/複数、大文字小文字違い等)が無いか横断的に監査する価値がありそう)。
 
+### 2. `iaas/fake` の `DatabaseOp.GetParameter` が `Conf` フィールドのnilチェックをしておらずpanicする
+
+- パッケージ: `github.com/sacloud/sacloud-sdk-go/api/iaas/fake`
+- ファイル: `ops_database.go`(`GetParameter`、314行目付近)
+- 再現: fakeドライバのデータストアに `Conf` フィールドが `nil` の `*iaas.Database` を(`fake.DataStore.Put` などで直接、あるいは `Conf` を指定しない `DatabaseCreateRequest` 経由で)投入した状態で `DatabaseOp.GetParameter` を呼ぶと、`if v.Conf.DatabaseName == "postgres"` の行でnilポインタ参照によりpanicする。
+- 影響: `Database.Conf` を設定し忘れた状態のデータに対して `GetParameter` を呼ぶと即クラッシュする。実際のAPIでは作成されたデータベースに `Conf` が必ず設定されるためAccTestでは表面化しにくいが、fakeドライバのデータストアへ直接データを投入するテストコード(SakPilotのE2Eシード等)では容易に踏み抜く。
+- SakPilotでの回避: E2Eシード(`e2e_server.go` の `seedDatabases`)で `Conf`/`CommonSetting` を明示的に設定するよう修正した。SakPilot本体のコード(`internal/sakura/database.go`)側はSDKが返す `Conf` の有無を全てnilチェックしているため、実運用データに対しては影響を受けない。
+- 報告時の提案: `GetParameter` 内で `v.Conf` がnilの場合はMariaDB用のメタ情報にフォールバックする(あるいは明確なエラーを返す)ようにしてほしい。
+
 ## 改善要望(upstream向け)
 
-### 2. AppRun専有型 `version.CreateParams.CPU` / SDK内の `Version.CPU` の単位がコード上どこにもドキュメント化されていない
+### 3. AppRun専有型 `version.CreateParams.CPU` / SDK内の `Version.CPU` の単位がコード上どこにもドキュメント化されていない
 
 - パッケージ: `github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/version`
 - 該当: `version.go` の `CreateParams.CPU int64` / `Version.CPU int64`(`json:"cpu"`)
@@ -32,7 +41,7 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - 実害: SakPilot側でこの単位を誤解しており、デプロイフォームの「CPU (vCPU)」欄のデフォルト値 `0.1` をそのまま送信すると `json: cannot unmarshal number 0.1 into ... int64` で必ず失敗するバグになっていた(SakPilot側で修正済み: ミリvCPUに変換してから送るよう修正)。単位がコード上明記されていれば防げたクラスの不具合。
 - 提案: `CPU int64` フィールドに `// CPU ミリvCPU単位のCPU割り当て(例: 1000 = 1 vCPU)` のようなdocコメントを追加してほしい。可能なら `Memory` 等の他の数値フィールドも単位を明記してほしい。
 
-### 3. `sakumock/objectstorage` のS3データプレーンが、control planeで発行したアクセスキーを検証しないため、キー発行込みの結合テストができない
+### 4. `sakumock/objectstorage` のS3データプレーンが、control planeで発行したアクセスキーを検証しないため、キー発行込みの結合テストができない
 
 - パッケージ: `github.com/sacloud/sakumock/objectstorage`
 - 参照: [README「Data plane (S3)」](https://github.com/sacloud/sakumock/tree/main/objectstorage#data-plane-s3)

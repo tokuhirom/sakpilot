@@ -565,6 +565,60 @@ func (a *App) GetDatabases(profileName, zone string) ([]sakura.DatabaseInfo, err
 	return service.List(a.ctx, zone)
 }
 
+func (a *App) GetDatabaseDetail(profileName, zone, databaseID string) (*sakura.DatabaseInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewDatabaseService(client)
+	return service.Get(a.ctx, zone, databaseID)
+}
+
+func (a *App) CreateDatabase(profileName, zone string, params sakura.CreateDatabaseParams) (*sakura.DatabaseInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewDatabaseService(client)
+	return service.Create(a.ctx, zone, params)
+}
+
+func (a *App) UpdateDatabase(profileName, zone, databaseID, name, description string, tags []string) (*sakura.DatabaseInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewDatabaseService(client)
+	return service.Update(a.ctx, zone, databaseID, name, description, tags)
+}
+
+func (a *App) UpdateDatabaseSettings(profileName, zone, databaseID string, params sakura.DatabaseSettingsParams) (*sakura.DatabaseInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewDatabaseService(client)
+	return service.UpdateSettings(a.ctx, zone, databaseID, params)
+}
+
+func (a *App) GetDatabaseParameter(profileName, zone, databaseID string) (*sakura.DatabaseParameterInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewDatabaseService(client)
+	return service.GetParameter(a.ctx, zone, databaseID)
+}
+
+func (a *App) SetDatabaseParameter(profileName, zone, databaseID string, params map[string]any) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewDatabaseService(client)
+	return service.SetParameter(a.ctx, zone, databaseID, params)
+}
+
 func (a *App) PowerOnDatabase(profileName, zone, databaseID string) error {
 	client, err := sakura.NewClientFromProfile(profileName)
 	if err != nil {
