@@ -42,6 +42,7 @@ import { ArchiveList } from './components/ArchiveList';
 import { BillList } from './components/BillList';
 import { ObjectStorageList } from './components/ObjectStorageList';
 import { EnhancedDBList } from './components/EnhancedDBList';
+import { EnhancedDBDetail } from './components/EnhancedDBDetail';
 import { KMSList } from './components/KMSList';
 import { KMSDetail } from './components/KMSDetail';
 import { ProxyLBList } from './components/ProxyLBList';
@@ -196,6 +197,7 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
               <Route path="container-registry/:id" element={<ContainerRegistryBreadcrumb profile={profile} />} />
               <Route path="object-storage/*" element={<span className="breadcrumb-item active">オブジェクトストレージ</span>} />
               <Route path="enhanced-db" element={<span className="breadcrumb-item active">エンハンスドDB</span>} />
+              <Route path="enhanced-db/:id" element={<EnhancedDBBreadcrumb profile={profile} />} />
               <Route path="kms" element={<span className="breadcrumb-item active">KMS</span>} />
               <Route path="kms/:id" element={<KMSBreadcrumb profile={profile} />} />
               <Route path="apprun-dedicated" element={<span className="breadcrumb-item active">AppRun 専有型</span>} />
@@ -288,7 +290,10 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
             <ContainerRegistryDetailWrapper profile={profile} />
           } />
           <Route path="object-storage" element={<ObjectStorageList profile={profile} />} />
-          <Route path="enhanced-db" element={<EnhancedDBList profile={profile} />} />
+          <Route path="enhanced-db" element={<EnhancedDBListWrapper profile={profile} />} />
+          <Route path="enhanced-db/:id" element={
+            <EnhancedDBDetailWrapper profile={profile} />
+          } />
           <Route path="kms" element={<KMSListWrapper profile={profile} />} />
           <Route path="kms/:id" element={
             <KMSDetailWrapper profile={profile} />
@@ -451,6 +456,22 @@ function ContainerRegistryDetailWrapper({ profile }: { profile: string }) {
   return <ContainerRegistryDetail profile={profile} registryId={id} />;
 }
 
+function EnhancedDBListWrapper({ profile }: { profile: string }) {
+  const navigate = useNavigate();
+  return (
+    <EnhancedDBList
+      profile={profile}
+      onSelectDB={(id) => navigate(`/${profile}/enhanced-db/${id}`)}
+    />
+  );
+}
+
+function EnhancedDBDetailWrapper({ profile }: { profile: string }) {
+  const { id } = useParams<{ id: string }>();
+  if (!id) return null;
+  return <EnhancedDBDetail profile={profile} enhancedDBId={id} />;
+}
+
 function KMSListWrapper({ profile }: { profile: string }) {
   const navigate = useNavigate();
   return (
@@ -552,6 +573,19 @@ function GSLBBreadcrumb({ profile }: { profile: string }) {
     <>
       <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/${profile}/gslb`)}>
         GSLB
+      </span>
+      <span className="breadcrumb-separator">/</span>
+      <span className="breadcrumb-item active">詳細</span>
+    </>
+  );
+}
+
+function EnhancedDBBreadcrumb({ profile }: { profile: string }) {
+  const navigate = useNavigate();
+  return (
+    <>
+      <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/${profile}/enhanced-db`)}>
+        エンハンスドDB
       </span>
       <span className="breadcrumb-separator">/</span>
       <span className="breadcrumb-item active">詳細</span>

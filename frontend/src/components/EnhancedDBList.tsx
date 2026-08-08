@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetEnhancedDBs, DeleteEnhancedDB } from '../../wailsjs/go/main/App';
+import { GetEnhancedDBs, DeleteEnhancedDB, CreateEnhancedDB } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -7,13 +7,23 @@ import { SearchBar } from './SearchBar';
 
 interface EnhancedDBListProps {
   profile: string;
+  onSelectDB: (id: string) => void;
 }
 
-export function EnhancedDBList({ profile }: EnhancedDBListProps) {
+export function EnhancedDBList({ profile, onSelectDB }: EnhancedDBListProps) {
   const [databases, setDatabases] = useState<sakura.EnhancedDBInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<sakura.EnhancedDBInfo | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [newDatabaseName, setNewDatabaseName] = useState('');
+  const [newDatabaseType, setNewDatabaseType] = useState<'tidb' | 'mariadb'>('tidb');
+  const [newRegion, setNewRegion] = useState<'is1' | 'tk1'>('is1');
+  const [newTags, setNewTags] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const {
     searchQuery,
@@ -103,10 +113,41 @@ export function EnhancedDBList({ profile }: EnhancedDBListProps) {
     }
   };
 
+  const handleCreateOpen = () => {
+    setNewName('');
+    setNewDescription('');
+    setNewDatabaseName('');
+    setNewDatabaseType('tidb');
+    setNewRegion('is1');
+    setNewTags('');
+    setCreateError(null);
+    setShowCreate(true);
+  };
+
+  const handleCreateCancel = () => {
+    setShowCreate(false);
+  };
+
+  const handleCreateSubmit = async () => {
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const tags = newTags.split(',').map(t => t.trim()).filter(t => t);
+      await CreateEnhancedDB(profile, newName, newDescription, tags, newDatabaseName, newDatabaseType, newRegion);
+      setShowCreate(false);
+      await loadDatabases();
+    } catch (e) {
+      setCreateError(String(e));
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <>
       <div className="header">
         <h2>エンハンスドDB</h2>
+        <button className="btn btn-primary btn-small" onClick={handleCreateOpen}>+ 作成</button>
       </div>
 
       <SearchBar
@@ -126,7 +167,7 @@ export function EnhancedDBList({ profile }: EnhancedDBListProps) {
         </div>
       ) : (
         filteredDatabases.map((db) => (
-          <div key={db.id} className="card">
+          <div key={db.id} className="card" onClick={() => onSelectDB(db.id)} style={{ cursor: 'pointer' }}>
             <div className="card-header">
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -167,7 +208,10 @@ export function EnhancedDBList({ profile }: EnhancedDBListProps) {
                 ID: {db.id}
                 <button
                   className="btn btn-danger btn-small"
-                  onClick={() => handleDeleteClick(db)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteClick(db);
+                  }}
                   disabled={deleting === db.id}
                   title="削除"
                 >
@@ -187,6 +231,95 @@ export function EnhancedDBList({ profile }: EnhancedDBListProps) {
             <div className="confirm-actions">
               <button className="btn btn-secondary" onClick={handleDeleteCancel}>キャンセル</button>
               <button className="btn btn-danger" onClick={handleDeleteConfirm}>削除する</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreate && (
+        <div className="modal-overlay" onClick={handleCreateCancel} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+            backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+            padding: '20px', minWidth: '320px', maxWidth: '420px',
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>エンハンスドDB作成</h3>
+            <div className="form-group">
+              <label>名前</label>
+              <input
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="my-enhanced-db"
+                autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <label>説明</label>
+              <input
+                type="text"
+                value={newDescription}
+                onChange={(e) => setNewDescription(e.target.value)}
+                placeholder="任意"
+              />
+            </div>
+            <div className="form-group">
+              <label>DB名</label>
+              <input
+                type="text"
+                value={newDatabaseName}
+                onChange={(e) => setNewDatabaseName(e.target.value)}
+                placeholder="mydb"
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="enhanced-db-create-type">DB種別</label>
+              <select
+                id="enhanced-db-create-type"
+                value={newDatabaseType}
+                onChange={(e) => setNewDatabaseType(e.target.value as 'tidb' | 'mariadb')}
+              >
+                <option value="tidb">TiDB</option>
+                <option value="mariadb">MariaDB</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label htmlFor="enhanced-db-create-region">リージョン</label>
+              <select
+                id="enhanced-db-create-region"
+                value={newRegion}
+                onChange={(e) => setNewRegion(e.target.value as 'is1' | 'tk1')}
+              >
+                <option value="is1">石狩</option>
+                <option value="tk1">東京</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>タグ</label>
+              <input
+                type="text"
+                value={newTags}
+                onChange={(e) => setNewTags(e.target.value)}
+                placeholder="任意(カンマ区切り、例: env:prod,team:sre)"
+              />
+            </div>
+            {createError && (
+              <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                エラー: {createError}
+              </div>
+            )}
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleCreateSubmit}
+                disabled={creating || !newName || !newDatabaseName}
+              >
+                {creating ? '作成中...' : '作成する'}
+              </button>
             </div>
           </div>
         </div>
