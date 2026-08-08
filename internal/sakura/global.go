@@ -7,6 +7,30 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 )
 
+// SimpleMonitorHealthCheckInput はCreate/Update時に指定するヘルスチェック設定。
+type SimpleMonitorHealthCheckInput struct {
+	Protocol       string `json:"protocol"`
+	Port           string `json:"port"`
+	Path           string `json:"path"`
+	Status         string `json:"status"`
+	Host           string `json:"host"`
+	ContainsString string `json:"containsString"`
+}
+
+// SimpleMonitorSettingsInput はCreate/Update時に指定する監視設定一式。
+type SimpleMonitorSettingsInput struct {
+	DelayLoop          int                           `json:"delayLoop"`
+	MaxCheckAttempts   int                           `json:"maxCheckAttempts"`
+	RetryInterval      int                           `json:"retryInterval"`
+	Timeout            int                           `json:"timeout"`
+	Enabled            bool                          `json:"enabled"`
+	NotifyEmailEnabled bool                          `json:"notifyEmailEnabled"`
+	NotifySlackEnabled bool                          `json:"notifySlackEnabled"`
+	SlackWebhooksURL   string                        `json:"slackWebhooksUrl"`
+	NotifyInterval     int                           `json:"notifyInterval"`
+	HealthCheck        SimpleMonitorHealthCheckInput `json:"healthCheck"`
+}
+
 type DNSRecord struct {
 	Name  string `json:"name"`
 	Type  string `json:"type"`
@@ -59,6 +83,8 @@ type SimpleMonitorDetailInfo struct {
 	Timeout            int                           `json:"timeout"`
 	NotifyEmailEnabled bool                          `json:"notifyEmailEnabled"`
 	NotifySlackEnabled bool                          `json:"notifySlackEnabled"`
+	SlackWebhooksURL   string                        `json:"slackWebhooksUrl"`
+	NotifyInterval     int                           `json:"notifyInterval"`
 	HealthCheck        *SimpleMonitorHealthCheckInfo `json:"healthCheck,omitempty"`
 }
 
@@ -256,13 +282,7 @@ func (s *GlobalService) ListSimpleMonitors(ctx context.Context) ([]SimpleMonitor
 	return list, nil
 }
 
-func (s *GlobalService) GetSimpleMonitor(ctx context.Context, id string) (*SimpleMonitorDetailInfo, error) {
-	smOp := iaas.NewSimpleMonitorOp(s.client.Caller())
-	m, err := smOp.Read(ctx, types.StringID(id))
-	if err != nil {
-		return nil, err
-	}
-
+func toSimpleMonitorDetailInfo(m *iaas.SimpleMonitor) *SimpleMonitorDetailInfo {
 	detail := &SimpleMonitorDetailInfo{
 		ID:                 m.ID.String(),
 		Name:               m.Name,
@@ -276,6 +296,8 @@ func (s *GlobalService) GetSimpleMonitor(ctx context.Context, id string) (*Simpl
 		Timeout:            m.Timeout,
 		NotifyEmailEnabled: m.NotifyEmailEnabled.Bool(),
 		NotifySlackEnabled: m.NotifySlackEnabled.Bool(),
+		SlackWebhooksURL:   m.SlackWebhooksURL,
+		NotifyInterval:     m.NotifyInterval,
 	}
 
 	if m.HealthCheck != nil {
@@ -289,7 +311,112 @@ func (s *GlobalService) GetSimpleMonitor(ctx context.Context, id string) (*Simpl
 		}
 	}
 
-	return detail, nil
+	return detail
+}
+
+func toSDKSimpleMonitorHealthCheck(hc SimpleMonitorHealthCheckInput) *iaas.SimpleMonitorHealthCheck {
+	return &iaas.SimpleMonitorHealthCheck{
+		Protocol:       types.ESimpleMonitorProtocol(hc.Protocol),
+		Port:           parseStringNumber(hc.Port),
+		Path:           hc.Path,
+		Status:         parseStringNumber(hc.Status),
+		Host:           hc.Host,
+		ContainsString: hc.ContainsString,
+	}
+}
+
+func parseStringNumber(s string) types.StringNumber {
+	n, err := types.ParseStringNumber(s)
+	if err != nil {
+		return types.StringNumber(0)
+	}
+	return n
+}
+
+func (s *GlobalService) GetSimpleMonitor(ctx context.Context, id string) (*SimpleMonitorDetailInfo, error) {
+	smOp := iaas.NewSimpleMonitorOp(s.client.Caller())
+	m, err := smOp.Read(ctx, types.StringID(id))
+	if err != nil {
+		return nil, err
+	}
+	return toSimpleMonitorDetailInfo(m), nil
+}
+
+// CreateSimpleMonitor はシンプル監視を新規作成する。targetは監視対象のホスト名/IPアドレス。
+func (s *GlobalService) CreateSimpleMonitor(ctx context.Context, target, description string, settings SimpleMonitorSettingsInput) (*SimpleMonitorDetailInfo, error) {
+	smOp := iaas.NewSimpleMonitorOp(s.client.Caller())
+	m, err := smOp.Create(ctx, &iaas.SimpleMonitorCreateRequest{
+		Target:             target,
+		Description:        description,
+		MaxCheckAttempts:   settings.MaxCheckAttempts,
+		RetryInterval:      settings.RetryInterval,
+		DelayLoop:          settings.DelayLoop,
+		Enabled:            types.StringFlag(settings.Enabled),
+		HealthCheck:        toSDKSimpleMonitorHealthCheck(settings.HealthCheck),
+		NotifyEmailEnabled: types.StringFlag(settings.NotifyEmailEnabled),
+		NotifySlackEnabled: types.StringFlag(settings.NotifySlackEnabled),
+		SlackWebhooksURL:   settings.SlackWebhooksURL,
+		NotifyInterval:     settings.NotifyInterval,
+		Timeout:            settings.Timeout,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return toSimpleMonitorDetailInfo(m), nil
+}
+
+// UpdateSimpleMonitor はシンプル監視の説明を更新する。監視設定は既存のものを維持したまま送信する
+// (Update APIはSettingsも含むリクエスト構造のため、空で送ると設定が失われる)。
+func (s *GlobalService) UpdateSimpleMonitor(ctx context.Context, id, description string) (*SimpleMonitorDetailInfo, error) {
+	smOp := iaas.NewSimpleMonitorOp(s.client.Caller())
+	current, err := smOp.Read(ctx, types.StringID(id))
+	if err != nil {
+		return nil, err
+	}
+	m, err := smOp.Update(ctx, types.StringID(id), &iaas.SimpleMonitorUpdateRequest{
+		Description:        description,
+		MaxCheckAttempts:   current.MaxCheckAttempts,
+		RetryInterval:      current.RetryInterval,
+		DelayLoop:          current.DelayLoop,
+		Enabled:            current.Enabled,
+		HealthCheck:        current.HealthCheck,
+		NotifyEmailEnabled: current.NotifyEmailEnabled,
+		NotifySlackEnabled: current.NotifySlackEnabled,
+		SlackWebhooksURL:   current.SlackWebhooksURL,
+		NotifyInterval:     current.NotifyInterval,
+		Timeout:            current.Timeout,
+		SettingsHash:       current.SettingsHash,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return toSimpleMonitorDetailInfo(m), nil
+}
+
+// UpdateSimpleMonitorSettings はシンプル監視の監視設定(ヘルスチェック・通知等)を更新する。説明は変更しない。
+func (s *GlobalService) UpdateSimpleMonitorSettings(ctx context.Context, id string, settings SimpleMonitorSettingsInput) (*SimpleMonitorDetailInfo, error) {
+	smOp := iaas.NewSimpleMonitorOp(s.client.Caller())
+	current, err := smOp.Read(ctx, types.StringID(id))
+	if err != nil {
+		return nil, err
+	}
+	m, err := smOp.UpdateSettings(ctx, types.StringID(id), &iaas.SimpleMonitorUpdateSettingsRequest{
+		MaxCheckAttempts:   settings.MaxCheckAttempts,
+		RetryInterval:      settings.RetryInterval,
+		DelayLoop:          settings.DelayLoop,
+		Enabled:            types.StringFlag(settings.Enabled),
+		HealthCheck:        toSDKSimpleMonitorHealthCheck(settings.HealthCheck),
+		NotifyEmailEnabled: types.StringFlag(settings.NotifyEmailEnabled),
+		NotifySlackEnabled: types.StringFlag(settings.NotifySlackEnabled),
+		SlackWebhooksURL:   settings.SlackWebhooksURL,
+		NotifyInterval:     settings.NotifyInterval,
+		Timeout:            settings.Timeout,
+		SettingsHash:       current.SettingsHash,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return toSimpleMonitorDetailInfo(m), nil
 }
 
 func (s *GlobalService) DeleteSimpleMonitor(ctx context.Context, id string) error {

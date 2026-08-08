@@ -25,7 +25,7 @@
 | DNS | ✅ あり | ✅ | (対象外) | Create/Update/UpdateSettings（レコード管理）まで対応済み。読み書き一式が完備 |
 | GSLB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #85、CI待ちでauto-merge設定済み） |
 | ProxyLB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #88）。証明書管理（Get/Set/Delete/RenewLetsEncrypt）を追加済み |
-| SimpleMonitor | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #86）。Get(詳細)・詳細ページを追加済み |
+| SimpleMonitor | ✅ あり | ✅ | (対象外) | 削除機能に加えCreate/Update（監視設定管理）まで対応済み。読み書き一式が完備 |
 | Database | ✅ あり | ✅ | ✅ | 起動/停止/再起動+削除+FEテストを追加済み（PR #81） |
 | EnhancedDB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #87） |
 | NFS | ✅ あり | ✅ | ✅ | 完備。FEテストとResetを追加済み（PR #80） |
@@ -106,11 +106,12 @@
 - **TODO**: トラフィック監視（MonitorConnection）は次点で検討
 
 ### SimpleMonitor
-- テスト: `MonitorList.test.tsx` あり（一覧表示・詳細遷移・削除確認フローをカバー）
-- バックエンド: List/**Get**/Delete 実装済み
+- テスト: `MonitorList.test.tsx`（一覧表示・詳細遷移・削除確認・作成フロー）、`MonitorDetail.test.tsx`（基本情報表示・説明編集・監視設定編集）ともに整備済み。`frontend/e2e/simplemonitor.spec.ts` で作成〜設定編集〜削除までのE2Eもカバー
+- バックエンド: List/Get/**Create**/**Update**/**UpdateSettings**/Delete 実装済み
 - ✅ **対応済み（PR #86）**: 削除機能を追加
 - ✅ **対応済み**: Get（詳細取得）と `MonitorDetail.tsx`（基本情報・ヘルスチェック設定）を追加。一覧の行クリックで詳細へ遷移
-- SDK比較で残る不足: Create/Update/UpdateSettings/MonitorResponseTime（応答時間グラフ）/HealthStatus（未着手）
+- ✅ **対応済み（2026-08-08 Tier1）**: 監視の新規作成（Create）、説明編集（Update）、監視設定編集（UpdateSettings: チェック間隔・リトライ・タイムアウト・ヘルスチェック・メール/Slack通知）を追加。DNSと同様にUpdateはDescriptionのみ・UpdateSettingsは設定一式のみを担当する分割方式とした。`MonitorList.tsx`に作成モーダル、`MonitorDetail.tsx`に説明インライン編集と監視設定編集モーダルを実装
+- SDK比較で残る不足: MonitorResponseTime（応答時間グラフ）/HealthStatus（未着手）
 
 ### Monitoring Suite（Monitoring.tsx / MonitoringMetricDetail.tsx / MetricGraph.tsx）
 - テスト: `MonitoringMetricDetail.test.tsx` あり（基本情報表示・アクセスキー0件時の案内・publisher切り替えとメトリクスのグルーピング表示・カスタムメトリクス・エラー分岐をカバー。`MetricGraph`はuPlot/canvas依存のため`vi.mock`でスタブ化）
@@ -229,8 +230,8 @@
 **Tier 1: 高頻度・低〜中リスクな基本操作（次に着手すべき候補）**
 1. ✅ DNS: Create/Update/UpdateSettings（レコード追加・編集は最頻出の日常操作） — 2026-08-08対応済み
 2. ✅ PacketFilter: Create/Update（ルール追加・編集） — 2026-08-08対応済み
-3. SimpleMonitor: Create/Update/UpdateSettings（監視対象の追加・設定変更） — 次に着手すべき候補
-4. GSLB: Create/Update/UpdateSettings
+3. ✅ SimpleMonitor: Create/Update/UpdateSettings（監視対象の追加・設定変更） — 2026-08-08対応済み
+4. GSLB: Create/Update/UpdateSettings — 次に着手すべき候補
 5. ContainerRegistry: Create、ユーザー管理（AddUser/UpdateUser/DeleteUser）
 6. AppRun専有型: Version Create（デプロイ）— 着手する場合はフルデプロイフォーム（image/CPU/メモリ/スケーリング/公開ポート/環境変数）として対応する方針（2026-08-08ユーザーに確認済み）
 
