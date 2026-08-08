@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetGSLBList, DeleteGSLB } from '../../wailsjs/go/main/App';
+import { GetGSLBList, DeleteGSLB, CreateGSLB } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -15,6 +15,12 @@ export function GSLBList({ profile, onSelectGSLB }: GSLBListProps) {
   const [loading, setLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<sakura.GSLBInfo | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [newSorryServer, setNewSorryServer] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const {
     searchQuery,
@@ -76,10 +82,50 @@ export function GSLBList({ profile, onSelectGSLB }: GSLBListProps) {
     }
   };
 
+  const handleCreateOpen = () => {
+    setNewName('');
+    setNewDescription('');
+    setNewSorryServer('');
+    setCreateError(null);
+    setShowCreate(true);
+  };
+
+  const handleCreateCancel = () => {
+    setShowCreate(false);
+  };
+
+  const handleCreateSubmit = async () => {
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const settings = new sakura.GSLBSettingsInput({
+        sorryServer: newSorryServer,
+        delayLoop: 10,
+        weighted: false,
+        healthCheck: {
+          protocol: 'ping',
+          hostHeader: '',
+          path: '',
+          responseCode: 0,
+          port: 0,
+        },
+        servers: [],
+      });
+      await CreateGSLB(profile, newName, newDescription, settings);
+      setShowCreate(false);
+      await loadGSLBList();
+    } catch (e) {
+      setCreateError(String(e));
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <>
       <div className="header">
         <h2>GSLB</h2>
+        <button className="btn btn-primary btn-small" onClick={handleCreateOpen}>+ GSLB作成</button>
       </div>
 
       <SearchBar
@@ -150,6 +196,67 @@ export function GSLBList({ profile, onSelectGSLB }: GSLBListProps) {
             <div className="confirm-actions">
               <button className="btn btn-secondary" onClick={handleDeleteCancel}>キャンセル</button>
               <button className="btn btn-danger" onClick={handleDeleteConfirm}>削除する</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreate && (
+        <div className="modal-overlay" onClick={handleCreateCancel} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+            backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+            padding: '20px', minWidth: '320px', maxWidth: '420px',
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>GSLB作成</h3>
+            <div className="form-group">
+              <label>名前</label>
+              <input
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="my-gslb"
+                autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <label>説明</label>
+              <input
+                type="text"
+                value={newDescription}
+                onChange={(e) => setNewDescription(e.target.value)}
+                placeholder="任意"
+              />
+            </div>
+            <div className="form-group">
+              <label>Sorry Server(IPアドレス)</label>
+              <input
+                type="text"
+                value={newSorryServer}
+                onChange={(e) => setNewSorryServer(e.target.value)}
+                placeholder="任意"
+              />
+            </div>
+            <p style={{ color: '#888', fontSize: '0.85rem' }}>
+              振り分け先サーバーやヘルスチェックの詳細は作成後、詳細画面から設定できます。
+            </p>
+            {createError && (
+              <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                エラー: {createError}
+              </div>
+            )}
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleCreateSubmit}
+                disabled={creating || !newName}
+              >
+                {creating ? '作成中...' : '作成する'}
+              </button>
             </div>
           </div>
         </div>

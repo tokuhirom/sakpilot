@@ -77,6 +77,9 @@ func runE2EServer(addr, dist string) error {
 	if err := seedSimpleMonitors(); err != nil {
 		return fmt.Errorf("failed to seed simple monitors: %w", err)
 	}
+	if err := seedGSLBs(); err != nil {
+		return fmt.Errorf("failed to seed GSLBs: %w", err)
+	}
 
 	kmsSrv := mockkms.NewTestServer(mockkms.Config{})
 	if err := os.Setenv("SAKURA_ENDPOINTS_KMS", kmsSrv.TestURL()); err != nil {
@@ -257,6 +260,37 @@ func seedSimpleMonitors() error {
 		Enabled:     true,
 		HealthCheck: &iaas.SimpleMonitorHealthCheck{
 			Protocol: types.SimpleMonitorProtocols.Ping,
+		},
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+// seedGSLBs はIaaS fakeドライバのデータストアにE2Eシナリオ用のGSLBを投入する。
+func seedGSLBs() error {
+	ctx := context.Background()
+	gslbOp := iaas.NewGSLBOp(nil)
+
+	if _, err := gslbOp.Create(ctx, &iaas.GSLBCreateRequest{
+		Name:        "e2e-gslb-target",
+		Description: "E2E: 設定編集シナリオ用",
+		DelayLoop:   10,
+		HealthCheck: &iaas.GSLBHealthCheck{
+			Protocol: types.GSLBHealthCheckProtocols.Ping,
+		},
+		DestinationServers: iaas.GSLBServers{
+			{IPAddress: "192.0.2.10", Enabled: types.StringFlag(true), Weight: types.StringNumber(1)},
+		},
+	}); err != nil {
+		return err
+	}
+	if _, err := gslbOp.Create(ctx, &iaas.GSLBCreateRequest{
+		Name:        "e2e-doomed-gslb",
+		Description: "E2E: 削除シナリオ用",
+		DelayLoop:   10,
+		HealthCheck: &iaas.GSLBHealthCheck{
+			Protocol: types.GSLBHealthCheckProtocols.Ping,
 		},
 	}); err != nil {
 		return err

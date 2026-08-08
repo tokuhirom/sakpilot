@@ -308,6 +308,33 @@ func (a *App) DeleteGSLB(profileName, gslbId string) error {
 	return service.DeleteGSLB(a.ctx, gslbId)
 }
 
+func (a *App) CreateGSLB(profileName, name, description string, settings sakura.GSLBSettingsInput) (*sakura.GSLBInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.CreateGSLB(a.ctx, name, description, settings)
+}
+
+func (a *App) UpdateGSLB(profileName, gslbId, name, description string) (*sakura.GSLBInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.UpdateGSLB(a.ctx, gslbId, name, description)
+}
+
+func (a *App) UpdateGSLBSettings(profileName, gslbId string, settings sakura.GSLBSettingsInput) (*sakura.GSLBInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.UpdateGSLBSettings(a.ctx, gslbId, settings)
+}
+
 // Switches
 func (a *App) GetSwitches(profileName, zone string) ([]sakura.SwitchInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
