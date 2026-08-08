@@ -22,7 +22,7 @@
 | Switch | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #82）。共有スコープは削除不可でボタン無効化 |
 | PacketFilter | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #83） |
 | KMS | ✅ あり | ✅（Delete） | (対象外) | 削除機能+FEテストを追加済み（PR #90）。Get/Rotate/ChangeStatus/暗号化は引き続き未実装 |
-| DNS | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #84） |
+| DNS | ✅ あり | ✅ | (対象外) | Create/Update/UpdateSettings（レコード管理）まで対応済み。読み書き一式が完備 |
 | GSLB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #85、CI待ちでauto-merge設定済み） |
 | ProxyLB | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #88）。証明書管理（Get/Set/Delete/RenewLetsEncrypt）を追加済み |
 | SimpleMonitor | ✅ あり | ✅ | (対象外) | 削除機能+FEテストを追加済み（PR #86）。Get(詳細)・詳細ページを追加済み |
@@ -84,10 +84,11 @@
 ## 2. DNS / GSLB / ProxyLB / 監視系
 
 ### DNS
-- テスト: `DNSList.test.tsx` あり（一覧表示・詳細遷移・削除確認フローをカバー）
-- バックエンド: List/Get/**Delete** 実装済み
+- テスト: `DNSList.test.tsx`（一覧表示・詳細遷移・削除確認・ゾーン作成フロー）、`DNSDetail.test.tsx`（説明編集・レコード追加/編集/削除）ともに整備済み。`frontend/e2e/dns.spec.ts` でゾーン作成〜レコード操作〜削除までのE2Eもカバー
+- バックエンド: List/Get/**Create**/**Update**/**UpdateSettings**/Delete 実装済み
 - ✅ **対応済み（PR #84）**: 削除機能を追加
-- SDK比較で残る不足: Create/Update/UpdateSettings（レコード追加・編集、未着手）
+- ✅ **対応済み（2026-08-08 Tier1着手）**: ゾーン作成（Create）、説明編集（Update）、リソースレコードの追加・編集・削除（UpdateSettings、全置き換え方式）を追加。`DNSList.tsx`にゾーン作成モーダル、`DNSDetail.tsx`に説明インライン編集とレコード管理UIを実装
+- SDK比較で残る不足: なし（Read/Write一式が揃った）
 
 ### GSLB
 - テスト: `GSLBList.test.tsx` あり（一覧表示・詳細遷移・削除確認フローをカバー）
@@ -222,7 +223,7 @@
 3. 書き込み系機能（Tier 1以降のCreate/Update）を実装する際は、対応するE2Eシナリオを同時に追加する
 
 **Tier 1: 高頻度・低〜中リスクな基本操作（次に着手すべき候補）**
-1. DNS: Create/Update/UpdateSettings（レコード追加・編集は最頻出の日常操作）
+1. ✅ DNS: Create/Update/UpdateSettings（レコード追加・編集は最頻出の日常操作） — 2026-08-08対応済み
 2. PacketFilter: Create/Update（ルール追加・編集）
 3. SimpleMonitor: Create/Update/UpdateSettings（監視対象の追加・設定変更）
 4. GSLB: Create/Update/UpdateSettings

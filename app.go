@@ -522,6 +522,33 @@ func (a *App) DeleteDNS(profileName, dnsId string) error {
 	return service.DeleteDNS(a.ctx, dnsId)
 }
 
+func (a *App) CreateDNS(profileName, name, description string) (*sakura.DNSInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.CreateDNS(a.ctx, name, description)
+}
+
+func (a *App) UpdateDNS(profileName, dnsId, description string) (*sakura.DNSInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.UpdateDNS(a.ctx, dnsId, description)
+}
+
+func (a *App) UpdateDNSRecords(profileName, dnsId string, records []sakura.DNSRecord) (*sakura.DNSInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.UpdateDNSRecords(a.ctx, dnsId, records)
+}
+
 // Monitoring Suite
 func (a *App) GetMSLogs(profileName string) ([]sakura.MSLogInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)

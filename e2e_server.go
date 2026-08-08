@@ -68,6 +68,9 @@ func runE2EServer(addr, dist string) error {
 
 	fake.SwitchFactoryFuncToFake()
 	seedServers()
+	if err := seedDNS(); err != nil {
+		return fmt.Errorf("failed to seed DNS zones: %w", err)
+	}
 
 	kmsSrv := mockkms.NewTestServer(mockkms.Config{})
 	if err := os.Setenv("SAKURA_ENDPOINTS_KMS", kmsSrv.TestURL()); err != nil {
@@ -170,6 +173,31 @@ func seedServers() {
 			CreatedAt:      now,
 		})
 	}
+}
+
+// seedDNS はIaaS fakeドライバのデータストアにE2Eシナリオ用のDNSゾーンを投入する。
+// fakeのDNSOpは実APIと同じCreate/Update/UpdateSettings/Deleteを備えているため、
+// Op経由でシードすることでフロントエンドの操作パスをそのまま検証できる。
+func seedDNS() error {
+	ctx := context.Background()
+	dnsOp := iaas.NewDNSOp(nil)
+
+	if _, err := dnsOp.Create(ctx, &iaas.DNSCreateRequest{
+		Name:        "e2e-example.com",
+		Description: "E2E: レコード操作シナリオ用",
+		Records: iaas.DNSRecords{
+			{Name: "www", Type: types.DNSRecordTypes.A, RData: "192.0.2.10", TTL: 3600},
+		},
+	}); err != nil {
+		return err
+	}
+	if _, err := dnsOp.Create(ctx, &iaas.DNSCreateRequest{
+		Name:        "e2e-doomed.com",
+		Description: "E2E: 削除シナリオ用",
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 // seedKMSKeys はsakumockのKMSサーバーにE2Eシナリオ用のキーを投入する。

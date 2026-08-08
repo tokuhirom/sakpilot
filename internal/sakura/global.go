@@ -110,6 +110,25 @@ func NewGlobalService(client *Client) *GlobalService {
 	return &GlobalService{client: client}
 }
 
+func toDNSInfo(d *iaas.DNS) *DNSInfo {
+	records := make([]DNSRecord, 0, len(d.Records))
+	for _, r := range d.Records {
+		records = append(records, DNSRecord{
+			Name:  r.Name,
+			Type:  string(r.Type),
+			RData: r.RData,
+			TTL:   r.TTL,
+		})
+	}
+	return &DNSInfo{
+		ID:          d.ID.String(),
+		Name:        d.Name,
+		Description: d.Description,
+		Zone:        d.DNSZone,
+		Records:     records,
+	}
+}
+
 func (s *GlobalService) ListDNS(ctx context.Context) ([]DNSInfo, error) {
 	dnsOp := iaas.NewDNSOp(s.client.Caller())
 	result, err := dnsOp.Find(ctx, &iaas.FindCondition{})
@@ -119,22 +138,7 @@ func (s *GlobalService) ListDNS(ctx context.Context) ([]DNSInfo, error) {
 
 	list := make([]DNSInfo, 0, len(result.DNS))
 	for _, d := range result.DNS {
-		records := make([]DNSRecord, 0, len(d.Records))
-		for _, r := range d.Records {
-			records = append(records, DNSRecord{
-				Name:  r.Name,
-				Type:  string(r.Type),
-				RData: r.RData,
-				TTL:   r.TTL,
-			})
-		}
-		list = append(list, DNSInfo{
-			ID:          d.ID.String(),
-			Name:        d.Name,
-			Description: d.Description,
-			Zone:        d.DNSZone,
-			Records:     records,
-		})
+		list = append(list, *toDNSInfo(d))
 	}
 	return list, nil
 }
@@ -145,24 +149,67 @@ func (s *GlobalService) GetDNS(ctx context.Context, id string) (*DNSInfo, error)
 	if err != nil {
 		return nil, err
 	}
+	return toDNSInfo(d), nil
+}
 
-	records := make([]DNSRecord, 0, len(d.Records))
-	for _, r := range d.Records {
-		records = append(records, DNSRecord{
+// CreateDNS はDNSゾーンを新規作成する。ゾーン名(name)はNSレコードが割り当てられる
+// ドメイン名そのもの(例: example.com)を指定する。
+func (s *GlobalService) CreateDNS(ctx context.Context, name, description string) (*DNSInfo, error) {
+	dnsOp := iaas.NewDNSOp(s.client.Caller())
+	d, err := dnsOp.Create(ctx, &iaas.DNSCreateRequest{
+		Name:        name,
+		Description: description,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return toDNSInfo(d), nil
+}
+
+// UpdateDNS はDNSゾーンの説明を更新する。Recordsは既存のものを維持したまま送信する
+// (Update APIはSettingsも含むリクエスト構造のため、空で送るとレコードが失われる)。
+func (s *GlobalService) UpdateDNS(ctx context.Context, id, description string) (*DNSInfo, error) {
+	dnsOp := iaas.NewDNSOp(s.client.Caller())
+	current, err := dnsOp.Read(ctx, types.StringID(id))
+	if err != nil {
+		return nil, err
+	}
+	d, err := dnsOp.Update(ctx, types.StringID(id), &iaas.DNSUpdateRequest{
+		Description: description,
+		Records:     current.Records,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return toDNSInfo(d), nil
+}
+
+// UpdateDNSRecords はDNSゾーンのリソースレコードを一括更新する(全置き換え)。
+func (s *GlobalService) UpdateDNSRecords(ctx context.Context, id string, records []DNSRecord) (*DNSInfo, error) {
+	dnsOp := iaas.NewDNSOp(s.client.Caller())
+	current, err := dnsOp.Read(ctx, types.StringID(id))
+	if err != nil {
+		return nil, err
+	}
+
+	sdkRecords := make(iaas.DNSRecords, 0, len(records))
+	for _, r := range records {
+		sdkRecords = append(sdkRecords, &iaas.DNSRecord{
 			Name:  r.Name,
-			Type:  string(r.Type),
+			Type:  types.EDNSRecordType(r.Type),
 			RData: r.RData,
 			TTL:   r.TTL,
 		})
 	}
 
-	return &DNSInfo{
-		ID:          d.ID.String(),
-		Name:        d.Name,
-		Description: d.Description,
-		Zone:        d.DNSZone,
-		Records:     records,
-	}, nil
+	d, err := dnsOp.UpdateSettings(ctx, types.StringID(id), &iaas.DNSUpdateSettingsRequest{
+		Records:      sdkRecords,
+		SettingsHash: current.SettingsHash,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return toDNSInfo(d), nil
 }
 
 func (s *GlobalService) DeleteDNS(ctx context.Context, id string) error {
