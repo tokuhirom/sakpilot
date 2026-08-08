@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	apprundedicated "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated"
+	"github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/cluster"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/version"
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
@@ -217,6 +218,47 @@ type LBNodeInfo struct {
 type LBNodeInterface struct {
 	Index     int      `json:"index"`
 	Addresses []string `json:"addresses"`
+}
+
+// CreateClusterPortParams クラスタ作成時の待ち受けポート設定
+type CreateClusterPortParams struct {
+	Port     int32  `json:"port"`
+	Protocol string `json:"protocol"` // "http", "https", "tcp"
+}
+
+// CreateClusterParams クラスタ作成パラメータ
+type CreateClusterParams struct {
+	Name               string                    `json:"name"`
+	LetsEncryptEmail   *string                   `json:"letsEncryptEmail,omitempty"`
+	Ports              []CreateClusterPortParams `json:"ports"`
+	ServicePrincipalID string                    `json:"servicePrincipalID"`
+}
+
+// CreateCluster クラスタを作成
+func (s *Service) CreateCluster(ctx context.Context, params CreateClusterParams) (*ClusterInfo, error) {
+	ports := make([]v1.CreateLoadBalancerPort, 0, len(params.Ports))
+	for _, p := range params.Ports {
+		ports = append(ports, v1.CreateLoadBalancerPort{
+			Port:     uint16(p.Port),
+			Protocol: v1.CreateLoadBalancerPortProtocol(p.Protocol),
+		})
+	}
+
+	clusterOp := apprundedicated.NewClusterOp(s.client)
+	created, err := clusterOp.Create(ctx, cluster.CreateParams{
+		Name:               params.Name,
+		LetsEncryptEmail:   params.LetsEncryptEmail,
+		Ports:              ports,
+		ServicePrincipalID: params.ServicePrincipalID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &ClusterInfo{
+		ID:   uuid.UUID(created.GetClusterID()).String(),
+		Name: params.Name,
+	}, nil
 }
 
 // ListClusters クラスタ一覧を取得

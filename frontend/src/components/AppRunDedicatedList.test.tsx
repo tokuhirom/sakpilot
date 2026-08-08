@@ -16,6 +16,7 @@ import {
   SetAppRunActiveVersion,
   CreateAppRunApplicationVersion,
   CreateAppRunApplication,
+  CreateAppRunCluster,
   UpdateAppRunWorkerNodeDraining,
   DeleteAppRunCluster,
   DeleteAppRunApplication,
@@ -90,6 +91,7 @@ describe('AppRunDedicatedList', () => {
     vi.mocked(SetAppRunActiveVersion).mockReset();
     vi.mocked(CreateAppRunApplicationVersion).mockReset();
     vi.mocked(CreateAppRunApplication).mockReset();
+    vi.mocked(CreateAppRunCluster).mockReset();
     vi.mocked(UpdateAppRunWorkerNodeDraining).mockReset();
     vi.mocked(DeleteAppRunCluster).mockReset();
     vi.mocked(DeleteAppRunApplication).mockReset();
@@ -113,6 +115,9 @@ describe('AppRunDedicatedList', () => {
     vi.mocked(CreateAppRunApplication).mockResolvedValue(
       new apprun.AppInfo({ id: 'app-2', clusterId: 'cluster-1', name: 'new-app', activeVersion: 0 })
     );
+    vi.mocked(CreateAppRunCluster).mockResolvedValue(
+      new apprun.ClusterInfo({ id: 'cluster-2', name: 'new-cluster' })
+    );
     vi.mocked(UpdateAppRunWorkerNodeDraining).mockResolvedValue();
     vi.mocked(DeleteAppRunCluster).mockResolvedValue();
     vi.mocked(DeleteAppRunApplication).mockResolvedValue();
@@ -125,6 +130,65 @@ describe('AppRunDedicatedList', () => {
     render(<AppRunDedicatedList profile="default" />);
 
     expect(await screen.findByText('クラスタがありません')).toBeInTheDocument();
+  });
+
+  it('creates a cluster from the clusters view and reloads the cluster list', async () => {
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('+ クラスタ作成'));
+    expect(await screen.findByText('クラスタを作成')).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('my-cluster'), 'new-cluster');
+    await user.type(screen.getByPlaceholderText('123456789012'), '123456789012');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    await waitFor(() => {
+      expect(CreateAppRunCluster).toHaveBeenCalledWith('default', expect.objectContaining({
+        name: 'new-cluster',
+        servicePrincipalID: '123456789012',
+        ports: [{ port: 443, protocol: 'https' }],
+      }));
+    });
+    expect(GetAppRunClusters).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText('クラスタを作成')).not.toBeInTheDocument();
+  });
+
+  it('requires a name and service principal ID before submitting the create-cluster form', async () => {
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('+ クラスタ作成'));
+
+    expect(screen.getByRole('button', { name: '作成する' })).toBeDisabled();
+    expect(CreateAppRunCluster).not.toHaveBeenCalled();
+  });
+
+  it('cancels the create-cluster form without calling the API', async () => {
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('+ クラスタ作成'));
+    await user.type(screen.getByPlaceholderText('my-cluster'), 'new-cluster');
+
+    await user.click(screen.getByText('キャンセル'));
+
+    expect(screen.queryByText('クラスタを作成')).not.toBeInTheDocument();
+    expect(CreateAppRunCluster).not.toHaveBeenCalled();
+  });
+
+  it('shows an error message when creating a cluster fails', async () => {
+    vi.mocked(CreateAppRunCluster).mockRejectedValue(new Error('quota exceeded'));
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('+ クラスタ作成'));
+    await user.type(screen.getByPlaceholderText('my-cluster'), 'new-cluster');
+    await user.type(screen.getByPlaceholderText('123456789012'), '123456789012');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    expect(await screen.findByText(/エラー: Error: quota exceeded/)).toBeInTheDocument();
+    expect(screen.getByText('クラスタを作成')).toBeInTheDocument();
   });
 
   it('navigates cluster -> app -> version, sets the active version, and navigates back via breadcrumb', async () => {

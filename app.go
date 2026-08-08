@@ -1015,6 +1015,14 @@ func (a *App) GetAppRunClusters(profileName string) ([]apprun.ClusterInfo, error
 	return service.ListClusters(a.ctx)
 }
 
+func (a *App) CreateAppRunCluster(profileName string, params apprun.CreateClusterParams) (*apprun.ClusterInfo, error) {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateCluster(a.ctx, params)
+}
+
 func (a *App) GetAppRunApplications(profileName, clusterID string) ([]apprun.AppInfo, error) {
 	service, err := apprun.NewService(profileName)
 	if err != nil {
