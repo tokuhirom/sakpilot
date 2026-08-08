@@ -14,6 +14,10 @@ import {
   GetAppRunLBNodes,
   ClearAppRunActiveVersion,
   SetAppRunActiveVersion,
+  DeleteAppRunCluster,
+  DeleteAppRunApplication,
+  DeleteAppRunASG,
+  DeleteAppRunLoadBalancer,
 } from '../../wailsjs/go/main/App';
 
 vi.mock('../../wailsjs/go/main/App');
@@ -80,6 +84,10 @@ describe('AppRunDedicatedList', () => {
     vi.mocked(GetAppRunLBNodes).mockReset();
     vi.mocked(ClearAppRunActiveVersion).mockReset();
     vi.mocked(SetAppRunActiveVersion).mockReset();
+    vi.mocked(DeleteAppRunCluster).mockReset();
+    vi.mocked(DeleteAppRunApplication).mockReset();
+    vi.mocked(DeleteAppRunASG).mockReset();
+    vi.mocked(DeleteAppRunLoadBalancer).mockReset();
 
     vi.mocked(GetAppRunClusters).mockResolvedValue([]);
     vi.mocked(GetAppRunApplications).mockResolvedValue([]);
@@ -91,6 +99,10 @@ describe('AppRunDedicatedList', () => {
     vi.mocked(GetAppRunLBNodes).mockResolvedValue([]);
     vi.mocked(ClearAppRunActiveVersion).mockResolvedValue();
     vi.mocked(SetAppRunActiveVersion).mockResolvedValue();
+    vi.mocked(DeleteAppRunCluster).mockResolvedValue();
+    vi.mocked(DeleteAppRunApplication).mockResolvedValue();
+    vi.mocked(DeleteAppRunASG).mockResolvedValue();
+    vi.mocked(DeleteAppRunLoadBalancer).mockResolvedValue();
   });
 
   it('shows an empty state when there are no clusters', async () => {
@@ -231,5 +243,106 @@ describe('AppRunDedicatedList', () => {
       expect(alertSpy).toHaveBeenCalledWith('アクティブバージョンの設定に失敗しました');
     });
     expect(screen.getByRole('button', { name: '⋯' })).toBeInTheDocument();
+  });
+
+  it('cancels a cluster deletion without calling the API', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByRole('button', { name: '削除' }));
+
+    expect(await screen.findByText('「my-cluster」を削除しますか？')).toBeInTheDocument();
+    await user.click(screen.getByText('キャンセル'));
+
+    expect(screen.queryByText('「my-cluster」を削除しますか？')).not.toBeInTheDocument();
+    expect(DeleteAppRunCluster).not.toHaveBeenCalled();
+  });
+
+  it('deletes a cluster after confirmation and reloads the cluster list', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByRole('button', { name: '削除' }));
+    await user.click(await screen.findByText('削除する'));
+
+    await waitFor(() => {
+      expect(DeleteAppRunCluster).toHaveBeenCalledWith('default', 'cluster-1');
+    });
+    expect(GetAppRunClusters).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows an alert when cluster deletion fails', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(DeleteAppRunCluster).mockRejectedValue(new Error('boom'));
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByRole('button', { name: '削除' }));
+    await user.click(await screen.findByText('削除する'));
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('削除に失敗しました'));
+    });
+  });
+
+  it('deletes an application from the cluster view and reloads cluster details', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(GetAppRunApplications).mockResolvedValue([makeApp()]);
+    vi.mocked(GetAppRunASGs).mockResolvedValue([makeAsg()]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await screen.findByText('my-app');
+
+    const deleteButtons = await screen.findAllByRole('button', { name: '削除' });
+    await user.click(deleteButtons[0]);
+    await user.click(await screen.findByText('削除する'));
+
+    await waitFor(() => {
+      expect(DeleteAppRunApplication).toHaveBeenCalledWith('default', 'app-1');
+    });
+    expect(GetAppRunApplications).toHaveBeenCalledWith('default', 'cluster-1');
+  });
+
+  it('deletes an ASG from the cluster view and reloads cluster details', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(GetAppRunApplications).mockResolvedValue([makeApp()]);
+    vi.mocked(GetAppRunASGs).mockResolvedValue([makeAsg()]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await screen.findByText('my-asg');
+
+    const deleteButtons = await screen.findAllByRole('button', { name: '削除' });
+    await user.click(deleteButtons[1]);
+    await user.click(await screen.findByText('削除する'));
+
+    await waitFor(() => {
+      expect(DeleteAppRunASG).toHaveBeenCalledWith('default', 'cluster-1', 'asg-1');
+    });
+    expect(GetAppRunASGs).toHaveBeenCalledWith('default', 'cluster-1');
+  });
+
+  it('deletes a load balancer from the ASG view and reloads ASG details', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(GetAppRunASGs).mockResolvedValue([makeAsg()]);
+    vi.mocked(GetAppRunLoadBalancers).mockResolvedValue([makeLb()]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('my-asg'));
+    await user.click(await screen.findByRole('button', { name: '削除' }));
+    await user.click(await screen.findByText('削除する'));
+
+    await waitFor(() => {
+      expect(DeleteAppRunLoadBalancer).toHaveBeenCalledWith('default', 'cluster-1', 'asg-1', 'lb-1');
+    });
+    expect(GetAppRunLoadBalancers).toHaveBeenCalledWith('default', 'cluster-1', 'asg-1');
   });
 });

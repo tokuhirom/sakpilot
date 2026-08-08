@@ -265,6 +265,172 @@ func TestService_ApplicationVersionLifecycle(t *testing.T) {
 	}
 }
 
+func TestService_DeleteCluster(t *testing.T) {
+	srv := mockapprundedicated.NewTestServer(mockapprundedicated.Config{})
+	defer srv.Close()
+	ctx := context.Background()
+
+	clusterID := seedCluster(t, ctx, newRawClient(t, srv.TestURL()))
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_APPRUN_DEDICATED", srv.TestURL())
+
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	if err := service.DeleteCluster(ctx, uuid.UUID(clusterID).String()); err != nil {
+		t.Fatalf("DeleteCluster: %v", err)
+	}
+
+	clusters, err := service.ListClusters(ctx)
+	if err != nil {
+		t.Fatalf("ListClusters: %v", err)
+	}
+	if len(clusters) != 0 {
+		t.Errorf("got %d clusters after delete, want 0: %+v", len(clusters), clusters)
+	}
+}
+
+func TestService_DeleteApplication(t *testing.T) {
+	srv := mockapprundedicated.NewTestServer(mockapprundedicated.Config{})
+	defer srv.Close()
+	ctx := context.Background()
+	rawClient := newRawClient(t, srv.TestURL())
+
+	clusterID := seedCluster(t, ctx, rawClient)
+	appID := seedApplication(t, ctx, rawClient, clusterID)
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_APPRUN_DEDICATED", srv.TestURL())
+
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	if err := service.DeleteApplication(ctx, uuid.UUID(appID).String()); err != nil {
+		t.Fatalf("DeleteApplication: %v", err)
+	}
+
+	apps, err := service.ListApplications(ctx, uuid.UUID(clusterID).String())
+	if err != nil {
+		t.Fatalf("ListApplications: %v", err)
+	}
+	if len(apps) != 0 {
+		t.Errorf("got %d applications after delete, want 0: %+v", len(apps), apps)
+	}
+}
+
+func TestService_DeleteAutoScalingGroup(t *testing.T) {
+	srv := mockapprundedicated.NewTestServer(mockapprundedicated.Config{})
+	defer srv.Close()
+	ctx := context.Background()
+	rawClient := newRawClient(t, srv.TestURL())
+
+	clusterID := seedCluster(t, ctx, rawClient)
+
+	asgResp, err := rawClient.CreateAutoScalingGroup(ctx, &v1.CreateAutoScalingGroup{
+		Name:                   "test-asg",
+		Zone:                   "is1a",
+		WorkerServiceClassPath: "cloud/apprun/dedicated/worker/1vcpu_2gb",
+		MinNodes:               1,
+		MaxNodes:               1,
+		NameServers:            []v1.IPv4{"210.188.224.10"},
+		Interfaces: []v1.AutoScalingGroupNodeInterface{
+			{InterfaceIndex: 0, Upstream: "shared"},
+		},
+	}, v1.CreateAutoScalingGroupParams{ClusterID: clusterID})
+	if err != nil {
+		t.Fatalf("seed CreateAutoScalingGroup: %v", err)
+	}
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_APPRUN_DEDICATED", srv.TestURL())
+
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	clusterIDStr := uuid.UUID(clusterID).String()
+	asgIDStr := uuid.UUID(asgResp.AutoScalingGroup.GetAutoScalingGroupID()).String()
+
+	if err := service.DeleteAutoScalingGroup(ctx, clusterIDStr, asgIDStr); err != nil {
+		t.Fatalf("DeleteAutoScalingGroup: %v", err)
+	}
+
+	asgs, err := service.ListAutoScalingGroups(ctx, clusterIDStr)
+	if err != nil {
+		t.Fatalf("ListAutoScalingGroups: %v", err)
+	}
+	if len(asgs) != 0 {
+		t.Errorf("got %d ASGs after delete, want 0: %+v", len(asgs), asgs)
+	}
+}
+
+func TestService_DeleteLoadBalancer(t *testing.T) {
+	srv := mockapprundedicated.NewTestServer(mockapprundedicated.Config{})
+	defer srv.Close()
+	ctx := context.Background()
+	rawClient := newRawClient(t, srv.TestURL())
+
+	clusterID := seedCluster(t, ctx, rawClient)
+
+	asgResp, err := rawClient.CreateAutoScalingGroup(ctx, &v1.CreateAutoScalingGroup{
+		Name:                   "test-asg",
+		Zone:                   "is1a",
+		WorkerServiceClassPath: "cloud/apprun/dedicated/worker/1vcpu_2gb",
+		MinNodes:               1,
+		MaxNodes:               1,
+		NameServers:            []v1.IPv4{"210.188.224.10"},
+		Interfaces: []v1.AutoScalingGroupNodeInterface{
+			{InterfaceIndex: 0, Upstream: "shared"},
+		},
+	}, v1.CreateAutoScalingGroupParams{ClusterID: clusterID})
+	if err != nil {
+		t.Fatalf("seed CreateAutoScalingGroup: %v", err)
+	}
+	asgID := asgResp.AutoScalingGroup.GetAutoScalingGroupID()
+
+	lbResp, err := rawClient.CreateLoadBalancer(ctx, &v1.CreateLoadBalancer{
+		Name:             "test-lb",
+		ServiceClassPath: "cloud/apprun/dedicated/lb/1vcpu_2gb",
+		NameServers:      []v1.IPv4{"210.188.224.10"},
+		Interfaces: []v1.LoadBalancerInterface{
+			{InterfaceIndex: 0, Upstream: "shared"},
+		},
+	}, v1.CreateLoadBalancerParams{ClusterID: clusterID, AutoScalingGroupID: asgID})
+	if err != nil {
+		t.Fatalf("seed CreateLoadBalancer: %v", err)
+	}
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_APPRUN_DEDICATED", srv.TestURL())
+
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	clusterIDStr := uuid.UUID(clusterID).String()
+	asgIDStr := uuid.UUID(asgID).String()
+	lbIDStr := uuid.UUID(lbResp.LoadBalancer.GetLoadBalancerID()).String()
+
+	if err := service.DeleteLoadBalancer(ctx, clusterIDStr, asgIDStr, lbIDStr); err != nil {
+		t.Fatalf("DeleteLoadBalancer: %v", err)
+	}
+
+	lbs, err := service.ListLoadBalancers(ctx, clusterIDStr, asgIDStr)
+	if err != nil {
+		t.Fatalf("ListLoadBalancers: %v", err)
+	}
+	if len(lbs) != 0 {
+		t.Errorf("got %d LBs after delete, want 0: %+v", len(lbs), lbs)
+	}
+}
+
 func TestService_ListAutoScalingGroups_Empty(t *testing.T) {
 	srv := mockapprundedicated.NewTestServer(mockapprundedicated.Config{})
 	defer srv.Close()

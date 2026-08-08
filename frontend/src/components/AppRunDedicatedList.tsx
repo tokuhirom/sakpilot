@@ -10,6 +10,10 @@ import {
   GetAppRunLBNodes,
   ClearAppRunActiveVersion,
   SetAppRunActiveVersion,
+  DeleteAppRunCluster,
+  DeleteAppRunApplication,
+  DeleteAppRunASG,
+  DeleteAppRunLoadBalancer,
 } from '../../wailsjs/go/main/App';
 import { apprun } from '../../wailsjs/go/models';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -26,6 +30,12 @@ type View =
   | { type: 'app'; clusterId: string; clusterName: string; appId: string; appName: string; activeVersion: number }
   | { type: 'version'; clusterId: string; clusterName: string; appId: string; appName: string; activeVersion: number; version: number };
 
+type DeleteTarget =
+  | { kind: 'cluster'; id: string; name: string }
+  | { kind: 'application'; id: string; name: string; clusterId: string }
+  | { kind: 'asg'; id: string; name: string; clusterId: string }
+  | { kind: 'lb'; id: string; name: string; clusterId: string; asgId: string };
+
 export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
   const [view, setView] = useState<View>({ type: 'clusters' });
   const [clusters, setClusters] = useState<apprun.ClusterInfo[]>([]);
@@ -41,6 +51,8 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
   const [clearingActiveVersion, setClearingActiveVersion] = useState(false);
   const [settingActiveVersion, setSettingActiveVersion] = useState(false);
   const [showVersionMenu, setShowVersionMenu] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<DeleteTarget | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const loadClusters = useCallback(async () => {
     if (!profile) return;
@@ -196,6 +208,47 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
     }
   };
 
+  const handleDeleteClick = (e: React.MouseEvent, target: DeleteTarget) => {
+    e.stopPropagation();
+    setConfirmDelete(target);
+  };
+
+  const handleDeleteCancel = () => {
+    setConfirmDelete(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!confirmDelete || !profile) return;
+    const target = confirmDelete;
+    setConfirmDelete(null);
+    setDeletingId(target.id);
+    try {
+      switch (target.kind) {
+        case 'cluster':
+          await DeleteAppRunCluster(profile, target.id);
+          await loadClusters();
+          break;
+        case 'application':
+          await DeleteAppRunApplication(profile, target.id);
+          await loadClusterDetails(target.clusterId);
+          break;
+        case 'asg':
+          await DeleteAppRunASG(profile, target.clusterId, target.id);
+          await loadClusterDetails(target.clusterId);
+          break;
+        case 'lb':
+          await DeleteAppRunLoadBalancer(profile, target.clusterId, target.asgId, target.id);
+          await loadASGDetails(target.clusterId, target.asgId);
+          break;
+      }
+    } catch (err) {
+      console.error('[AppRunList] delete error:', err);
+      alert(`削除に失敗しました: ${err}`);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const handleGlobalReload = useCallback(() => {
     if (view.type === 'clusters') {
       loadClusters();
@@ -287,6 +340,22 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
     );
   };
 
+  const renderConfirmDialog = () => {
+    if (!confirmDelete) return null;
+    return (
+      <div className="confirm-overlay" onClick={handleDeleteCancel}>
+        <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+          <p>「{confirmDelete.name}」を削除しますか？</p>
+          <p className="confirm-warning">この操作は取り消せません。</p>
+          <div className="confirm-actions">
+            <button className="btn btn-secondary" onClick={handleDeleteCancel}>キャンセル</button>
+            <button className="btn btn-danger" onClick={handleDeleteConfirm}>削除する</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <>
@@ -315,6 +384,7 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
               <tr>
                 <th>名前</th>
                 <th>ID</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -327,11 +397,21 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                 >
                   <td style={{ color: '#00adb5', fontWeight: 'bold' }}>{c.name}</td>
                   <td>{c.id}</td>
+                  <td style={{ textAlign: 'left' }}>
+                    <button
+                      className="btn btn-danger btn-small"
+                      onClick={(e) => handleDeleteClick(e, { kind: 'cluster', id: c.id, name: c.name })}
+                      disabled={deletingId === c.id}
+                    >
+                      {deletingId === c.id ? '削除中...' : '削除'}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
+        {renderConfirmDialog()}
       </>
     );
   }
@@ -355,6 +435,7 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                 <th>名前</th>
                 <th>アクティブバージョン</th>
                 <th>ID</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -375,6 +456,15 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                   <td style={{ color: '#00adb5', fontWeight: 'bold' }}>{app.name}</td>
                   <td>{app.activeVersion || '-'}</td>
                   <td>{app.id}</td>
+                  <td style={{ textAlign: 'left' }}>
+                    <button
+                      className="btn btn-danger btn-small"
+                      onClick={(e) => handleDeleteClick(e, { kind: 'application', id: app.id, name: app.name, clusterId: view.clusterId })}
+                      disabled={deletingId === app.id}
+                    >
+                      {deletingId === app.id ? '削除中...' : '削除'}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -392,6 +482,7 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                 <th>ゾーン</th>
                 <th>ノード (min/max/current)</th>
                 <th>ID</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -412,11 +503,21 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                   <td>{asg.zone}</td>
                   <td>{asg.minNodes} / {asg.maxNodes} / {asg.workerNodeCount}</td>
                   <td>{asg.id}</td>
+                  <td style={{ textAlign: 'left' }}>
+                    <button
+                      className="btn btn-danger btn-small"
+                      onClick={(e) => handleDeleteClick(e, { kind: 'asg', id: asg.id, name: asg.name, clusterId: view.clusterId })}
+                      disabled={deletingId === asg.id}
+                    >
+                      {deletingId === asg.id ? '削除中...' : '削除'}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
+        {renderConfirmDialog()}
       </>
     );
   }
@@ -525,6 +626,13 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
                   <span style={{ color: '#00adb5', fontWeight: 'bold', fontSize: '1.1rem' }}>{lb.name}</span>
                   <span style={{ color: '#888', fontSize: '0.9rem' }}>{lb.serviceClassPath}</span>
+                  <button
+                    className="btn btn-danger btn-small"
+                    onClick={(e) => handleDeleteClick(e, { kind: 'lb', id: lb.id, name: lb.name, clusterId: view.clusterId, asgId: view.asgId })}
+                    disabled={deletingId === lb.id}
+                  >
+                    {deletingId === lb.id ? '削除中...' : '削除'}
+                  </button>
                 </div>
                 {nodes.length === 0 ? (
                   <div style={{ color: '#888', marginLeft: '1rem' }}>ノードなし</div>
@@ -605,6 +713,7 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
             </tbody>
           </table>
         )}
+        {renderConfirmDialog()}
       </>
     );
   }

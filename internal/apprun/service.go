@@ -354,6 +354,62 @@ func (s *Service) ClearActiveVersion(ctx context.Context, applicationID string) 
 	return applicationOp.Update(ctx, v1.ApplicationID(appID), nil)
 }
 
+// DeleteCluster クラスタを削除
+func (s *Service) DeleteCluster(ctx context.Context, clusterID string) error {
+	cID, err := uuid.Parse(clusterID)
+	if err != nil {
+		return err
+	}
+
+	clusterOp := apprundedicated.NewClusterOp(s.client)
+	return clusterOp.Delete(ctx, v1.ClusterID(cID))
+}
+
+// DeleteApplication アプリケーションを削除
+func (s *Service) DeleteApplication(ctx context.Context, applicationID string) error {
+	appID, err := uuid.Parse(applicationID)
+	if err != nil {
+		return err
+	}
+
+	applicationOp := apprundedicated.NewApplicationOp(s.client)
+	return applicationOp.Delete(ctx, v1.ApplicationID(appID))
+}
+
+// DeleteAutoScalingGroup ASGを削除
+func (s *Service) DeleteAutoScalingGroup(ctx context.Context, clusterID, asgID string) error {
+	cID, err := uuid.Parse(clusterID)
+	if err != nil {
+		return err
+	}
+	aID, err := uuid.Parse(asgID)
+	if err != nil {
+		return err
+	}
+
+	asgOp := apprundedicated.NewAutoScalingGroupOp(s.client, v1.ClusterID(cID))
+	return asgOp.Delete(ctx, v1.AutoScalingGroupID(aID))
+}
+
+// DeleteLoadBalancer ロードバランサーを削除
+func (s *Service) DeleteLoadBalancer(ctx context.Context, clusterID, asgID, lbID string) error {
+	cID, err := uuid.Parse(clusterID)
+	if err != nil {
+		return err
+	}
+	aID, err := uuid.Parse(asgID)
+	if err != nil {
+		return err
+	}
+	loadBalancerID, err := uuid.Parse(lbID)
+	if err != nil {
+		return err
+	}
+
+	lbOp := apprundedicated.NewLoadBalancerOp(s.client, v1.ClusterID(cID), v1.AutoScalingGroupID(aID))
+	return lbOp.Delete(ctx, v1.LoadBalancerID(loadBalancerID))
+}
+
 // ListAutoScalingGroups ASG 一覧を取得
 func (s *Service) ListAutoScalingGroups(ctx context.Context, clusterID string) ([]ASGInfo, error) {
 	cID, err := uuid.Parse(clusterID)

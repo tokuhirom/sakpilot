@@ -799,6 +799,38 @@ func (a *App) GetAppRunApplicationVersion(profileName, applicationID string, ver
 	return service.GetApplicationVersion(a.ctx, applicationID, version)
 }
 
+func (a *App) DeleteAppRunCluster(profileName, clusterID string) error {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteCluster(a.ctx, clusterID)
+}
+
+func (a *App) DeleteAppRunApplication(profileName, applicationID string) error {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteApplication(a.ctx, applicationID)
+}
+
+func (a *App) DeleteAppRunASG(profileName, clusterID, asgID string) error {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteAutoScalingGroup(a.ctx, clusterID, asgID)
+}
+
+func (a *App) DeleteAppRunLoadBalancer(profileName, clusterID, asgID, lbID string) error {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteLoadBalancer(a.ctx, clusterID, asgID, lbID)
+}
+
 // AppRun Shared API
 func (a *App) GetAppRunSharedApplications(profileName string) ([]apprunshared.AppInfo, error) {
 	service, err := apprunshared.NewService(profileName)
