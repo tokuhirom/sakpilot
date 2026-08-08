@@ -10,6 +10,8 @@ interface GSLBListProps {
   onSelectGSLB: (id: string) => void;
 }
 
+const IPV4_PATTERN = '^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$';
+
 export function GSLBList({ profile, onSelectGSLB }: GSLBListProps) {
   const [gslbList, setGslbList] = useState<sakura.GSLBInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -94,7 +96,8 @@ export function GSLBList({ profile, onSelectGSLB }: GSLBListProps) {
     setShowCreate(false);
   };
 
-  const handleCreateSubmit = async () => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setCreating(true);
     setCreateError(null);
     try {
@@ -212,13 +215,15 @@ export function GSLBList({ profile, onSelectGSLB }: GSLBListProps) {
             padding: '20px', minWidth: '320px', maxWidth: '420px',
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>GSLB作成</h3>
+            <form onSubmit={handleCreateSubmit}>
             <div className="form-group">
-              <label>名前</label>
+              <label>名前 *</label>
               <input
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="my-gslb"
+                required
                 autoFocus
               />
             </div>
@@ -237,7 +242,9 @@ export function GSLBList({ profile, onSelectGSLB }: GSLBListProps) {
                 type="text"
                 value={newSorryServer}
                 onChange={(e) => setNewSorryServer(e.target.value)}
-                placeholder="任意"
+                placeholder="任意 (例: 192.0.2.1)"
+                pattern={IPV4_PATTERN}
+                title="IPv4アドレスの形式で入力してください"
               />
             </div>
             <p style={{ color: '#888', fontSize: '0.85rem' }}>
@@ -249,15 +256,16 @@ export function GSLBList({ profile, onSelectGSLB }: GSLBListProps) {
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+              <button type="button" className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
               <button
+                type="submit"
                 className="btn btn-primary"
-                onClick={handleCreateSubmit}
-                disabled={creating || !newName}
+                disabled={creating}
               >
                 {creating ? '作成中...' : '作成する'}
               </button>
             </div>
+            </form>
           </div>
         </div>
       )}

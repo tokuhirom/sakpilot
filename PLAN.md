@@ -307,6 +307,15 @@
     - 各フォームの入力欄に「何を入力すればよいか」が分かるplaceholderやヘルプテキストが無い箇所を洗い出し追加する（現状はラベルのみで単位や制約の説明が無い項目が多い）
     - 見直し対象はTier1〜Tier3で実装した機能に限らず、既存の全Create/Updateフォームが対象。範囲が広いため、着手時にリソース単位で区切って段階的にPRを分けるか、ユーザーと相談してスコープを決めること
     - フォームごとに前提（SDK側のバリデーション仕様、必須/任意の別）を確認した上で実装すること。SDK側で判明した制約や挙動の不明点は[[sakpilot-upstream-issues-doc]]の運用に従いdocs/upstream-issues.mdに記録する
+    - **進捗**: DNS/GSLB対応済み（下記セッション31）。残り: ProxyLB/SimpleMonitor/Switch/Disk/Database/NFS/EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/AppRun専有・共用型/Server等
+
+### ✅ 完了（2026-08-09 追加セッション31、Tier5 #23 一部・DNS/GSLB）
+- 対象範囲が広いため、リソース単位で段階的にPRを分ける方針とし、まずDNS/GSLBから着手。
+- 従来は各モーダルが`<div>`+ボタンonClickで送信処理を呼んでおり、`required`属性を付けても未入力時のブラウザネイティブバリデーションが機能しない構造だったため、`DNSDetail.tsx`のレコード追加/編集モーダル、`GSLBList.tsx`のGSLB作成モーダル、`GSLBDetail.tsx`の基本情報インライン編集・監視設定編集モーダルを`<form onSubmit>`+`<button type="submit">`に変換した（キャンセルボタンは`type="button"`）。他のフォームも同様の構造のため、以降のリソース対応でも同じ変換が必要になる見込み。
+- DNSレコードの名前・データにrequired、TTLを`type="number" min={10}`に変更。rdataのplaceholderはレコードタイプ（A/AAAA/CNAME/MX/TXT/SRV/CAA等）ごとに入力例を出し分け（`RDATA_PLACEHOLDER`）、Aレコードのみ IPv4 の`pattern`を付与（AAAA以降は形式差が大きくSDK側の明示的な制約も確認できなかったため正当な入力を誤って弾くリスクを避けてplaceholderのみに留めた）。
+- GSLBは作成フォームの名前をrequired、Sorry Server/振り分け先サーバーIPアドレスにIPv4 pattern、監視間隔を`min={10}`(SDKのデフォルト値に合わせた下限、明示的な上限はSDK上に見当たらず未設定)、ポート/期待レスポンスコードを`type="number"`+min/maxに変更。
+- `required`属性のネイティブバリデーションがブラウザ（およびjsdom）側で送信をブロックするようになったため、`GSLBDetail.tsx`の`handleSettingsSave`に残っていた「サーバーのIPアドレス未入力」用のJS側バリデーション分岐は到達不能になり削除、対応するテストもネイティブバリデーション（`input.validity.valid`）を確認する形に更新した。
+- `tsc --noEmit`/`npm run test`（264件全パス）/`npx playwright test e2e/dns.spec.ts e2e/gslb.spec.ts`（10件全パス）/`golangci-lint run`（0 issues、Go側の変更なし）を確認してから作成。
 
 ### ✅ 完了（2026-08-08 追加セッション26、Tier3 #16）
 - ServerのChangePlan/InsertCDROM/EjectCDROM/SendKey/SendNMI/GetVNCProxyを実装。`internal/sakura/server.go`に各メソッドを追加（ChangePlanはAPI仕様上サーバーIDが再採番されるため戻り値のIDが変わる点に注意、CD-ROM一覧取得用に`internal/sakura/cdrom.go`を新設）、`app.go`に対応する7つのRPCを公開。`ServerDetail.tsx`を新設（従来Detail画面が存在しなかった）し、`ServerList.tsx`のカードクリックで遷移するようにした。プラン変更フォーム、CD-ROM挿入/排出、コンソールキー送信（プリセット+NMI確認ダイアログ）、VNC接続情報取得UIを実装。あわせて`internal/sakura/server.go`に残っていた`println`デバッグ文を削除。`internal/sakura/server_test.go`、`ServerDetail.test.tsx`、`frontend/e2e/server-detail.spec.ts`を追加

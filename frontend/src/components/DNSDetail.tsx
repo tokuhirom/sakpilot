@@ -14,6 +14,21 @@ type RecordForm = { name: string; type: string; rdata: string; ttl: string };
 
 const emptyRecordForm: RecordForm = { name: '', type: 'A', rdata: '', ttl: '3600' };
 
+const IPV4_PATTERN = '^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$';
+
+const RDATA_PLACEHOLDER: Record<string, string> = {
+  A: '192.0.2.1',
+  AAAA: '2001:db8::1',
+  CNAME: 'target.example.com.',
+  ALIAS: 'target.example.com.',
+  MX: '10 mail.example.com.',
+  NS: 'ns1.example.com.',
+  TXT: 'v=spf1 include:example.com ~all',
+  SRV: '10 5 5060 sip.example.com.',
+  CAA: '0 issue "letsencrypt.org"',
+  PTR: 'host.example.com.',
+};
+
 export function DNSDetail({ profile, dnsId }: DNSDetailProps) {
   const [dns, setDns] = useState<sakura.DNSInfo | null>(null);
   const [loading, setLoading] = useState(false);
@@ -107,7 +122,8 @@ export function DNSDetail({ profile, dnsId }: DNSDetailProps) {
     setRecordError(null);
   };
 
-  const handleRecordFormSubmit = async () => {
+  const handleRecordFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!dns || !recordForm) return;
     const ttl = parseInt(recordForm.ttl, 10);
     if (!recordForm.name || !recordForm.rdata || isNaN(ttl)) {
@@ -234,13 +250,15 @@ export function DNSDetail({ profile, dnsId }: DNSDetailProps) {
             padding: '20px', minWidth: '320px', maxWidth: '420px',
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>{editingIndex !== null ? 'レコード編集' : 'レコード追加'}</h3>
+            <form onSubmit={handleRecordFormSubmit}>
             <div className="form-group">
-              <label>名前</label>
+              <label>名前 *</label>
               <input
                 type="text"
                 value={recordForm.name}
                 onChange={(e) => setRecordForm({ ...recordForm, name: e.target.value })}
                 placeholder="www (@はゾーン自身)"
+                required
                 autoFocus
               />
             </div>
@@ -254,20 +272,25 @@ export function DNSDetail({ profile, dnsId }: DNSDetailProps) {
               </select>
             </div>
             <div className="form-group">
-              <label>データ</label>
+              <label>データ *</label>
               <input
                 type="text"
                 value={recordForm.rdata}
                 onChange={(e) => setRecordForm({ ...recordForm, rdata: e.target.value })}
-                placeholder="192.0.2.1"
+                placeholder={RDATA_PLACEHOLDER[recordForm.type] || ''}
+                pattern={recordForm.type === 'A' ? IPV4_PATTERN : undefined}
+                required
               />
             </div>
             <div className="form-group">
-              <label>TTL(秒)</label>
+              <label>TTL(秒) *</label>
               <input
                 type="number"
                 value={recordForm.ttl}
                 onChange={(e) => setRecordForm({ ...recordForm, ttl: e.target.value })}
+                min={10}
+                step={1}
+                required
               />
             </div>
             {recordError && (
@@ -276,11 +299,12 @@ export function DNSDetail({ profile, dnsId }: DNSDetailProps) {
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleRecordFormCancel}>キャンセル</button>
-              <button className="btn btn-primary" onClick={handleRecordFormSubmit} disabled={savingRecords}>
+              <button type="button" className="btn btn-secondary" onClick={handleRecordFormCancel}>キャンセル</button>
+              <button type="submit" className="btn btn-primary" disabled={savingRecords}>
                 {savingRecords ? '保存中...' : '保存する'}
               </button>
             </div>
+            </form>
           </div>
         </div>
       )}
