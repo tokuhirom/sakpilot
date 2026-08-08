@@ -34,6 +34,7 @@ test('スイッチ詳細で名前・説明・ネットワーク設定を編集�
   await page.getByRole('link', { name: 'スイッチ' }).click();
   await switchRow(page, 'e2e-switch').click();
   await expect(page).toHaveURL(/#\/e2e\/switches\//);
+  await expect(page.getByRole('heading', { name: /^スイッチ詳細: / })).toBeVisible();
 
   await page.getByRole('button', { name: '編集' }).click();
   await page.getByPlaceholder('任意(ルータ接続する場合のみ、例: 28)').fill('28');

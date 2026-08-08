@@ -36,6 +36,7 @@ test('DNSゾーン詳細でレコードを追加・編集・削除できる', as
   await page.getByRole('link', { name: 'DNS' }).click();
   await dnsRow(page, 'e2e-example.com').click();
   await expect(page).toHaveURL(/#\/e2e\/dns\//);
+  await expect(page.getByRole('heading', { name: /^DNS詳細: / })).toBeVisible();
 
   // シードされたレコードが表示される
   await expect(page.getByRole('cell', { name: 'www', exact: true })).toBeVisible();
@@ -66,6 +67,7 @@ test('DNSゾーン詳細で説明を編集できる', async ({ page }) => {
   await page.getByRole('link', { name: 'DNS' }).click();
   await dnsRow(page, 'e2e-example.com').click();
   await expect(page).toHaveURL(/#\/e2e\/dns\//);
+  await expect(page.getByRole('heading', { name: /^DNS詳細: / })).toBeVisible();
 
   const descriptionRow = page.locator('tr', { hasText: '説明' });
   await descriptionRow.getByRole('button', { name: '編集', exact: true }).click();
