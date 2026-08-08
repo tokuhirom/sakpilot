@@ -80,6 +80,9 @@ func runE2EServer(addr, dist string) error {
 	if err := seedGSLBs(); err != nil {
 		return fmt.Errorf("failed to seed GSLBs: %w", err)
 	}
+	if err := seedContainerRegistries(); err != nil {
+		return fmt.Errorf("failed to seed container registries: %w", err)
+	}
 
 	kmsSrv := mockkms.NewTestServer(mockkms.Config{})
 	if err := os.Setenv("SAKURA_ENDPOINTS_KMS", kmsSrv.TestURL()); err != nil {
@@ -292,6 +295,28 @@ func seedGSLBs() error {
 		HealthCheck: &iaas.GSLBHealthCheck{
 			Protocol: types.GSLBHealthCheckProtocols.Ping,
 		},
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+// seedContainerRegistries はIaaS fakeドライバのデータストアにE2Eシナリオ用のコンテナレジストリを投入する。
+func seedContainerRegistries() error {
+	ctx := context.Background()
+	crOp := iaas.NewContainerRegistryOp(nil)
+
+	if _, err := crOp.Create(ctx, &iaas.ContainerRegistryCreateRequest{
+		Name:        "e2e-registry-target",
+		Description: "E2E: ユーザー管理シナリオ用",
+		AccessLevel: types.ContainerRegistryAccessLevels.None,
+	}); err != nil {
+		return err
+	}
+	if _, err := crOp.Create(ctx, &iaas.ContainerRegistryCreateRequest{
+		Name:        "e2e-doomed-registry",
+		Description: "E2E: 削除シナリオ用",
+		AccessLevel: types.ContainerRegistryAccessLevels.None,
 	}); err != nil {
 		return err
 	}

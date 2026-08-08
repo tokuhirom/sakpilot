@@ -8,6 +8,10 @@ import {
   HasContainerRegistrySecret,
   ListContainerRegistryImages,
   GetContainerRegistryImageTags,
+  UpdateContainerRegistry,
+  AddContainerRegistryUser,
+  UpdateContainerRegistryUser,
+  DeleteContainerRegistryUser,
 } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -37,6 +41,32 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
+
+  // Basic info inline edit
+  const [editingBasic, setEditingBasic] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [descriptionInput, setDescriptionInput] = useState('');
+  const [accessLevelInput, setAccessLevelInput] = useState('none');
+  const [virtualDomainInput, setVirtualDomainInput] = useState('');
+  const [savingBasic, setSavingBasic] = useState(false);
+  const [basicError, setBasicError] = useState<string | null>(null);
+
+  // User add/edit
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserPermission, setNewUserPermission] = useState('readwrite');
+  const [addingUser, setAddingUser] = useState(false);
+  const [addUserError, setAddUserError] = useState<string | null>(null);
+
+  const [editingUser, setEditingUser] = useState<string | null>(null);
+  const [editUserPassword, setEditUserPassword] = useState('');
+  const [editUserPermission, setEditUserPermission] = useState('readwrite');
+  const [savingUser, setSavingUser] = useState(false);
+  const [editUserError, setEditUserError] = useState<string | null>(null);
+
+  const [deletingUser, setDeletingUser] = useState<string | null>(null);
+  const [confirmDeleteUser, setConfirmDeleteUser] = useState<string | null>(null);
 
   // Image list state
   const [images, setImages] = useState<sakura.RegistryImage[]>([]);
@@ -213,6 +243,113 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
     }
   };
 
+  const handleBasicEditStart = () => {
+    if (!registry) return;
+    setNameInput(registry.name);
+    setDescriptionInput(registry.description || '');
+    setAccessLevelInput(registry.accessLevel === 'readonly' ? 'readonly' : 'none');
+    setVirtualDomainInput(registry.virtualDomain || '');
+    setBasicError(null);
+    setEditingBasic(true);
+  };
+
+  const handleBasicEditCancel = () => {
+    setEditingBasic(false);
+    setBasicError(null);
+  };
+
+  const handleBasicSave = async () => {
+    setSavingBasic(true);
+    setBasicError(null);
+    try {
+      const updated = await UpdateContainerRegistry(
+        profile, registryId, nameInput, descriptionInput, accessLevelInput, virtualDomainInput
+      );
+      setRegistry(updated);
+      setEditingBasic(false);
+    } catch (e) {
+      setBasicError(String(e));
+    } finally {
+      setSavingBasic(false);
+    }
+  };
+
+  const handleAddUserOpen = () => {
+    setNewUserName('');
+    setNewUserPassword('');
+    setNewUserPermission('readwrite');
+    setAddUserError(null);
+    setShowAddUser(true);
+  };
+
+  const handleAddUserCancel = () => {
+    setShowAddUser(false);
+  };
+
+  const handleAddUserSubmit = async () => {
+    setAddingUser(true);
+    setAddUserError(null);
+    try {
+      await AddContainerRegistryUser(profile, registryId, newUserName, newUserPassword, newUserPermission);
+      setShowAddUser(false);
+      await loadUsers();
+    } catch (e) {
+      setAddUserError(String(e));
+    } finally {
+      setAddingUser(false);
+    }
+  };
+
+  const handleEditUserOpen = (user: UserWithSecret) => {
+    setEditingUser(user.userName);
+    setEditUserPassword('');
+    setEditUserPermission(user.permission || 'readwrite');
+    setEditUserError(null);
+  };
+
+  const handleEditUserCancel = () => {
+    setEditingUser(null);
+    setEditUserError(null);
+  };
+
+  const handleEditUserSave = async () => {
+    if (!editingUser) return;
+    setSavingUser(true);
+    setEditUserError(null);
+    try {
+      await UpdateContainerRegistryUser(profile, registryId, editingUser, editUserPassword, editUserPermission);
+      setEditingUser(null);
+      await loadUsers();
+    } catch (e) {
+      setEditUserError(String(e));
+    } finally {
+      setSavingUser(false);
+    }
+  };
+
+  const handleDeleteUserClick = (userName: string) => {
+    setConfirmDeleteUser(userName);
+  };
+
+  const handleDeleteUserCancel = () => {
+    setConfirmDeleteUser(null);
+  };
+
+  const handleDeleteUserConfirm = async () => {
+    if (!confirmDeleteUser) return;
+    const userName = confirmDeleteUser;
+    setConfirmDeleteUser(null);
+    setDeletingUser(userName);
+    try {
+      await DeleteContainerRegistryUser(profile, registryId, userName);
+      await loadUsers();
+    } catch (e) {
+      alert(`ユーザーの削除に失敗しました: ${e}`);
+    } finally {
+      setDeletingUser(null);
+    }
+  };
+
   const handleImageClick = (imageName: string) => {
     setSelectedImage(imageName);
     setViewMode('tags');
@@ -303,40 +440,101 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
       </div>
 
       <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem', background: '#2a2a2a', borderRadius: '8px' }}>
-        <h4 style={{ color: '#00adb5', marginTop: 0, marginBottom: '1rem' }}>基本情報</h4>
-        <table style={{ borderCollapse: 'collapse' }}>
-          <tbody>
-            <tr>
-              <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>ID</td>
-              <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{registry.id}</td>
-            </tr>
-            <tr>
-              <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>FQDN</td>
-              <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{registry.fqdn}</td>
-            </tr>
-            <tr>
-              <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>説明</td>
-              <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{registry.description || '-'}</td>
-            </tr>
-            <tr>
-              <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>アクセスレベル</td>
-              <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>
-                <span className={`status ${registry.accessLevel === 'readwrite' ? 'up' : ''}`}>
-                  {registry.accessLevel === 'readwrite' ? '読み書き' :
-                   registry.accessLevel === 'readonly' ? '読み取り専用' :
-                   registry.accessLevel === 'none' ? '非公開' : registry.accessLevel}
-                </span>
-              </td>
-            </tr>
-            <tr>
-              <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>仮想ドメイン</td>
-              <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{registry.virtualDomain || '-'}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h4 style={{ color: '#00adb5', margin: 0 }}>基本情報</h4>
+          {!editingBasic && (
+            <button className="btn btn-secondary btn-small" onClick={handleBasicEditStart}>編集</button>
+          )}
+        </div>
+        {editingBasic ? (
+          <div>
+            <div className="form-group">
+              <label>名前</label>
+              <input
+                type="text"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <label>説明</label>
+              <input
+                type="text"
+                value={descriptionInput}
+                onChange={(e) => setDescriptionInput(e.target.value)}
+                placeholder="任意"
+              />
+            </div>
+            <div className="form-group">
+              <label>アクセスレベル</label>
+              <select
+                value={accessLevelInput}
+                onChange={(e) => setAccessLevelInput(e.target.value)}
+              >
+                <option value="none">非公開</option>
+                <option value="readonly">読み取り専用で公開</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>仮想ドメイン</label>
+              <input
+                type="text"
+                value={virtualDomainInput}
+                onChange={(e) => setVirtualDomainInput(e.target.value)}
+                placeholder="任意"
+              />
+            </div>
+            {basicError && (
+              <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                エラー: {basicError}
+              </div>
+            )}
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleBasicEditCancel} disabled={savingBasic}>キャンセル</button>
+              <button className="btn btn-primary" onClick={handleBasicSave} disabled={savingBasic || !nameInput}>
+                {savingBasic ? '保存中...' : '保存する'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <table style={{ borderCollapse: 'collapse' }}>
+            <tbody>
+              <tr>
+                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>ID</td>
+                <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{registry.id}</td>
+              </tr>
+              <tr>
+                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>FQDN</td>
+                <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{registry.fqdn}</td>
+              </tr>
+              <tr>
+                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>説明</td>
+                <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{registry.description || '-'}</td>
+              </tr>
+              <tr>
+                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>アクセスレベル</td>
+                <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>
+                  <span className={`status ${registry.accessLevel === 'readwrite' ? 'up' : ''}`}>
+                    {registry.accessLevel === 'readwrite' ? '読み書き' :
+                     registry.accessLevel === 'readonly' ? '読み取り専用' :
+                     registry.accessLevel === 'none' ? '非公開' : registry.accessLevel}
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>仮想ドメイン</td>
+                <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{registry.virtualDomain || '-'}</td>
+              </tr>
+            </tbody>
+          </table>
+        )}
       </div>
 
-      <h3>ユーザー一覧</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h3>ユーザー一覧</h3>
+        <button className="btn btn-primary btn-small" onClick={handleAddUserOpen}>+ ユーザー追加</button>
+      </div>
       <div style={{
         marginBottom: '1rem',
         padding: '0.75rem',
@@ -355,7 +553,8 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
             <tr>
               <th>ユーザー名</th>
               <th>権限</th>
-              <th style={{ width: '200px' }}>操作</th>
+              <th style={{ width: '200px' }}>資格情報</th>
+              <th style={{ width: '160px' }}>操作</th>
             </tr>
           </thead>
           <tbody>
@@ -371,11 +570,23 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
                     )}
                   </td>
                   <td style={{ textAlign: 'left' }}>
-                    <span className={`status ${user.permission === 'all' ? 'up' : ''}`}>
-                      {user.permission === 'all' ? '全権限' :
-                       user.permission === 'readwrite' ? '読み書き' :
-                       user.permission === 'readonly' ? '読み取り専用' : user.permission}
-                    </span>
+                    {editingUser === user.userName ? (
+                      <select
+                        value={editUserPermission}
+                        onChange={(e) => setEditUserPermission(e.target.value)}
+                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+                      >
+                        <option value="all">全権限</option>
+                        <option value="readwrite">読み書き</option>
+                        <option value="readonly">読み取り専用</option>
+                      </select>
+                    ) : (
+                      <span className={`status ${user.permission === 'all' ? 'up' : ''}`}>
+                        {user.permission === 'all' ? '全権限' :
+                         user.permission === 'readwrite' ? '読み書き' :
+                         user.permission === 'readonly' ? '読み取り専用' : user.permission}
+                      </span>
+                    )}
                   </td>
                   <td>
                     {user.permission === 'all' && (
@@ -443,17 +654,140 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
                       <span style={{ color: '#666', fontSize: '0.8rem' }}>-</span>
                     )}
                   </td>
+                  <td style={{ textAlign: 'left' }}>
+                    {editingUser === user.userName ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <input
+                          type="password"
+                          value={editUserPassword}
+                          onChange={(e) => setEditUserPassword(e.target.value)}
+                          placeholder="新しいパスワード(任意)"
+                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                        />
+                        {editUserError && (
+                          <span style={{ color: '#ff6b6b', fontSize: '0.75rem' }}>{editUserError}</span>
+                        )}
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            className="btn btn-primary"
+                            onClick={handleEditUserSave}
+                            disabled={savingUser}
+                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                          >
+                            {savingUser ? '保存中...' : '保存'}
+                          </button>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={handleEditUserCancel}
+                            disabled={savingUser}
+                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                          >
+                            取消
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => handleEditUserOpen(user)}
+                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                        >
+                          ユーザー編集
+                        </button>
+                        <button
+                          className="btn btn-danger"
+                          onClick={() => handleDeleteUserClick(user.userName)}
+                          disabled={deletingUser === user.userName}
+                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                        >
+                          {deletingUser === user.userName ? '削除中...' : 'ユーザー削除'}
+                        </button>
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={3} style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+                <td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
                   ユーザーが登録されていません
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+      )}
+
+      {confirmDeleteUser && (
+        <div className="confirm-overlay" onClick={handleDeleteUserCancel}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <p>ユーザー「{confirmDeleteUser}」を削除しますか？</p>
+            <p className="confirm-warning">この操作は取り消せません。</p>
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleDeleteUserCancel}>キャンセル</button>
+              <button className="btn btn-danger" onClick={handleDeleteUserConfirm}>削除する</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddUser && (
+        <div className="modal-overlay" onClick={handleAddUserCancel} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+            backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+            padding: '20px', minWidth: '320px', maxWidth: '420px',
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>ユーザー追加</h3>
+            <div className="form-group">
+              <label>ユーザー名</label>
+              <input
+                type="text"
+                value={newUserName}
+                onChange={(e) => setNewUserName(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <label>パスワード</label>
+              <input
+                type="password"
+                value={newUserPassword}
+                onChange={(e) => setNewUserPassword(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label>権限</label>
+              <select
+                value={newUserPermission}
+                onChange={(e) => setNewUserPermission(e.target.value)}
+              >
+                <option value="all">全権限</option>
+                <option value="readwrite">読み書き</option>
+                <option value="readonly">読み取り専用</option>
+              </select>
+            </div>
+            {addUserError && (
+              <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                エラー: {addUserError}
+              </div>
+            )}
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleAddUserCancel}>キャンセル</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleAddUserSubmit}
+                disabled={addingUser || !newUserName || !newUserPassword}
+              >
+                {addingUser ? '追加中...' : '追加する'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Image list section */}

@@ -596,6 +596,17 @@ func (s *GlobalService) DeleteGSLB(ctx context.Context, id string) error {
 	return gslbOp.Delete(ctx, types.StringID(id))
 }
 
+func toContainerRegistryInfo(cr *iaas.ContainerRegistry) ContainerRegistryInfo {
+	return ContainerRegistryInfo{
+		ID:            cr.ID.String(),
+		Name:          cr.Name,
+		Description:   cr.Description,
+		FQDN:          cr.FQDN,
+		AccessLevel:   string(cr.AccessLevel),
+		VirtualDomain: cr.VirtualDomain,
+	}
+}
+
 func (s *GlobalService) ListContainerRegistries(ctx context.Context) ([]ContainerRegistryInfo, error) {
 	crOp := iaas.NewContainerRegistryOp(s.client.Caller())
 	result, err := crOp.Find(ctx, &iaas.FindCondition{})
@@ -605,16 +616,44 @@ func (s *GlobalService) ListContainerRegistries(ctx context.Context) ([]Containe
 
 	list := make([]ContainerRegistryInfo, 0, len(result.ContainerRegistries))
 	for _, cr := range result.ContainerRegistries {
-		list = append(list, ContainerRegistryInfo{
-			ID:            cr.ID.String(),
-			Name:          cr.Name,
-			Description:   cr.Description,
-			FQDN:          cr.FQDN,
-			AccessLevel:   string(cr.AccessLevel),
-			VirtualDomain: cr.VirtualDomain,
-		})
+		list = append(list, toContainerRegistryInfo(cr))
 	}
 	return list, nil
+}
+
+func (s *GlobalService) CreateContainerRegistry(ctx context.Context, name, description, accessLevel, virtualDomain string) (*ContainerRegistryInfo, error) {
+	crOp := iaas.NewContainerRegistryOp(s.client.Caller())
+	cr, err := crOp.Create(ctx, &iaas.ContainerRegistryCreateRequest{
+		Name:          name,
+		Description:   description,
+		AccessLevel:   types.EContainerRegistryAccessLevel(accessLevel), //nolint:staticcheck // deprecated but still functional
+		VirtualDomain: virtualDomain,
+	})
+	if err != nil {
+		return nil, err
+	}
+	info := toContainerRegistryInfo(cr)
+	return &info, nil
+}
+
+func (s *GlobalService) UpdateContainerRegistry(ctx context.Context, id, name, description, accessLevel, virtualDomain string) (*ContainerRegistryInfo, error) {
+	crOp := iaas.NewContainerRegistryOp(s.client.Caller())
+	current, err := crOp.Read(ctx, types.StringID(id))
+	if err != nil {
+		return nil, err
+	}
+	cr, err := crOp.Update(ctx, types.StringID(id), &iaas.ContainerRegistryUpdateRequest{
+		Name:          name,
+		Description:   description,
+		AccessLevel:   types.EContainerRegistryAccessLevel(accessLevel), //nolint:staticcheck // deprecated but still functional
+		VirtualDomain: virtualDomain,
+		SettingsHash:  current.SettingsHash,
+	})
+	if err != nil {
+		return nil, err
+	}
+	info := toContainerRegistryInfo(cr)
+	return &info, nil
 }
 
 func (s *GlobalService) ListContainerRegistryUsers(ctx context.Context, id string) ([]ContainerRegistryUserInfo, error) {
@@ -622,6 +661,9 @@ func (s *GlobalService) ListContainerRegistryUsers(ctx context.Context, id strin
 	result, err := crOp.ListUsers(ctx, types.StringID(id))
 	if err != nil {
 		return nil, err
+	}
+	if result == nil {
+		return []ContainerRegistryUserInfo{}, nil
 	}
 
 	list := make([]ContainerRegistryUserInfo, 0, len(result.Users))
@@ -637,4 +679,26 @@ func (s *GlobalService) ListContainerRegistryUsers(ctx context.Context, id strin
 func (s *GlobalService) DeleteContainerRegistry(ctx context.Context, id string) error {
 	crOp := iaas.NewContainerRegistryOp(s.client.Caller())
 	return crOp.Delete(ctx, types.StringID(id))
+}
+
+func (s *GlobalService) AddContainerRegistryUser(ctx context.Context, id, userName, password, permission string) error {
+	crOp := iaas.NewContainerRegistryOp(s.client.Caller())
+	return crOp.AddUser(ctx, types.StringID(id), &iaas.ContainerRegistryUserCreateRequest{
+		UserName:   userName,
+		Password:   password,
+		Permission: types.EContainerRegistryPermission(permission),
+	})
+}
+
+func (s *GlobalService) UpdateContainerRegistryUser(ctx context.Context, id, userName, password, permission string) error {
+	crOp := iaas.NewContainerRegistryOp(s.client.Caller())
+	return crOp.UpdateUser(ctx, types.StringID(id), userName, &iaas.ContainerRegistryUserUpdateRequest{
+		Password:   password,
+		Permission: types.EContainerRegistryPermission(permission),
+	})
+}
+
+func (s *GlobalService) DeleteContainerRegistryUser(ctx context.Context, id, userName string) error {
+	crOp := iaas.NewContainerRegistryOp(s.client.Caller())
+	return crOp.DeleteUser(ctx, types.StringID(id), userName)
 }

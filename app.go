@@ -289,6 +289,51 @@ func (a *App) DeleteContainerRegistry(profileName, registryId string) error {
 	return service.DeleteContainerRegistry(a.ctx, registryId)
 }
 
+func (a *App) CreateContainerRegistry(profileName, name, description, accessLevel, virtualDomain string) (*sakura.ContainerRegistryInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.CreateContainerRegistry(a.ctx, name, description, accessLevel, virtualDomain)
+}
+
+func (a *App) UpdateContainerRegistry(profileName, registryId, name, description, accessLevel, virtualDomain string) (*sakura.ContainerRegistryInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.UpdateContainerRegistry(a.ctx, registryId, name, description, accessLevel, virtualDomain)
+}
+
+func (a *App) AddContainerRegistryUser(profileName, registryId, userName, password, permission string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.AddContainerRegistryUser(a.ctx, registryId, userName, password, permission)
+}
+
+func (a *App) UpdateContainerRegistryUser(profileName, registryId, userName, password, permission string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.UpdateContainerRegistryUser(a.ctx, registryId, userName, password, permission)
+}
+
+func (a *App) DeleteContainerRegistryUser(profileName, registryId, userName string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	service := sakura.NewGlobalService(client)
+	return service.DeleteContainerRegistryUser(a.ctx, registryId, userName)
+}
+
 // GSLB Detail
 func (a *App) GetGSLBDetail(profileName, gslbId string) (*sakura.GSLBInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)

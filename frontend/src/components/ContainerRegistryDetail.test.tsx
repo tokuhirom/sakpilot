@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ContainerRegistryDetail } from './ContainerRegistryDetail';
 import { sakura } from '../../wailsjs/go/models';
@@ -12,6 +12,10 @@ import {
   HasContainerRegistrySecret,
   ListContainerRegistryImages,
   GetContainerRegistryImageTags,
+  UpdateContainerRegistry,
+  AddContainerRegistryUser,
+  UpdateContainerRegistryUser,
+  DeleteContainerRegistryUser,
 } from '../../wailsjs/go/main/App';
 
 vi.mock('../../wailsjs/go/main/App');
@@ -46,6 +50,10 @@ describe('ContainerRegistryDetail', () => {
     vi.mocked(HasContainerRegistrySecret).mockReset();
     vi.mocked(ListContainerRegistryImages).mockReset();
     vi.mocked(GetContainerRegistryImageTags).mockReset();
+    vi.mocked(UpdateContainerRegistry).mockReset();
+    vi.mocked(AddContainerRegistryUser).mockReset();
+    vi.mocked(UpdateContainerRegistryUser).mockReset();
+    vi.mocked(DeleteContainerRegistryUser).mockReset();
 
     vi.mocked(GetContainerRegistries).mockResolvedValue([makeRegistry()]);
     vi.mocked(GetContainerRegistryUsers).mockResolvedValue([]);
@@ -185,5 +193,95 @@ describe('ContainerRegistryDetail', () => {
     await user.click(screen.getByRole('button', { name: '← 戻る' }));
 
     expect(await screen.findByText('コンテナレジストリ詳細: my-registry')).toBeInTheDocument();
+  });
+
+  it('edits the basic info (name/description/accessLevel)', async () => {
+    vi.mocked(UpdateContainerRegistry).mockResolvedValueOnce(
+      makeRegistry({ name: 'renamed-registry', description: 'updated', accessLevel: 'readonly' })
+    );
+    const user = userEvent.setup();
+
+    render(<ContainerRegistryDetail profile="default" registryId="123456789012" />);
+    await screen.findByText('コンテナレジストリ詳細: my-registry');
+
+    await user.click(screen.getByRole('button', { name: '編集' }));
+    const nameInput = screen.getByDisplayValue('my-registry');
+    await user.clear(nameInput);
+    await user.type(nameInput, 'renamed-registry');
+    await user.click(screen.getByRole('button', { name: '保存する' }));
+
+    await waitFor(() => {
+      expect(UpdateContainerRegistry).toHaveBeenCalledWith(
+        'default', '123456789012', 'renamed-registry', '', 'none', ''
+      );
+    });
+    expect(await screen.findByText('コンテナレジストリ詳細: renamed-registry')).toBeInTheDocument();
+    expect(screen.getByText('読み取り専用')).toBeInTheDocument();
+  });
+
+  it('adds a new user via the add user modal', async () => {
+    vi.mocked(GetContainerRegistryUsers)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([makeUser({ userName: 'new-user', permission: 'readwrite' })]);
+    vi.mocked(HasContainerRegistrySecret).mockResolvedValue(false);
+    vi.mocked(AddContainerRegistryUser).mockResolvedValueOnce(undefined);
+    const user = userEvent.setup();
+
+    render(<ContainerRegistryDetail profile="default" registryId="123456789012" />);
+    await screen.findByText('ユーザーが登録されていません');
+
+    await user.click(screen.getByRole('button', { name: '+ ユーザー追加' }));
+    const modal = screen.getByText('ユーザー追加').closest('.modal-content') as HTMLElement;
+    await user.type(within(modal).getByRole('textbox'), 'new-user');
+    const passwordInput = modal.querySelector('input[type="password"]') as HTMLInputElement;
+    await user.type(passwordInput, 'new-password');
+    await user.click(within(modal).getByRole('button', { name: '追加する' }));
+
+    await waitFor(() => {
+      expect(AddContainerRegistryUser).toHaveBeenCalledWith(
+        'default', '123456789012', 'new-user', 'new-password', 'readwrite'
+      );
+    });
+    expect(await screen.findByText('new-user')).toBeInTheDocument();
+  });
+
+  it('updates a user permission/password via the edit action', async () => {
+    vi.mocked(GetContainerRegistryUsers).mockResolvedValue([makeUser({ userName: 'user1', permission: 'readonly' })]);
+    vi.mocked(HasContainerRegistrySecret).mockResolvedValue(false);
+    vi.mocked(UpdateContainerRegistryUser).mockResolvedValueOnce(undefined);
+    const user = userEvent.setup();
+
+    render(<ContainerRegistryDetail profile="default" registryId="123456789012" />);
+    await screen.findByText('user1');
+
+    await user.click(screen.getByRole('button', { name: 'ユーザー編集' }));
+    await user.click(screen.getByRole('button', { name: '保存' }));
+
+    await waitFor(() => {
+      expect(UpdateContainerRegistryUser).toHaveBeenCalledWith(
+        'default', '123456789012', 'user1', '', 'readonly'
+      );
+    });
+  });
+
+  it('deletes a user after confirmation', async () => {
+    vi.mocked(GetContainerRegistryUsers)
+      .mockResolvedValueOnce([makeUser({ userName: 'user1' })])
+      .mockResolvedValueOnce([]);
+    vi.mocked(HasContainerRegistrySecret).mockResolvedValue(false);
+    vi.mocked(DeleteContainerRegistryUser).mockResolvedValueOnce(undefined);
+    const user = userEvent.setup();
+
+    render(<ContainerRegistryDetail profile="default" registryId="123456789012" />);
+    await screen.findByText('user1');
+
+    await user.click(screen.getByRole('button', { name: 'ユーザー削除' }));
+    expect(await screen.findByText('ユーザー「user1」を削除しますか？')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '削除する' }));
+
+    await waitFor(() => {
+      expect(DeleteContainerRegistryUser).toHaveBeenCalledWith('default', '123456789012', 'user1');
+    });
+    expect(await screen.findByText('ユーザーが登録されていません')).toBeInTheDocument();
   });
 });
