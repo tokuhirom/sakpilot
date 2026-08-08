@@ -798,3 +798,71 @@ func TestService_ListAutoScalingGroups_Empty(t *testing.T) {
 		t.Errorf("got %d ASGs, want 0: %+v", len(asgs), asgs)
 	}
 }
+
+func TestService_CertificateLifecycle(t *testing.T) {
+	srv := mockapprundedicated.NewTestServer(mockapprundedicated.Config{})
+	defer srv.Close()
+	ctx := context.Background()
+
+	clusterID := seedCluster(t, ctx, newRawClient(t, srv.TestURL()))
+	clusterIDStr := uuid.UUID(clusterID).String()
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_APPRUN_DEDICATED", srv.TestURL())
+
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	const dummyCertPEM = "-----BEGIN CERTIFICATE-----\ndummy\n-----END CERTIFICATE-----"
+	const dummyKeyPEM = "-----BEGIN PRIVATE KEY-----\ndummy\n-----END PRIVATE KEY-----"
+
+	created, err := service.CreateCertificate(ctx, clusterIDStr, apprun.CreateCertificateParams{
+		Name:           "new-cert",
+		CertificatePEM: dummyCertPEM,
+		PrivateKeyPEM:  dummyKeyPEM,
+	})
+	if err != nil {
+		t.Fatalf("CreateCertificate: %v", err)
+	}
+	if created.Name != "new-cert" {
+		t.Errorf("Name = %q, want %q", created.Name, "new-cert")
+	}
+
+	certs, err := service.ListCertificates(ctx, clusterIDStr)
+	if err != nil {
+		t.Fatalf("ListCertificates: %v", err)
+	}
+	if len(certs) != 1 || certs[0].ID != created.ID {
+		t.Fatalf("certs = %+v, want single certificate with ID %q", certs, created.ID)
+	}
+
+	if err := service.UpdateCertificate(ctx, clusterIDStr, created.ID, apprun.CreateCertificateParams{
+		Name:           "updated-cert",
+		CertificatePEM: dummyCertPEM,
+		PrivateKeyPEM:  dummyKeyPEM,
+	}); err != nil {
+		t.Fatalf("UpdateCertificate: %v", err)
+	}
+
+	certs, err = service.ListCertificates(ctx, clusterIDStr)
+	if err != nil {
+		t.Fatalf("ListCertificates after update: %v", err)
+	}
+	if len(certs) != 1 || certs[0].Name != "updated-cert" {
+		t.Fatalf("certs = %+v, want single certificate named %q", certs, "updated-cert")
+	}
+
+	if err := service.DeleteCertificate(ctx, clusterIDStr, created.ID); err != nil {
+		t.Fatalf("DeleteCertificate: %v", err)
+	}
+
+	certs, err = service.ListCertificates(ctx, clusterIDStr)
+	if err != nil {
+		t.Fatalf("ListCertificates after delete: %v", err)
+	}
+	if len(certs) != 0 {
+		t.Errorf("got %d certificates after delete, want 0: %+v", len(certs), certs)
+	}
+}

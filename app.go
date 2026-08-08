@@ -1143,6 +1143,38 @@ func (a *App) UpdateAppRunWorkerNodeDraining(profileName, clusterID, asgID, work
 	return service.UpdateWorkerNodeDraining(a.ctx, clusterID, asgID, workerNodeID, draining)
 }
 
+func (a *App) GetAppRunCertificates(profileName, clusterID string) ([]apprun.CertificateInfo, error) {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListCertificates(a.ctx, clusterID)
+}
+
+func (a *App) CreateAppRunCertificate(profileName, clusterID string, params apprun.CreateCertificateParams) (*apprun.CertificateInfo, error) {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateCertificate(a.ctx, clusterID, params)
+}
+
+func (a *App) UpdateAppRunCertificate(profileName, clusterID, certificateID string, params apprun.CreateCertificateParams) error {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.UpdateCertificate(a.ctx, clusterID, certificateID, params)
+}
+
+func (a *App) DeleteAppRunCertificate(profileName, clusterID, certificateID string) error {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteCertificate(a.ctx, clusterID, certificateID)
+}
+
 func (a *App) DeleteAppRunCluster(profileName, clusterID string) error {
 	service, err := apprun.NewService(profileName)
 	if err != nil {

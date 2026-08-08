@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	apprundedicated "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated"
 	"github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/autoscalinggroup"
+	"github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/certificate"
 	"github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/cluster"
 	"github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/loadbalancer"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
@@ -926,4 +927,123 @@ func (s *Service) ListLoadBalancerNodes(ctx context.Context, clusterID, asgID, l
 		})
 	}
 	return nodes, nil
+}
+
+// CertificateInfo クラスタの証明書情報
+type CertificateInfo struct {
+	ID                      string   `json:"id"`
+	Name                    string   `json:"name"`
+	CommonName              string   `json:"commonName"`
+	SubjectAlternativeNames []string `json:"subjectAlternativeNames"`
+	NotBefore               string   `json:"notBefore"`
+	NotAfter                string   `json:"notAfter"`
+	Created                 string   `json:"created"`
+}
+
+// CreateCertificateParams 証明書の作成・更新パラメータ
+type CreateCertificateParams struct {
+	Name                       string  `json:"name"`
+	CertificatePEM             string  `json:"certificatePem"`
+	PrivateKeyPEM              string  `json:"privateKeyPem"`
+	IntermediateCertificatePEM *string `json:"intermediateCertificatePem,omitempty"`
+}
+
+func toCertificateInfo(id string, c v1.ReadCertificate) CertificateInfo {
+	unixOrEmpty := func(sec int) string {
+		if sec == 0 {
+			return ""
+		}
+		return time.Unix(int64(sec), 0).Format("2006-01-02 15:04:05")
+	}
+	return CertificateInfo{
+		ID:                      id,
+		Name:                    c.Name,
+		CommonName:              c.CommonName,
+		SubjectAlternativeNames: c.SubjectAlternativeNames,
+		NotBefore:               unixOrEmpty(c.NotBeforeSec),
+		NotAfter:                unixOrEmpty(c.NotAfterSec),
+		Created:                 unixOrEmpty(c.Created),
+	}
+}
+
+// ListCertificates クラスタの証明書一覧を取得
+func (s *Service) ListCertificates(ctx context.Context, clusterID string) ([]CertificateInfo, error) {
+	cID, err := uuid.Parse(clusterID)
+	if err != nil {
+		return nil, err
+	}
+
+	certOp := apprundedicated.NewCertificateOp(s.client, v1.ClusterID(cID))
+	list, _, err := certOp.List(ctx, 30, nil) // 最小1、最大30
+	if err != nil {
+		return nil, err
+	}
+
+	certs := make([]CertificateInfo, 0, len(list))
+	for _, c := range list {
+		certs = append(certs, toCertificateInfo(uuid.UUID(c.GetCertificateID()).String(), c))
+	}
+	return certs, nil
+}
+
+// CreateCertificate クラスタに証明書を作成
+func (s *Service) CreateCertificate(ctx context.Context, clusterID string, params CreateCertificateParams) (*CertificateInfo, error) {
+	cID, err := uuid.Parse(clusterID)
+	if err != nil {
+		return nil, err
+	}
+
+	certOp := apprundedicated.NewCertificateOp(s.client, v1.ClusterID(cID))
+	created, err := certOp.Create(ctx, certificate.CreateParams{
+		Name:                       params.Name,
+		CertificatePEM:             params.CertificatePEM,
+		PrivateKeyPEM:              params.PrivateKeyPEM,
+		IntermediateCertificatePEM: params.IntermediateCertificatePEM,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	cert, err := certOp.Read(ctx, created.GetCertificateID())
+	if err != nil {
+		return nil, err
+	}
+
+	info := toCertificateInfo(uuid.UUID(created.GetCertificateID()).String(), *cert)
+	return &info, nil
+}
+
+// UpdateCertificate クラスタの証明書を更新(全項目を再送信する必要がある)
+func (s *Service) UpdateCertificate(ctx context.Context, clusterID, certificateID string, params CreateCertificateParams) error {
+	cID, err := uuid.Parse(clusterID)
+	if err != nil {
+		return err
+	}
+	certID, err := uuid.Parse(certificateID)
+	if err != nil {
+		return err
+	}
+
+	certOp := apprundedicated.NewCertificateOp(s.client, v1.ClusterID(cID))
+	return certOp.Update(ctx, v1.CertificateID(certID), certificate.UpdateParams{
+		Name:                       params.Name,
+		CertificatePEM:             params.CertificatePEM,
+		PrivateKeyPEM:              params.PrivateKeyPEM,
+		IntermediateCertificatePEM: params.IntermediateCertificatePEM,
+	})
+}
+
+// DeleteCertificate クラスタの証明書を削除
+func (s *Service) DeleteCertificate(ctx context.Context, clusterID, certificateID string) error {
+	cID, err := uuid.Parse(clusterID)
+	if err != nil {
+		return err
+	}
+	certID, err := uuid.Parse(certificateID)
+	if err != nil {
+		return err
+	}
+
+	certOp := apprundedicated.NewCertificateOp(s.client, v1.ClusterID(cID))
+	return certOp.Delete(ctx, v1.CertificateID(certID))
 }

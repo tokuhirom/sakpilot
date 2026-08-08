@@ -19,6 +19,10 @@ import {
   CreateAppRunCluster,
   CreateAppRunASG,
   CreateAppRunLoadBalancer,
+  GetAppRunCertificates,
+  CreateAppRunCertificate,
+  UpdateAppRunCertificate,
+  DeleteAppRunCertificate,
   UpdateAppRunWorkerNodeDraining,
   DeleteAppRunCluster,
   DeleteAppRunApplication,
@@ -46,6 +50,14 @@ function makeAsg(overrides: Partial<apprun.ASGInfo> = {}): apprun.ASGInfo {
 
 function makeLb(overrides: Partial<apprun.LBInfo> = {}): apprun.LBInfo {
   return new apprun.LBInfo({ id: 'lb-1', name: 'my-lb', serviceClassPath: '100', ...overrides });
+}
+
+function makeCertificate(overrides: Partial<apprun.CertificateInfo> = {}): apprun.CertificateInfo {
+  return new apprun.CertificateInfo({
+    id: 'cert-1', name: 'my-cert', commonName: 'example.com', subjectAlternativeNames: ['example.com'],
+    notBefore: '2026-01-01 00:00:00', notAfter: '2027-01-01 00:00:00', created: '2026-01-01 00:00:00',
+    ...overrides,
+  });
 }
 
 function makeLbNode(overrides: Partial<apprun.LBNodeInfo> = {}): apprun.LBNodeInfo {
@@ -96,6 +108,10 @@ describe('AppRunDedicatedList', () => {
     vi.mocked(CreateAppRunCluster).mockReset();
     vi.mocked(CreateAppRunASG).mockReset();
     vi.mocked(CreateAppRunLoadBalancer).mockReset();
+    vi.mocked(GetAppRunCertificates).mockReset();
+    vi.mocked(CreateAppRunCertificate).mockReset();
+    vi.mocked(UpdateAppRunCertificate).mockReset();
+    vi.mocked(DeleteAppRunCertificate).mockReset();
     vi.mocked(UpdateAppRunWorkerNodeDraining).mockReset();
     vi.mocked(DeleteAppRunCluster).mockReset();
     vi.mocked(DeleteAppRunApplication).mockReset();
@@ -109,6 +125,7 @@ describe('AppRunDedicatedList', () => {
     vi.mocked(GetAppRunApplicationVersion).mockResolvedValue(makeVersionDetail());
     vi.mocked(GetAppRunASGs).mockResolvedValue([]);
     vi.mocked(GetAppRunLoadBalancers).mockResolvedValue([]);
+    vi.mocked(GetAppRunCertificates).mockResolvedValue([]);
     vi.mocked(GetAppRunWorkerNodes).mockResolvedValue([]);
     vi.mocked(GetAppRunLBNodes).mockResolvedValue([]);
     vi.mocked(ClearAppRunActiveVersion).mockResolvedValue();
@@ -128,6 +145,9 @@ describe('AppRunDedicatedList', () => {
     vi.mocked(CreateAppRunLoadBalancer).mockResolvedValue(
       new apprun.LBInfo({ id: 'lb-2', name: 'new-lb', serviceClassPath: 'cloud/apprun/dedicated/lb/1vcpu_2gb' })
     );
+    vi.mocked(CreateAppRunCertificate).mockResolvedValue(makeCertificate({ id: 'cert-2', name: 'new-cert' }));
+    vi.mocked(UpdateAppRunCertificate).mockResolvedValue();
+    vi.mocked(DeleteAppRunCertificate).mockResolvedValue();
     vi.mocked(UpdateAppRunWorkerNodeDraining).mockResolvedValue();
     vi.mocked(DeleteAppRunCluster).mockResolvedValue();
     vi.mocked(DeleteAppRunApplication).mockResolvedValue();
@@ -363,6 +383,86 @@ describe('AppRunDedicatedList', () => {
 
     expect(await screen.findByText(/エラー: Error: quota exceeded/)).toBeInTheDocument();
     expect(screen.getByText('ロードバランサーを作成')).toBeInTheDocument();
+  });
+
+  it('shows certificates in the cluster view', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(GetAppRunCertificates).mockResolvedValue([makeCertificate()]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+
+    expect(await screen.findByText('my-cert')).toBeInTheDocument();
+    expect(screen.getByText('example.com')).toBeInTheDocument();
+  });
+
+  it('creates a certificate from the cluster view and reloads cluster details', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+
+    await user.click(await screen.findByText('+ 証明書作成'));
+    expect(await screen.findByText('証明書を作成')).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('my-cert'), 'new-cert');
+    await user.type(screen.getByPlaceholderText('-----BEGIN CERTIFICATE-----', { exact: true }), 'dummy-cert-pem');
+    await user.type(screen.getByPlaceholderText('-----BEGIN PRIVATE KEY-----'), 'dummy-key-pem');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    await waitFor(() => {
+      expect(CreateAppRunCertificate).toHaveBeenCalledWith('default', 'cluster-1', expect.objectContaining({
+        name: 'new-cert',
+        certificatePem: 'dummy-cert-pem',
+        privateKeyPem: 'dummy-key-pem',
+      }));
+    });
+    expect(GetAppRunCertificates).toHaveBeenCalledWith('default', 'cluster-1');
+    expect(screen.queryByText('証明書を作成')).not.toBeInTheDocument();
+  });
+
+  it('edits a certificate requiring the PEM fields to be re-entered', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(GetAppRunCertificates).mockResolvedValue([makeCertificate()]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('編集'));
+
+    expect(await screen.findByText('証明書を更新')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('my-cert')).toHaveValue('my-cert');
+    expect(screen.getByRole('button', { name: '更新する' })).toBeDisabled();
+
+    await user.type(screen.getByPlaceholderText('-----BEGIN CERTIFICATE-----', { exact: true }), 'renewed-cert-pem');
+    await user.type(screen.getByPlaceholderText('-----BEGIN PRIVATE KEY-----'), 'renewed-key-pem');
+    await user.click(screen.getByRole('button', { name: '更新する' }));
+
+    await waitFor(() => {
+      expect(UpdateAppRunCertificate).toHaveBeenCalledWith('default', 'cluster-1', 'cert-1', expect.objectContaining({
+        name: 'my-cert',
+        certificatePem: 'renewed-cert-pem',
+        privateKeyPem: 'renewed-key-pem',
+      }));
+    });
+  });
+
+  it('deletes a certificate after confirmation and reloads cluster details', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(GetAppRunCertificates).mockResolvedValue([makeCertificate()]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByRole('button', { name: '削除' }));
+    await user.click(await screen.findByRole('button', { name: '削除する' }));
+
+    await waitFor(() => {
+      expect(DeleteAppRunCertificate).toHaveBeenCalledWith('default', 'cluster-1', 'cert-1');
+    });
+    expect(GetAppRunCertificates).toHaveBeenCalledWith('default', 'cluster-1');
   });
 
   it('clears the active version from the app view', async () => {
