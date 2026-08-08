@@ -1,6 +1,6 @@
 # ADR 0001: E2Eテスト戦略 — HTTPブリッジ + Playwright + sakumock/自前IaaSモック
 
-- Status: Accepted
+- Status: Accepted (2026-08-08 実装時追記あり — 「実装時の変更 (2026-08-08)」参照)
 - Date: 2026-08-08
 
 ## Context
@@ -47,6 +47,14 @@ Playwright (headless Chromium)
 3. **クラウドAPIモック**: sakumockがカバーするサービスは `SAKURA_ENDPOINTS_*` で差し替える。IaaSは自前モックパッケージ(`internal/testing/iaasmock` 等)をsakumockと同様のhttptestベース・インメモリ状態で実装し、**E2Eシナリオで必要になったエンドポイントから段階的に追加する**(全API網羅は目指さない)。
 4. **IaaSルートURL差し替えフック**: 環境変数(例: `SAKPILOT_IAAS_API_ROOT_URL`)が設定されていれば `iaas.SakuraCloudAPIRoot` を書き換えるフックをE2Eサーバー起動時に入れる。あわせて `internal/sakura/client.go` の `SetEnviron` にプロセス環境を透過させる。
 5. **環境の隔離**: 既存Goテストと同じパターンを踏襲する — `HOME` を一時ディレクトリに差し替えて `~/.usacloud/<profile>/config.json` を偽装し、キーチェーンはフェイクに差し替える。
+
+## 実装時の変更 (2026-08-08)
+
+実装時に `sacloud-sdk-go` の `api/iaas/fake` パッケージに **iaas-api-go由来のインメモリfakeドライバが同梱されている**ことが判明した(`fake.SwitchFactoryFuncToFake()` で全IaaSリソースのOp実装をプロセス内fakeに切り替えられる。電源操作の状態遷移や「起動中サーバーは削除不可(409)」等の挙動も再現される)。これを受けて以下を変更した:
+
+- **自前IaaSモック(httptestベース)は作らない**。E2EサーバーはAppと同一プロセスなので、`fake.SwitchFactoryFuncToFake()` + `fake.DataStore.Put(...)` によるシードで置き換える。HTTPレイヤーを通らないため、上記4(IaaSルートURL差し替えフックと `client.go` の環境変数透過)も**不要になり実施しない**。
+- **エントリポイントはbuild tag方式**(`go run -tags e2e .`)とした。`App` はルートの `package main` にあり `cmd/` 配下から参照できないため。`main.go` に `//go:build !e2e` を付与し、`e2e_server.go`(`//go:build e2e`)がE2E用の `main()` を提供する。
+- キーチェーンのフェイクは `zalando/go-keyring` 標準の `keyring.MockInit()` で済み、インターフェース化は不要だった。
 
 ## Alternatives Considered
 

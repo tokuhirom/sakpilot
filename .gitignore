@@ -49,3 +49,7 @@ vendor/
 # Coverage
 coverage.out
 coverage.html
+
+# Playwright
+frontend/test-results/
+frontend/playwright-report/
