@@ -29,7 +29,7 @@
 | NFS | ✅ あり | ✅ | ✅ | 完備。FEテストとResetを追加済み（PR #80） |
 | ObjectStorage | ✅ あり | ✅（バケット・アクセスキー） | (対象外) | バケット作成/削除、アクセスキー作成/削除+FEテストを追加済み |
 | ContainerRegistry | ✅ あり | ✅ | (対象外) | 削除機能+FEテスト(List/Detail)を追加済み（PR #89、#95） |
-| AppRun (専有/共用) | ✅ あり | ❌ **なし** | (対象外) | 専有型・共用型ともFEテスト追加済み。閲覧＋アクティブバージョン切替のみ（デプロイ・削除は方針判断待ち） |
+| AppRun (専有/共用) | ✅ あり | 専有型は✅（Cluster/App/ASG/LB） | (対象外) | 専有型・共用型ともFEテスト追加済み。専有型は削除機能を追加（デプロイ操作は方針判断によりスコープ外） |
 | Bill | ❌ なし | (対象外) | (対象外) | 読み取り専用リソースなので概ね妥当 |
 
 **17リソース中、FEテストが未着手なのは Bill のみ。**
@@ -155,12 +155,13 @@
 - **TODO**: ユーザー管理機能の追加を検討
 
 ### AppRun（専有型 / 共用型）
-- テスト: `AppRunSharedList.test.tsx` あり（ユーザー未設定時の案内・一覧表示・エラー表示・詳細遷移とコンポーネント/トラフィック/バージョン履歴表示・戻る操作をカバー）。`AppRunDedicatedList.test.tsx` も追加済み（cluster→app→version遷移とアクティブバージョン設定・ASGのLB/ワーカーノード表示・非アクティブ化/アクティブ化の成功・失敗フローをカバー。`lb` view単体はUI上到達経路が無く未カバー）
-- バックエンド: `internal/apprun/`（専有型）・`internal/apprunshared/`（共用型）に分離実装。List/Read/`SetActiveVersion`/`ClearActiveVersion` のみ
-- SDK比較で不足:
-  - 専有型: Cluster/Application/ASG/LoadBalancerの**Create/Delete**、**Versionの Create（新バージョンのデプロイ）**/Delete、WorkerNodeのUpdate（draining）、Certificate系全般
+- テスト: `AppRunSharedList.test.tsx` あり（ユーザー未設定時の案内・一覧表示・エラー表示・詳細遷移とコンポーネント/トラフィック/バージョン履歴表示・戻る操作をカバー）。`AppRunDedicatedList.test.tsx` も整備済み（cluster→app→version遷移とアクティブバージョン設定・ASGのLB/ワーカーノード表示・非アクティブ化/アクティブ化の成功・失敗フロー・Cluster/Application/ASG/LoadBalancerの削除確認〜成功・失敗フローをカバー。`lb` view単体はUI上到達経路が無く未カバー）
+- バックエンド: `internal/apprun/`（専有型）・`internal/apprunshared/`（共用型）に分離実装。List/Read/`SetActiveVersion`/`ClearActiveVersion`に加え、専有型はCluster/Application/ASG/LoadBalancerの**Delete**を実装
+- ✅ **対応済み（2026-08-08 追加セッション6）**: AppRun専有型の削除機能一式を実装。`internal/apprun/service.go`に`DeleteCluster`/`DeleteApplication`/`DeleteAutoScalingGroup`/`DeleteLoadBalancer`を追加し、`app.go`に対応するRPCを公開。`AppRunDedicatedList.tsx`のクラスタ一覧・アプリ一覧・ASG一覧・LB一覧の各行に削除ボタンと確認ダイアログを追加
+- SDK比較で残る不足:
+  - 専有型: Cluster/Application/ASG/LoadBalancerの**Create**、**Versionの Create（新バージョンのデプロイ）**/Delete、WorkerNodeのUpdate（draining）、Certificate系全般（方針判断により削除機能のみ対応、Create・デプロイ操作は現状スコープ外のまま据え置き）
   - 共用型: ApplicationのCreate/Update/Delete、VersionのDelete、TrafficのUpdate（分散比率変更）、UserのCreate
-- **TODO**: `AppRunDedicatedList.test.tsx` を最優先で追加。デプロイ操作（Version Create）はSakPilotの現状スコープ（閲覧中心）を超えるため、実装するかは別途方針判断が必要
+- **TODO**: `lb` view（ロードバランサー単体詳細）への遷移導線が無い点は意図的な未実装か実装漏れか要確認
 
 ### Bill（請求）
 - テスト: なし。分岐が薄く現状は無理にテスト不要
@@ -196,10 +197,12 @@
 ### ✅ 完了（2026-08-08 追加セッション5）
 - ObjectStorageのバケット・アクセスキーCreate/Delete機能一式を実装。バックエンドに`CreateBucket`/`DeleteBucket`/`CreateAccessKey`/`DeleteAccessKey`（`internal/sakura/objectstorage.go`）とそれぞれのapp.go RPCを追加し、`ObjectStorageList.tsx`にバケット作成モーダル・削除確認・アクセスキー作成時のSecret一度きり表示モーダル・アクセスキー削除確認を追加。`ObjectStorageList.test.tsx`を新規作成
 
+### ✅ 完了（2026-08-08 追加セッション6）
+- AppRun専有型のスコープ判断（ユーザーに確認）: 削除機能のみ追加し、デプロイ操作（Version Create）は引き続きスコープ外とする方針に決定。Cluster/Application/ASG/LoadBalancerの削除機能とFEテストを追加
+
 ### 次セッションの優先順位
 
-**C. 大物・要方針決定（着手前にスコープを確認）**
-1. AppRun（専有型）: 削除・デプロイ操作はSDK比較で不足あり。Version Create（新バージョンのデプロイ）は「閲覧中心」という現状スコープを超えるため、実装するか自体を判断してから着手。`lb` viewへの遷移導線が無い点も要確認（意図的な未実装か、実装漏れか）
+現時点でPLAN.md記載の主要リソースはFEテスト・削除機能とも一通り対応済み。残るのは各節「SDK比較で残る不足」に記載の個別機能（Create/Update系、パワーユーザー向け機能）で、いずれも優先度低または方針判断が必要な項目。着手する場合は各節のTODOを参照。
 
 ### その他
 - `internal/sakura/server.go` の `println` デバッグ文の削除（別issueとして切り出し推奨、未着手）
