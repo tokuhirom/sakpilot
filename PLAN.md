@@ -116,10 +116,10 @@
 - SDK比較で残る不足: MonitorResponseTime（応答時間グラフ）/HealthStatus（未着手）
 
 ### Monitoring Suite（Monitoring.tsx / MonitoringMetricDetail.tsx / MetricGraph.tsx）
-- テスト: `MonitoringMetricDetail.test.tsx` あり（基本情報表示・アクセスキー0件時の案内・publisher切り替えとメトリクスのグルーピング表示・カスタムメトリクス・エラー分岐をカバー。`MetricGraph`はuPlot/canvas依存のため`vi.mock`でスタブ化）
+- テスト: `MonitoringMetricDetail.test.tsx`（基本情報表示・編集・削除・アクセスキー作成/削除・publisher切り替えとメトリクスのグルーピング表示・カスタムメトリクス・エラー分岐をカバー。`MetricGraph`はuPlot/canvas依存のため`vi.mock`でスタブ化）、`Monitoring.test.tsx`（ストレージ作成/削除フロー）ともに整備済み
 - `MetricGraph.tsx` はuPlot依存が強くjsdomでの描画テストはコスト高のため未着手。フォーマッタ関数（formatBytes/formatPercent/detectMetricType）を切り出せば単体テスト可能
-- バックエンド: Logs/Metrics/Traces/StorageDetail/AccessKeys/Prometheusクエリ系はRead系のみ実装。ストレージ・アクセスキーの Create/Update/Destroy は未実装
-- ✅ **対応済み**: `MonitoringMetricDetail.test.tsx` を追加
+- バックエンド: Logs/Metrics/Traces/StorageDetail/AccessKeys/Prometheusクエリ系に加え、`internal/sakura/monitoring.go`に**Logs/Metrics/Traces各ストレージのCreate/Update(PartialUpdate)/Destroy**、**MetricsストレージのアクセスキーCreate/Destroy**を追加
+- ✅ **対応済み（2026-08-09、Tier3 #19）**: ストレージ作成（`Monitoring.tsx`のタブ共通で「+ ストレージ作成」モーダル）・削除（一覧行の削除ボタン+確認ダイアログ）を追加。`MonitoringMetricDetail.tsx`にはストレージ名・説明のインライン編集、ストレージ削除（削除後は一覧へ遷移）、アクセスキー作成（Secret/Tokenは作成レスポンスでしか取得できないため一度きり表示モーダル）・削除を追加。Logs/Traces StorageはAPI(Create/Update/Destroy)のみ対応し、AccessKey管理は詳細画面が存在するMetricsのみに限定（既存のRead実装スコープを踏襲）。SDKのMetrics系Update(`MetricsStoragesPartialUpdate`)はPATCH的な部分更新のため、GSLB/ProxyLB等と異なり事前Read不要だった。詳細は`docs/ui-implementation-patterns.md`
 
 ---
 
@@ -291,7 +291,7 @@
 16. ✅ Server: ChangePlan/InsertCDROM/EjectCDROM/SendKey/SendNMI/GetVNCProxy等パワーユーザー向け機能 — 2026-08-08対応済み
 17. ✅ Archive: Create/CreateBlank/CreateFromShared/Share/OpenFTP/CloseFTP — 2026-08-08対応済み
 18. ✅ ObjectStorage: AccountのRead/Delete、PermissionsAPI全般、暗号化/レプリケーション/クォータ設定、S3側のPutObject/DeleteObject — 2026-08-09対応済み
-19. Monitoring Suite: ストレージ・アクセスキーのCreate/Update/Destroy
+19. ✅ Monitoring Suite: ストレージ・アクセスキーのCreate/Update/Destroy — 2026-08-09対応済み
 20. ProxyLB: ChangePlan/MonitorConnection（トラフィックグラフ）
 21. Bill: ByContractYear/ByContractYearMonth（期間絞り込み）/DetailsCSV
 
@@ -310,3 +310,11 @@
 - バケットの暗号化・レプリケーションはsakumockでは未設定時に404を返す仕様のため、`saclient.IsNotFoundError`で判定して`Enabled: false`として返すようにした（エラーではなく正常系として扱う）。
 - フロントに`BucketSettingsModal.tsx`（暗号化/レプリケーション/クォータの表示・切り替え）、`ObjectStoragePermissions.tsx`（パーミッションCRUD＋アクセスキー発行管理）を新設し、`ObjectStorageList.tsx`のバケット一覧に「設定」ボタン、サイトヘッダーに「パーミッション管理」ボタン、アカウントコード表示＋削除ボタンを追加。オブジェクト一覧にはアップロード（ファイル選択ダイアログ）・削除ボタンを追加。
 - S3のPutObject/DeleteObjectはsakumockのS3データプレーンが外部`versitygw`バイナリ依存のオプトイン機能のため、既存の`ListObjects`/`DownloadObject`同様ユニットテスト対象外とした（E2Eでも同じ理由で従来から対象外）。`internal/sakura/objectstorage_test.go`にAccount/Permissions/暗号化/レプリケーション/クォータのGoテスト8件、`BucketSettingsModal.test.tsx`/`ObjectStoragePermissions.test.tsx`/`ObjectStorageList.test.tsx`にフロントテストを追加して検証
+
+### ✅ 完了（2026-08-09 追加セッション29、Tier3 #19）
+- Monitoring SuiteのLogs/Metrics/Traces各ストレージのCreate/Update/Destroy、MetricsストレージのアクセスキーCreate/Destroyを実装。`internal/sakura/monitoring.go`に各メソッドを追加し、`app.go`に対応する11個のRPCを公開。SDKの`monitoring-suite/apis/v1`は3種のストレージ全てに対称的なCreate/Destroy/PartialUpdate APIが揃っており（`LogsStoragesCreate`/`MetricsStoragesCreate`/`TracesStoragesCreate`等）、他リソースと異なりUpdateはPATCH的な部分更新（`PartialUpdate`）のため事前Read不要だった。
+- アクセスキーのSecretは作成レスポンス（`WrappedMetricsStorageAccessKey.Secret`）でしか取得できないため、ObjectStorageと同様に一覧用DTO（`MSMetricsAccessKey`）とは別に作成専用DTO（`MSMetricsAccessKeyCreated`）を用意し、フロントで一度きり表示モーダルを実装（キーチェーン保存導線は無し、表示のみ）。
+- `Monitoring.tsx`にタブ（ログ/メトリクス/トレース）共通の「+ ストレージ作成」モーダルと行削除ボタンを追加。`MonitoringMetricDetail.tsx`にはストレージ名・説明のインライン編集（`editingBasic`パターン）、ストレージ削除（削除後は一覧へ`navigate`）、アクセスキーの作成・削除を追加。AccessKey管理はDetail画面が存在するMetricsストレージのみに限定し、Logs/Tracesはストレージ自体のCRUDのみ対応（既存のRead実装スコープの非対称性を踏襲した意図的な判断）
+- `MonitoringMetricDetail.test.tsx`にuseNavigateのための`MemoryRouter`ラップを追加（既存7テストが`useNavigate() may be used only in the context of a <Router>`で全滅していたのを機に修正）、編集・削除・アクセスキー作成/削除の4テストを追加。`Monitoring.test.tsx`を新規作成（作成/削除/キャンセルフロー5テスト）
+- ユーザーの要望を受け、各サービスで積み重ねてきたUI実装パターン（editingBasic単一フォーム編集、SettingsHash事前Read+楽観ロック、一度きりSecret表示モーダル等）を`docs/ui-implementation-patterns.md`に整理して追加
+- `golangci-lint run`（0 issues）/`go build`/`go vet`/`go test ./...`/`tsc --noEmit`/`npm run test`（264件全パス）/`wails build -tags webkit2_41`を確認してから作成

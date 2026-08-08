@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	ms "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
@@ -81,6 +82,15 @@ type MSMetricsAccessKey struct {
 	Description string `json:"description"`
 }
 
+// MSMetricsAccessKeyCreated represents a newly created access key, including the secret
+// which is only ever returned at creation time and cannot be retrieved again afterwards.
+type MSMetricsAccessKeyCreated struct {
+	UID         string `json:"uid"`
+	Token       string `json:"token"`
+	Secret      string `json:"secret"`
+	Description string `json:"description"`
+}
+
 // PrometheusLabel represents a Prometheus label value
 type PrometheusLabel struct {
 	Name string `json:"name"`
@@ -114,7 +124,7 @@ type PrometheusQueryRangeData struct {
 
 // PrometheusQueryRangeResponse represents the response from query_range
 type PrometheusQueryRangeResponse struct {
-	Status string                    `json:"status"`
+	Status string                   `json:"status"`
 	Data   PrometheusQueryRangeData `json:"data"`
 }
 
@@ -159,6 +169,74 @@ func (s *MonitoringService) ListLogs(ctx context.Context) ([]MSLogInfo, error) {
 	return list, nil
 }
 
+// CreateLogsStorage creates a new logs storage
+func (s *MonitoringService) CreateLogsStorage(ctx context.Context, name, description string) (*MSLogInfo, error) {
+	c, err := s.getMSClient()
+	if err != nil {
+		return nil, err
+	}
+
+	req := &v1.LogStorageCreateRequest{Name: name}
+	if description != "" {
+		req.Description = v1.NewOptString(description)
+	}
+
+	res, err := c.LogsStoragesCreate(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MSLogInfo{
+		ID:          fmt.Sprintf("%d", res.ID),
+		Name:        res.Name.Value,
+		Description: res.Description.Value,
+	}, nil
+}
+
+// UpdateLogsStorage updates the name/description of a logs storage
+func (s *MonitoringService) UpdateLogsStorage(ctx context.Context, storageID, name, description string) (*MSLogInfo, error) {
+	c, err := s.getMSClient()
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := strconv.ParseInt(storageID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid storage ID: %w", err)
+	}
+
+	req := v1.NewOptPatchedLogStorageRequest(v1.PatchedLogStorageRequest{
+		Name:        v1.NewOptString(name),
+		Description: v1.NewOptString(description),
+	})
+
+	res, err := c.LogsStoragesPartialUpdate(ctx, req, v1.LogsStoragesPartialUpdateParams{ResourceID: id})
+	if err != nil {
+		return nil, err
+	}
+
+	return &MSLogInfo{
+		ID:          fmt.Sprintf("%d", res.ID),
+		Name:        res.Name.Value,
+		Description: res.Description.Value,
+	}, nil
+}
+
+// DeleteLogsStorage deletes a logs storage
+func (s *MonitoringService) DeleteLogsStorage(ctx context.Context, storageID string) error {
+	c, err := s.getMSClient()
+	if err != nil {
+		return err
+	}
+
+	id, err := strconv.ParseInt(storageID, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid storage ID: %w", err)
+	}
+
+	return c.LogsStoragesDestroy(ctx, v1.LogsStoragesDestroyParams{ResourceID: id})
+}
+
 func (s *MonitoringService) ListMetrics(ctx context.Context) ([]MSMetricInfo, error) {
 	c, err := s.getMSClient()
 	if err != nil {
@@ -199,6 +277,74 @@ func (s *MonitoringService) ListMetrics(ctx context.Context) ([]MSMetricInfo, er
 	return list, nil
 }
 
+// CreateMetricsStorage creates a new metrics storage
+func (s *MonitoringService) CreateMetricsStorage(ctx context.Context, name, description string) (*MSMetricInfo, error) {
+	c, err := s.getMSClient()
+	if err != nil {
+		return nil, err
+	}
+
+	req := &v1.MetricsStorageCreateRequest{Name: name}
+	if description != "" {
+		req.Description = v1.NewOptString(description)
+	}
+
+	res, err := c.MetricsStoragesCreate(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MSMetricInfo{
+		ID:          fmt.Sprintf("%d", res.ID),
+		Name:        res.Name.Value,
+		Description: res.Description.Value,
+	}, nil
+}
+
+// UpdateMetricsStorage updates the name/description of a metrics storage
+func (s *MonitoringService) UpdateMetricsStorage(ctx context.Context, storageID, name, description string) (*MSMetricInfo, error) {
+	c, err := s.getMSClient()
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := strconv.ParseInt(storageID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid storage ID: %w", err)
+	}
+
+	req := v1.NewOptPatchedMetricsStorageRequest(v1.PatchedMetricsStorageRequest{
+		Name:        v1.NewOptString(name),
+		Description: v1.NewOptString(description),
+	})
+
+	res, err := c.MetricsStoragesPartialUpdate(ctx, req, v1.MetricsStoragesPartialUpdateParams{ResourceID: id})
+	if err != nil {
+		return nil, err
+	}
+
+	return &MSMetricInfo{
+		ID:          fmt.Sprintf("%d", res.ID),
+		Name:        res.Name.Value,
+		Description: res.Description.Value,
+	}, nil
+}
+
+// DeleteMetricsStorage deletes a metrics storage
+func (s *MonitoringService) DeleteMetricsStorage(ctx context.Context, storageID string) error {
+	c, err := s.getMSClient()
+	if err != nil {
+		return err
+	}
+
+	id, err := strconv.ParseInt(storageID, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid storage ID: %w", err)
+	}
+
+	return c.MetricsStoragesDestroy(ctx, v1.MetricsStoragesDestroyParams{ResourceID: id})
+}
+
 func (s *MonitoringService) ListTraces(ctx context.Context) ([]MSTraceInfo, error) {
 	c, err := s.getMSClient()
 	if err != nil {
@@ -219,6 +365,74 @@ func (s *MonitoringService) ListTraces(ctx context.Context) ([]MSTraceInfo, erro
 		})
 	}
 	return list, nil
+}
+
+// CreateTracesStorage creates a new traces storage
+func (s *MonitoringService) CreateTracesStorage(ctx context.Context, name, description string) (*MSTraceInfo, error) {
+	c, err := s.getMSClient()
+	if err != nil {
+		return nil, err
+	}
+
+	req := &v1.TraceStorageCreateRequest{Name: name}
+	if description != "" {
+		req.Description = v1.NewOptString(description)
+	}
+
+	res, err := c.TracesStoragesCreate(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MSTraceInfo{
+		ID:          fmt.Sprintf("%d", res.ID),
+		Name:        res.Name.Value,
+		Description: res.Description.Value,
+	}, nil
+}
+
+// UpdateTracesStorage updates the name/description of a traces storage
+func (s *MonitoringService) UpdateTracesStorage(ctx context.Context, storageID, name, description string) (*MSTraceInfo, error) {
+	c, err := s.getMSClient()
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := strconv.ParseInt(storageID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid storage ID: %w", err)
+	}
+
+	req := v1.NewOptPatchedTraceStorageRequest(v1.PatchedTraceStorageRequest{
+		Name:        v1.NewOptString(name),
+		Description: v1.NewOptString(description),
+	})
+
+	res, err := c.TracesStoragesPartialUpdate(ctx, req, v1.TracesStoragesPartialUpdateParams{ResourceID: id})
+	if err != nil {
+		return nil, err
+	}
+
+	return &MSTraceInfo{
+		ID:          fmt.Sprintf("%d", res.ID),
+		Name:        res.Name.Value,
+		Description: res.Description.Value,
+	}, nil
+}
+
+// DeleteTracesStorage deletes a traces storage
+func (s *MonitoringService) DeleteTracesStorage(ctx context.Context, storageID string) error {
+	c, err := s.getMSClient()
+	if err != nil {
+		return err
+	}
+
+	id, err := strconv.ParseInt(storageID, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid storage ID: %w", err)
+	}
+
+	return c.TracesStoragesDestroy(ctx, v1.TracesStoragesDestroyParams{ResourceID: id})
 }
 
 // GetMetricsStorageDetail retrieves detailed information about a metrics storage
@@ -277,6 +491,62 @@ func (s *MonitoringService) ListMetricsAccessKeys(ctx context.Context, storageID
 		})
 	}
 	return keys, nil
+}
+
+// CreateMetricsAccessKey creates a new access key for a metrics storage. The returned
+// Secret is only ever available at creation time and cannot be retrieved afterwards.
+func (s *MonitoringService) CreateMetricsAccessKey(ctx context.Context, storageID, description string) (*MSMetricsAccessKeyCreated, error) {
+	c, err := s.getMSClient()
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := strconv.ParseInt(storageID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid storage ID: %w", err)
+	}
+
+	var req v1.OptMetricsStorageAccessKeyRequest
+	if description != "" {
+		req = v1.NewOptMetricsStorageAccessKeyRequest(v1.MetricsStorageAccessKeyRequest{
+			Description: v1.NewOptString(description),
+		})
+	}
+
+	res, err := c.MetricsStoragesKeysCreate(ctx, req, v1.MetricsStoragesKeysCreateParams{MetricsResourceID: id})
+	if err != nil {
+		return nil, err
+	}
+
+	return &MSMetricsAccessKeyCreated{
+		UID:         res.UID.String(),
+		Token:       res.Token,
+		Secret:      res.Secret.String(),
+		Description: res.Description.Value,
+	}, nil
+}
+
+// DeleteMetricsAccessKey deletes an access key from a metrics storage
+func (s *MonitoringService) DeleteMetricsAccessKey(ctx context.Context, storageID, uid string) error {
+	c, err := s.getMSClient()
+	if err != nil {
+		return err
+	}
+
+	id, err := strconv.ParseInt(storageID, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid storage ID: %w", err)
+	}
+
+	parsedUID, err := uuid.Parse(uid)
+	if err != nil {
+		return fmt.Errorf("invalid access key UID: %w", err)
+	}
+
+	return c.MetricsStoragesKeysDestroy(ctx, v1.MetricsStoragesKeysDestroyParams{
+		MetricsResourceID: id,
+		UID:               parsedUID,
+	})
 }
 
 // QueryPrometheusLabels queries Prometheus API to get all metric names
