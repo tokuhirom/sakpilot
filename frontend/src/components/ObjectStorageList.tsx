@@ -9,10 +9,14 @@ import {
   HasObjectStorageSecretKey,
   ListObjectStorageObjects,
   DownloadObjectStorageObject,
+  UploadObjectStorageObject,
+  DeleteObjectStorageObject,
   CreateObjectStorageBucket,
   DeleteObjectStorageBucket,
   CreateObjectStorageAccessKey,
   DeleteObjectStorageAccessKey,
+  GetObjectStorageAccount,
+  DeleteObjectStorageAccount,
 } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
@@ -20,6 +24,8 @@ import { useGlobalReload } from '../hooks/useGlobalReload';
 import { SearchBar } from './SearchBar';
 import { JSONLPreview } from './JSONLPreview';
 import { TextPreview } from './TextPreview';
+import { BucketSettingsModal } from './BucketSettingsModal';
+import { ObjectStoragePermissions } from './ObjectStoragePermissions';
 
 interface ObjectStorageListProps {
   profile: string;
@@ -74,6 +80,15 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
   const [newAccessKey, setNewAccessKey] = useState<sakura.AccessKeyCreated | null>(null);
   const [confirmDeleteAccessKey, setConfirmDeleteAccessKey] = useState(false);
   const [deletingAccessKey, setDeletingAccessKey] = useState(false);
+
+  // Account state
+  const [account, setAccount] = useState<sakura.AccountInfo | null>(null);
+  const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  // Bucket settings / permissions modal state
+  const [settingsBucket, setSettingsBucket] = useState<sakura.BucketInfo | null>(null);
+  const [showPermissions, setShowPermissions] = useState(false);
 
   // Object list state
   const [selectedBucket, setSelectedBucket] = useState<sakura.BucketInfo | null>(null);
@@ -152,6 +167,17 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
       setAccessKeys([]);
     } finally {
       setLoadingAccessKeys(false);
+    }
+  }, [profile]);
+
+  const loadAccount = useCallback(async (siteId: string) => {
+    if (!profile || !siteId) return;
+    try {
+      const acc = await GetObjectStorageAccount(profile, siteId);
+      setAccount(acc);
+    } catch {
+      // No account created for this site yet, that's fine
+      setAccount(null);
     }
   }, [profile]);
 
@@ -266,7 +292,7 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
     setSecretKey('');
     setSecretSaved(false);
     onBreadcrumbChange?.(site.displayName, null);
-    await loadAccessKeys(site.id);
+    await Promise.all([loadAccessKeys(site.id), loadAccount(site.id)]);
   };
 
   const handleBackToSites = () => {
@@ -278,7 +304,22 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
     setSecretKey('');
     setSecretSaved(false);
     setBucketsError(null);
+    setAccount(null);
     onBreadcrumbChange?.(null, null);
+  };
+
+  const handleDeleteAccountConfirm = async () => {
+    if (!profile || !selectedSite) return;
+    setConfirmDeleteAccount(false);
+    setDeletingAccount(true);
+    try {
+      await DeleteObjectStorageAccount(profile, selectedSite.id);
+      setAccount(null);
+    } catch (e) {
+      alert(`削除に失敗しました: ${e}`);
+    } finally {
+      setDeletingAccount(false);
+    }
   };
 
   const handleAccessKeySelect = async (accessKeyId: string) => {
@@ -577,6 +618,55 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
     }
   };
 
+  const [uploading, setUploading] = useState(false);
+  const [deletingObject, setDeletingObject] = useState<string | null>(null);
+  const [confirmDeleteObject, setConfirmDeleteObject] = useState<sakura.ObjectInfo | null>(null);
+
+  const handleUpload = async () => {
+    if (!selectedSite || !selectedBucket) return;
+
+    setUploading(true);
+    setObjectsError(null);
+    try {
+      await UploadObjectStorageObject(
+        selectedSite.endpoint,
+        selectedAccessKeyId,
+        secretKey,
+        selectedBucket.name,
+        currentPrefix
+      );
+      await loadObjects(currentPrefix);
+    } catch (err) {
+      console.error('[ObjectStorageList] upload error:', err);
+      if (err instanceof Error && !err.message.includes('cancelled')) {
+        setObjectsError(`アップロードに失敗しました: ${err.message}`);
+      }
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeleteObjectConfirm = async () => {
+    if (!selectedSite || !selectedBucket || !confirmDeleteObject) return;
+    const obj = confirmDeleteObject;
+    setConfirmDeleteObject(null);
+    setDeletingObject(obj.key);
+    try {
+      await DeleteObjectStorageObject(
+        selectedSite.endpoint,
+        selectedAccessKeyId,
+        secretKey,
+        selectedBucket.name,
+        obj.key
+      );
+      await loadObjects(currentPrefix);
+    } catch (err) {
+      setObjectsError(`削除に失敗しました: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setDeletingObject(null);
+    }
+  };
+
   // Object list view
   if (viewMode === 'objects' && selectedSite && selectedBucket) {
     return (
@@ -592,6 +682,13 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
             </button>
             <h2>{selectedBucket.name}</h2>
           </div>
+          <button
+            className="btn btn-primary"
+            onClick={handleUpload}
+            disabled={uploading}
+          >
+            {uploading ? 'アップロード中...' : '+ アップロード'}
+          </button>
         </div>
 
         <div style={{ marginBottom: '0.5rem', padding: '0.5rem', backgroundColor: '#1a1a2e', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '0.25rem', flexWrap: 'wrap' }}>
@@ -716,6 +813,15 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
                       >
                         {downloading === obj.key ? '...' : '↓'}
                       </button>
+                      <button
+                        className="btn btn-danger"
+                        onClick={() => setConfirmDeleteObject(obj)}
+                        disabled={deletingObject === obj.key}
+                        style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+                        title="削除"
+                      >
+                        {deletingObject === obj.key ? '...' : '🗑'}
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -762,6 +868,19 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
             onClose={() => { setPreviewingObject(null); setPreviewType(null); }}
           />
         )}
+
+        {confirmDeleteObject && (
+          <div className="confirm-overlay" onClick={() => setConfirmDeleteObject(null)}>
+            <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+              <p>オブジェクト「{getDisplayName(confirmDeleteObject.key)}」を削除しますか？</p>
+              <p className="confirm-warning">この操作は取り消せません。</p>
+              <div className="confirm-actions">
+                <button className="btn btn-secondary" onClick={() => setConfirmDeleteObject(null)}>キャンセル</button>
+                <button className="btn btn-danger" onClick={handleDeleteObjectConfirm}>削除する</button>
+              </div>
+            </div>
+          </div>
+        )}
       </>
     );
   }
@@ -780,17 +899,38 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
             </button>
             <h2>{selectedSite.displayName}</h2>
           </div>
-          <button
-            className="btn btn-primary"
-            onClick={handleCreateBucketOpen}
-          >
-            + バケット作成
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowPermissions(true)}
+            >
+              パーミッション管理
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={handleCreateBucketOpen}
+            >
+              + バケット作成
+            </button>
+          </div>
         </div>
 
         <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#1a1a2e', borderRadius: '8px' }}>
-          <div style={{ marginBottom: '0.75rem', fontSize: '0.85rem', color: '#888' }}>
-            エンドポイント: {selectedSite.endpoint}
+          <div style={{ marginBottom: '0.75rem', fontSize: '0.85rem', color: '#888', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>エンドポイント: {selectedSite.endpoint}</span>
+            {account && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                アカウントコード: {account.code}
+                <button
+                  className="btn btn-danger btn-small"
+                  onClick={() => setConfirmDeleteAccount(true)}
+                  disabled={deletingAccount}
+                  title="アカウントを削除（バケットが残っている場合は削除できません）"
+                >
+                  {deletingAccount ? '削除中...' : 'アカウント削除'}
+                </button>
+              </span>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
@@ -967,7 +1107,13 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
                 >
                   <td style={{ color: '#00adb5', fontWeight: 'bold' }}>{bucket.name}</td>
                   <td>{bucket.creationDate ? formatDate(bucket.creationDate) : '-'}</td>
-                  <td style={{ textAlign: 'left' }}>
+                  <td style={{ textAlign: 'left', display: 'flex', gap: '0.25rem' }}>
+                    <button
+                      className="btn btn-secondary btn-small"
+                      onClick={(e) => { e.stopPropagation(); setSettingsBucket(bucket); }}
+                    >
+                      設定
+                    </button>
                     <button
                       className="btn btn-danger btn-small"
                       onClick={(e) => handleDeleteBucketClick(e, bucket)}
@@ -1087,6 +1233,38 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
               </div>
             </div>
           </div>
+        )}
+
+        {confirmDeleteAccount && (
+          <div className="confirm-overlay" onClick={() => setConfirmDeleteAccount(false)}>
+            <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+              <p>このサイトのオブジェクトストレージアカウント（コード: {account?.code}）を削除しますか？</p>
+              <p className="confirm-warning">この操作は取り消せません。発行済みのアクセスキーも合わせて削除されます。バケットが残っている場合は削除できません。</p>
+              <div className="confirm-actions">
+                <button className="btn btn-secondary" onClick={() => setConfirmDeleteAccount(false)}>キャンセル</button>
+                <button className="btn btn-danger" onClick={handleDeleteAccountConfirm}>削除する</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {settingsBucket && selectedSite && (
+          <BucketSettingsModal
+            profile={profile}
+            siteId={selectedSite.id}
+            bucketName={settingsBucket.name}
+            otherBuckets={buckets.filter((b) => b.name !== settingsBucket.name).map((b) => b.name)}
+            onClose={() => setSettingsBucket(null)}
+          />
+        )}
+
+        {showPermissions && selectedSite && (
+          <ObjectStoragePermissions
+            profile={profile}
+            siteId={selectedSite.id}
+            bucketNames={buckets.map((b) => b.name)}
+            onClose={() => setShowPermissions(false)}
+          />
         )}
       </>
     );

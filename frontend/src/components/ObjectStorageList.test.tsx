@@ -15,6 +15,15 @@ import {
   DeleteObjectStorageBucket,
   CreateObjectStorageAccessKey,
   DeleteObjectStorageAccessKey,
+  GetObjectStorageAccount,
+  DeleteObjectStorageAccount,
+  ListObjectStorageObjects,
+  UploadObjectStorageObject,
+  DeleteObjectStorageObject,
+  GetObjectStoragePermissions,
+  GetObjectStorageBucketEncryption,
+  GetObjectStorageBucketReplication,
+  GetObjectStorageBucketQuota,
 } from '../../wailsjs/go/main/App';
 
 vi.mock('../../wailsjs/go/main/App');
@@ -42,6 +51,25 @@ function makeBucket(overrides: Partial<sakura.BucketInfo> = {}): sakura.BucketIn
     name: 'my-bucket',
     siteId: 'isk01',
     creationDate: '2026-08-01T00:00:00Z',
+    ...overrides,
+  });
+}
+
+function makeAccount(overrides: Partial<sakura.AccountInfo> = {}): sakura.AccountInfo {
+  return new sakura.AccountInfo({
+    siteId: 'isk01',
+    code: 'ACC001',
+    createdAt: '2026-08-01T00:00:00Z',
+    ...overrides,
+  });
+}
+
+function makeObject(overrides: Partial<sakura.ObjectInfo> = {}): sakura.ObjectInfo {
+  return new sakura.ObjectInfo({
+    key: 'file.txt',
+    size: 123,
+    lastModified: '2026-08-01T00:00:00Z',
+    storageClass: 'STANDARD',
     ...overrides,
   });
 }
@@ -91,6 +119,15 @@ describe('ObjectStorageList', () => {
     vi.mocked(DeleteObjectStorageBucket).mockReset();
     vi.mocked(CreateObjectStorageAccessKey).mockReset();
     vi.mocked(DeleteObjectStorageAccessKey).mockReset();
+    vi.mocked(GetObjectStorageAccount).mockReset();
+    vi.mocked(DeleteObjectStorageAccount).mockReset();
+    vi.mocked(ListObjectStorageObjects).mockReset();
+    vi.mocked(UploadObjectStorageObject).mockReset();
+    vi.mocked(DeleteObjectStorageObject).mockReset();
+    vi.mocked(GetObjectStoragePermissions).mockReset();
+    vi.mocked(GetObjectStorageBucketEncryption).mockReset();
+    vi.mocked(GetObjectStorageBucketReplication).mockReset();
+    vi.mocked(GetObjectStorageBucketQuota).mockReset();
   });
 
   it('lists sites and navigates to the buckets view on click', async () => {
@@ -222,6 +259,115 @@ describe('ObjectStorageList', () => {
       });
       await waitFor(() => {
         expect(screen.queryByText('key-1')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('account', () => {
+    it('shows the account code and deletes the account after confirmation', async () => {
+      vi.mocked(GetObjectStorageSites).mockResolvedValueOnce([makeSite()]);
+      vi.mocked(GetObjectStorageAccessKeys).mockResolvedValueOnce([]);
+      vi.mocked(GetObjectStorageAccount).mockResolvedValueOnce(makeAccount());
+
+      const user = userEvent.setup();
+      render(<ObjectStorageList profile="default" />);
+      await user.click(await screen.findByText('石狩第1サイト'));
+
+      expect(await screen.findByText(/アカウントコード: ACC001/)).toBeInTheDocument();
+
+      vi.mocked(DeleteObjectStorageAccount).mockResolvedValueOnce(undefined);
+      await user.click(screen.getByRole('button', { name: 'アカウント削除' }));
+      await user.click(screen.getByRole('button', { name: '削除する' }));
+
+      await waitFor(() => {
+        expect(DeleteObjectStorageAccount).toHaveBeenCalledWith('default', 'isk01');
+      });
+      await waitFor(() => {
+        expect(screen.queryByText(/アカウントコード/)).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('bucket settings and permissions', () => {
+    it('opens the bucket settings modal from a bucket row', async () => {
+      const user = await goToBucketsView();
+      vi.mocked(GetObjectStorageBuckets).mockResolvedValue([makeBucket()]);
+      await enterAndSaveSecret(user);
+      await screen.findByText('my-bucket');
+
+      vi.mocked(GetObjectStorageBucketEncryption).mockResolvedValueOnce(
+        new sakura.BucketEncryptionInfo({ enabled: false, kmsKeyId: '', configuredAt: '' })
+      );
+      vi.mocked(GetObjectStorageBucketReplication).mockResolvedValueOnce(
+        new sakura.BucketReplicationInfo({ enabled: false, destBucketName: '', destClusterId: '', configStatus: '', createdAt: '' })
+      );
+      vi.mocked(GetObjectStorageBucketQuota).mockResolvedValueOnce(
+        new sakura.BucketQuotaInfo({ numObjectsPerBucket: 100, amountGibPerBucket: 10 })
+      );
+
+      const bucketRow = screen.getByText('my-bucket').closest('tr')!;
+      await user.click(within(bucketRow).getByRole('button', { name: '設定' }));
+
+      expect(await screen.findByText('バケット設定: my-bucket')).toBeInTheDocument();
+    });
+
+    it('opens the permissions management modal', async () => {
+      const user = await goToBucketsView();
+      vi.mocked(GetObjectStoragePermissions).mockResolvedValueOnce([]);
+
+      await user.click(screen.getByRole('button', { name: 'パーミッション管理' }));
+
+      expect(await screen.findByText('パーミッションがありません')).toBeInTheDocument();
+    });
+  });
+
+  describe('objects view', () => {
+    async function goToObjectsView() {
+      const user = await goToBucketsView();
+      vi.mocked(GetObjectStorageBuckets).mockResolvedValue([makeBucket()]);
+      await enterAndSaveSecret(user);
+      await screen.findByText('my-bucket');
+
+      vi.mocked(ListObjectStorageObjects).mockResolvedValue(
+        new sakura.ListObjectsResult({ objects: [makeObject()], prefixes: [], isTruncated: false, nextToken: '' })
+      );
+      await user.click(screen.getByText('my-bucket'));
+      await screen.findByText(/file\.txt/);
+
+      return user;
+    }
+
+    it('uploads a file and reloads the object list', async () => {
+      const user = await goToObjectsView();
+      vi.mocked(UploadObjectStorageObject).mockResolvedValueOnce(undefined);
+
+      await user.click(screen.getByRole('button', { name: '+ アップロード' }));
+
+      await waitFor(() => {
+        expect(UploadObjectStorageObject).toHaveBeenCalledWith(
+          's3.isk01.objectstorage.sakurastorage.jp', 'key-1', 'my-secret', 'my-bucket', ''
+        );
+      });
+    });
+
+    it('deletes an object after confirmation', async () => {
+      const user = await goToObjectsView();
+      vi.mocked(DeleteObjectStorageObject).mockResolvedValueOnce(undefined);
+      vi.mocked(ListObjectStorageObjects).mockResolvedValueOnce(
+        new sakura.ListObjectsResult({ objects: [], prefixes: [], isTruncated: false, nextToken: '' })
+      );
+
+      const objectRow = screen.getByText(/file\.txt/).closest('tr')!;
+      await user.click(within(objectRow).getByTitle('削除'));
+      await user.click(screen.getByRole('button', { name: '削除する' }));
+
+      await waitFor(() => {
+        expect(DeleteObjectStorageObject).toHaveBeenCalledWith(
+          's3.isk01.objectstorage.sakurastorage.jp', 'key-1', 'my-secret', 'my-bucket', 'file.txt'
+        );
+      });
+      await waitFor(() => {
+        expect(screen.queryByText(/file\.txt/)).not.toBeInTheDocument();
       });
     });
   });
