@@ -10,6 +10,8 @@
 
 > **2026-08-07 追記**: 電源操作・削除機能の欠落解消を目的に PR #80〜#90 を実施済み（#85 のみ CI 待ちで auto-merge 設定）。以下の表・各節は実施結果を反映済み。詳細は各節の「対応状況」を参照。
 
+> **2026-08-08 追記（方針）**: 本PLAN.mdは元々「閲覧中心」というスコープ制約を前提に書かれていたが、これは過去セッションがPLAN.md作成時に自己判断で置いた記述であり、CLAUDE.md等の正式な方針として明文化されたものではなかった。ユーザー確認の上でこの制約は撤廃し、SakPilotは削除・デプロイ等の書き込み系操作も対象に含む管理ツールとして今後の対応を判断する。
+
 ## サマリ表
 
 | リソース | FEテスト | 削除機能 | 電源操作 | 総評 |
@@ -29,7 +31,7 @@
 | NFS | ✅ あり | ✅ | ✅ | 完備。FEテストとResetを追加済み（PR #80） |
 | ObjectStorage | ✅ あり | ✅（バケット・アクセスキー） | (対象外) | バケット作成/削除、アクセスキー作成/削除+FEテストを追加済み |
 | ContainerRegistry | ✅ あり | ✅ | (対象外) | 削除機能+FEテスト(List/Detail)を追加済み（PR #89、#95） |
-| AppRun (専有/共用) | ✅ あり | 専有型は✅（Cluster/App/ASG/LB） | (対象外) | 専有型・共用型ともFEテスト追加済み。専有型は削除機能を追加（デプロイ操作は方針判断によりスコープ外） |
+| AppRun (専有/共用) | ✅ あり | 専有型は✅（Cluster/App/ASG/LB） | (対象外) | 専有型・共用型ともFEテスト追加済み。専有型は削除機能を追加。デプロイ（Version Create）は次の対応対象 |
 | Bill | ❌ なし | (対象外) | (対象外) | 読み取り専用リソースなので概ね妥当 |
 
 **17リソース中、FEテストが未着手なのは Bill のみ。**
@@ -42,7 +44,7 @@
 - テスト: `ServerList.test.tsx` あり（確認ダイアログ・ポーリング・再起動等カバー済み）
 - バックエンド: List/PowerOn(Boot)/PowerOff(Shutdown)/ForceStop/**Reset**/Delete/GetStatus 実装済み、app.goで全て公開
 - ✅ **対応済み（PR #80）**: Reset（再起動）ボタンを追加
-- SDK比較で残る不足: ChangePlan、Monitor/MonitorCPU、InsertCDROM/EjectCDROM、SendKey/SendNMI、GetVNCProxy、Create、Update、DeleteWithDisks（いずれもパワーユーザー向け機能で現状スコープ外と判断）
+- SDK比較で残る不足: ChangePlan、Monitor/MonitorCPU、InsertCDROM/EjectCDROM、SendKey/SendNMI、GetVNCProxy、Create、Update、DeleteWithDisks（いずれもパワーユーザー向け機能で複雑さ・利用頻度の観点から未着手。読み取り専用方針による除外ではなく、個別に要否判断する）
 - 備考: `server.go` に `println` デバッグ文が複数残存（要クリーンアップ、別issue化推奨）
 
 ### Disk
@@ -159,7 +161,7 @@
 - バックエンド: `internal/apprun/`（専有型）・`internal/apprunshared/`（共用型）に分離実装。List/Read/`SetActiveVersion`/`ClearActiveVersion`に加え、専有型はCluster/Application/ASG/LoadBalancerの**Delete**を実装
 - ✅ **対応済み（2026-08-08 追加セッション6）**: AppRun専有型の削除機能一式を実装。`internal/apprun/service.go`に`DeleteCluster`/`DeleteApplication`/`DeleteAutoScalingGroup`/`DeleteLoadBalancer`を追加し、`app.go`に対応するRPCを公開。`AppRunDedicatedList.tsx`のクラスタ一覧・アプリ一覧・ASG一覧・LB一覧の各行に削除ボタンと確認ダイアログを追加
 - SDK比較で残る不足:
-  - 専有型: Cluster/Application/ASG/LoadBalancerの**Create**、**Versionの Create（新バージョンのデプロイ）**/Delete、WorkerNodeのUpdate（draining）、Certificate系全般（方針判断により削除機能のみ対応、Create・デプロイ操作は現状スコープ外のまま据え置き）
+  - 専有型: Cluster/Application/ASG/LoadBalancerの**Create**、**Versionの Delete**、WorkerNodeのUpdate（draining）、Certificate系全般、**Versionの Create（デプロイ）**（いずれも未着手。優先順位は後述の「実装順序」参照）
   - 共用型: ApplicationのCreate/Update/Delete、VersionのDelete、TrafficのUpdate（分散比率変更）、UserのCreate
 - **TODO**: `lb` view（ロードバランサー単体詳細）への遷移導線が無い点は意図的な未実装か実装漏れか要確認
 
@@ -171,7 +173,7 @@
 
 ---
 
-## 優先度まとめ（2026-08-07更新）
+## 優先度まとめ（2026-08-08更新）
 
 ### ✅ 完了（PR #80〜#90）
 - 電源操作: Server Reset / NFS Reset / Database 起動・停止・再起動
@@ -198,12 +200,39 @@
 - ObjectStorageのバケット・アクセスキーCreate/Delete機能一式を実装。バックエンドに`CreateBucket`/`DeleteBucket`/`CreateAccessKey`/`DeleteAccessKey`（`internal/sakura/objectstorage.go`）とそれぞれのapp.go RPCを追加し、`ObjectStorageList.tsx`にバケット作成モーダル・削除確認・アクセスキー作成時のSecret一度きり表示モーダル・アクセスキー削除確認を追加。`ObjectStorageList.test.tsx`を新規作成
 
 ### ✅ 完了（2026-08-08 追加セッション6）
-- AppRun専有型のスコープ判断（ユーザーに確認）: 削除機能のみ追加し、デプロイ操作（Version Create）は引き続きスコープ外とする方針に決定。Cluster/Application/ASG/LoadBalancerの削除機能とFEテストを追加
+- AppRun専有型の削除機能（Cluster/Application/ASG/LoadBalancer）とFEテストを追加
+- **方針転換**: SakPilotは「閲覧中心」に限定しない管理ツールとして、書き込み系操作（デプロイ含む）も対象に含める方針に変更。旧PLAN.mdに残っていた「閲覧中心」という自己制約の記述は撤廃した
 
-### 次セッションの優先順位
+### 実装順序（2026-08-08 方針転換後の書き込み系機能ロードマップ）
 
-現時点でPLAN.md記載の主要リソースはFEテスト・削除機能とも一通り対応済み。残るのは各節「SDK比較で残る不足」に記載の個別機能（Create/Update系、パワーユーザー向け機能）で、いずれも優先度低または方針判断が必要な項目。着手する場合は各節のTODOを参照。
+「閲覧中心」制約の撤廃を受け、各節「SDK比較で残る不足」に列挙された未実装機能（主にCreate/Update系）を、(a) 利用頻度・実用価値、(b) 実装複雑度、(c) 誤操作時のリスク（実インフラ作成・課金発生の有無）で並べ替えたロードマップ。上から順に着手することを推奨するが、各Tier内の順序はユーザーの関心に応じて入れ替えてよい。
+
+**Tier 1: 高頻度・低〜中リスクな基本操作（次に着手すべき候補）**
+1. DNS: Create/Update/UpdateSettings（レコード追加・編集は最頻出の日常操作）
+2. PacketFilter: Create/Update（ルール追加・編集）
+3. SimpleMonitor: Create/Update/UpdateSettings（監視対象の追加・設定変更）
+4. GSLB: Create/Update/UpdateSettings
+5. ContainerRegistry: Create、ユーザー管理（AddUser/UpdateUser/DeleteUser）
+6. AppRun専有型: Version Create（デプロイ）— 着手する場合はフルデプロイフォーム（image/CPU/メモリ/スケーリング/公開ポート/環境変数）として対応する方針（2026-08-08ユーザーに確認済み）
+
+**Tier 2: リソース新規作成系（入力項目・依存関係が多くフォーム設計コストが高い、または実インフラ作成を伴い課金・削除確認等の設計が必要）**
+7. Switch: Create/Update
+8. Disk: Create/CreateWithConfig/Update/ConnectToServer/DisconnectFromServer
+9. ProxyLB: Create/Update/UpdateSettings
+10. KMS: Create/Update
+11. Database: Create/Update/UpdateSettings/GetParameter/SetParameter
+12. NFS: Create/Update
+13. EnhancedDB: Create/Update/SetPassword
+14. AppRun専有型: Cluster/Application/ASG/LoadBalancerのCreate、VersionのDelete、WorkerNodeのUpdate（draining）、Certificate系
+15. AppRun共用型: ApplicationのCreate/Update/Delete、VersionのDelete、TrafficのUpdate、UserのCreate
+
+**Tier 3: 低優先度・ニッチ or 複雑度が高い機能**
+16. Server: ChangePlan/InsertCDROM/EjectCDROM/SendKey/SendNMI/GetVNCProxy等パワーユーザー向け機能（複雑さ・利用頻度の観点で後回し。読み取り専用方針による除外ではない）
+17. Archive: Create/CreateBlank/CreateFromShared/Share/OpenFTP/CloseFTP
+18. ObjectStorage: AccountのRead/Delete、PermissionsAPI全般、暗号化/レプリケーション/クォータ設定、S3側のPutObject/DeleteObject
+19. Monitoring Suite: ストレージ・アクセスキーのCreate/Update/Destroy
+20. ProxyLB: ChangePlan/MonitorConnection（トラフィックグラフ）
+21. Bill: ByContractYear/ByContractYearMonth（期間絞り込み）/DetailsCSV
 
 ### その他
 - `internal/sakura/server.go` の `println` デバッグ文の削除（別issueとして切り出し推奨、未着手）
-- Server/NFSのChangePlan・CDROM・VNC・SendKey等は現状スコープ外と判断し据え置き
