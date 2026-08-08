@@ -18,6 +18,7 @@ import {
 import { sakura, main } from '../wailsjs/go/models';
 import { ServerList } from './components/ServerList';
 import { DiskList } from './components/DiskList';
+import { DiskDetail } from './components/DiskDetail';
 import { DNSList } from './components/DNSList';
 import { DNSDetail } from './components/DNSDetail';
 import { MonitorList } from './components/MonitorList';
@@ -172,6 +173,7 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
             <Routes>
               <Route path="servers" element={<span className="breadcrumb-item active">サーバー</span>} />
               <Route path="disks" element={<span className="breadcrumb-item active">ディスク</span>} />
+              <Route path="disks/:id" element={<DiskBreadcrumb profile={profile} />} />
               <Route path="archives" element={<span className="breadcrumb-item active">アーカイブ</span>} />
               <Route path="switches" element={<span className="breadcrumb-item active">スイッチ</span>} />
               <Route path="switches/:id" element={<SwitchBreadcrumb profile={profile} />} />
@@ -227,7 +229,10 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
             <ServerList profile={profile} zone={selectedZone} zones={zones} onZoneChange={setSelectedZone} />
           } />
           <Route path="disks" element={
-            <DiskList profile={profile} zone={selectedZone} zones={zones} onZoneChange={setSelectedZone} />
+            <DiskListWrapper profile={profile} zone={selectedZone} zones={zones} onZoneChange={setSelectedZone} />
+          } />
+          <Route path="disks/:id" element={
+            <DiskDetailWrapper profile={profile} zone={selectedZone} />
           } />
           <Route path="archives" element={
             <ArchiveList profile={profile} zone={selectedZone} zones={zones} onZoneChange={setSelectedZone} />
@@ -300,6 +305,25 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
 }
 
 // Wrapper components for navigation
+function DiskListWrapper({ profile, zone, zones, onZoneChange }: { profile: string; zone: string; zones: sakura.ZoneInfo[]; onZoneChange: (zone: string) => void }) {
+  const navigate = useNavigate();
+  return (
+    <DiskList
+      profile={profile}
+      zone={zone}
+      zones={zones}
+      onZoneChange={onZoneChange}
+      onSelectDisk={(id) => navigate(`/${profile}/disks/${id}`)}
+    />
+  );
+}
+
+function DiskDetailWrapper({ profile, zone }: { profile: string; zone: string }) {
+  const { id } = useParams<{ id: string }>();
+  if (!id) return null;
+  return <DiskDetail profile={profile} zone={zone} diskId={id} />;
+}
+
 function SwitchListWrapper({ profile, zone, zones, onZoneChange }: { profile: string; zone: string; zones: sakura.ZoneInfo[]; onZoneChange: (zone: string) => void }) {
   const navigate = useNavigate();
   return (
@@ -420,6 +444,19 @@ function KMSDetailWrapper({ profile }: { profile: string }) {
 }
 
 // Breadcrumb components
+function DiskBreadcrumb({ profile }: { profile: string }) {
+  const navigate = useNavigate();
+  return (
+    <>
+      <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/${profile}/disks`)}>
+        ディスク
+      </span>
+      <span className="breadcrumb-separator">/</span>
+      <span className="breadcrumb-item active">詳細</span>
+    </>
+  );
+}
+
 function SwitchBreadcrumb({ profile }: { profile: string }) {
   const navigate = useNavigate();
   return (

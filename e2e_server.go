@@ -68,6 +68,9 @@ func runE2EServer(addr, dist string) error {
 
 	fake.SwitchFactoryFuncToFake()
 	seedServers()
+	if err := seedDisks(); err != nil {
+		return fmt.Errorf("failed to seed disks: %w", err)
+	}
 	if err := seedSwitches(); err != nil {
 		return fmt.Errorf("failed to seed switches: %w", err)
 	}
@@ -188,6 +191,58 @@ func seedServers() {
 			CreatedAt:      now,
 		})
 	}
+}
+
+// seedDisks はIaaS fakeドライバのデータストアにE2Eシナリオ用のディスクを投入する。
+// e2e-connected-disk は seedServers が投入する e2e-web-1(900000000001)に接続した状態にする。
+func seedDisks() error {
+	ctx := context.Background()
+	diskOp := iaas.NewDiskOp(nil)
+
+	if _, err := diskOp.Create(ctx, e2eZone, &iaas.DiskCreateRequest{
+		Name:        "e2e-disk",
+		Description: "E2E: 編集シナリオ用",
+		SizeMB:      20 * 1024,
+		DiskPlanID:  types.DiskPlans.SSD,
+		Connection:  types.DiskConnections.VirtIO,
+	}, nil, types.ID(0)); err != nil {
+		return err
+	}
+
+	if _, err := diskOp.Create(ctx, e2eZone, &iaas.DiskCreateRequest{
+		Name:        "e2e-unconnected-disk",
+		Description: "E2E: 接続シナリオ用",
+		SizeMB:      20 * 1024,
+		DiskPlanID:  types.DiskPlans.SSD,
+		Connection:  types.DiskConnections.VirtIO,
+	}, nil, types.ID(0)); err != nil {
+		return err
+	}
+
+	connected, err := diskOp.Create(ctx, e2eZone, &iaas.DiskCreateRequest{
+		Name:        "e2e-connected-disk",
+		Description: "E2E: 切断シナリオ用",
+		SizeMB:      20 * 1024,
+		DiskPlanID:  types.DiskPlans.SSD,
+		Connection:  types.DiskConnections.VirtIO,
+	}, nil, types.ID(0))
+	if err != nil {
+		return err
+	}
+	if err := diskOp.ConnectToServer(ctx, e2eZone, connected.ID, 900000000001); err != nil {
+		return err
+	}
+
+	if _, err := diskOp.Create(ctx, e2eZone, &iaas.DiskCreateRequest{
+		Name:        "e2e-doomed-disk",
+		Description: "E2E: 削除シナリオ用",
+		SizeMB:      20 * 1024,
+		DiskPlanID:  types.DiskPlans.SSD,
+		Connection:  types.DiskConnections.VirtIO,
+	}, nil, types.ID(0)); err != nil {
+		return err
+	}
+	return nil
 }
 
 // seedDNS はIaaS fakeドライバのデータストアにE2Eシナリオ用のDNSゾーンを投入する。
