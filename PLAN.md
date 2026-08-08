@@ -289,7 +289,7 @@
 
 **Tier 3: 低優先度・ニッチ or 複雑度が高い機能**
 16. ✅ Server: ChangePlan/InsertCDROM/EjectCDROM/SendKey/SendNMI/GetVNCProxy等パワーユーザー向け機能 — 2026-08-08対応済み
-17. Archive: Create/CreateBlank/CreateFromShared/Share/OpenFTP/CloseFTP
+17. ✅ Archive: Create/CreateBlank/CreateFromShared/Share/OpenFTP/CloseFTP — 2026-08-08対応済み
 18. ObjectStorage: AccountのRead/Delete、PermissionsAPI全般、暗号化/レプリケーション/クォータ設定、S3側のPutObject/DeleteObject
 19. Monitoring Suite: ストレージ・アクセスキーのCreate/Update/Destroy
 20. ProxyLB: ChangePlan/MonitorConnection（トラフィックグラフ）
@@ -297,3 +297,9 @@
 
 ### ✅ 完了（2026-08-08 追加セッション26、Tier3 #16）
 - ServerのChangePlan/InsertCDROM/EjectCDROM/SendKey/SendNMI/GetVNCProxyを実装。`internal/sakura/server.go`に各メソッドを追加（ChangePlanはAPI仕様上サーバーIDが再採番されるため戻り値のIDが変わる点に注意、CD-ROM一覧取得用に`internal/sakura/cdrom.go`を新設）、`app.go`に対応する7つのRPCを公開。`ServerDetail.tsx`を新設（従来Detail画面が存在しなかった）し、`ServerList.tsx`のカードクリックで遷移するようにした。プラン変更フォーム、CD-ROM挿入/排出、コンソールキー送信（プリセット+NMI確認ダイアログ）、VNC接続情報取得UIを実装。あわせて`internal/sakura/server.go`に残っていた`println`デバッグ文を削除。`internal/sakura/server_test.go`、`ServerDetail.test.tsx`、`frontend/e2e/server-detail.spec.ts`を追加
+
+### ✅ 完了（2026-08-08 追加セッション27、Tier3 #17）
+- ArchiveのCreate（ディスク/既存アーカイブからのコピー）、CreateBlank（空のアーカイブ作成、アップロード用FTP接続情報を返す）、OpenFTP/CloseFTP、Share（共有キー発行）、CreateFromShared（共有キーを使ったゾーン間複製）を実装。`internal/sakura/archive.go`に各メソッドを追加し、`app.go`に対応する6つのRPCを公開。
+- WailsのTS変換は「戻り値がerror以外に2つ以上ある場合の型付けが正しく生成されない」ことが判明したため（`.d.ts`上は最初の戻り値の型しか出ない）、CreateBlankは`*ArchiveInfo, *FTPServerInfo, error`ではなく`ArchiveWithFTP{Archive, FTPServer}`という単一構造体を返す形に設計。他のGo→TS RPCを増やす際もこの制約に注意すること（upstream-issues.md行き案件ではなくWails自体の制約）。
+- 共有キーの形式は`ゾーン名:元アーカイブID:トークン`（`types.ArchiveShareKey`）。CreateFromShared時の複製先ゾーンはゾーン名からSDKの`types.ZoneIDs`で数値IDに変換して渡す。
+- `ArchiveList.tsx`に「+ アーカイブ作成」（空/ディスクから/既存アーカイブからの3方式）、「共有キーから複製」ボタン、行ごとの「共有」「FTP」ボタンを追加。`internal/sakura/archive_test.go`（Goテスト5件）、`ArchiveList.test.tsx`への追加テスト5件で検証
