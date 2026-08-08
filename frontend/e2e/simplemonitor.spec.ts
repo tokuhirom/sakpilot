@@ -41,6 +41,19 @@ test('シンプル監視詳細で監視設定を編集できる', async ({ page 
   await expect(page.getByText('120秒')).toBeVisible();
 });
 
+test('シンプル監視詳細で説明を編集できる', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'シンプル監視' }).click();
+  await monitorRow(page, 'e2e-monitor-target.example.com').click();
+  await expect(page).toHaveURL(/#\/e2e\/monitors\//);
+
+  await page.getByRole('button', { name: '編集', exact: true }).click();
+  await page.locator('tr', { hasText: '説明' }).locator('input').fill('E2Eで編集した説明');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+
+  await expect(page.getByText('E2Eで編集した説明')).toBeVisible();
+});
+
 test('シンプル監視を削除すると一覧から消える', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('link', { name: 'シンプル監視' }).click();

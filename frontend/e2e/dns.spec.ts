@@ -61,6 +61,20 @@ test('DNSゾーン詳細でレコードを追加・編集・削除できる', as
   await expect(page.getByRole('cell', { name: 'api', exact: true })).toHaveCount(0, { timeout: 10_000 });
 });
 
+test('DNSゾーン詳細で説明を編集できる', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'DNS' }).click();
+  await dnsRow(page, 'e2e-example.com').click();
+  await expect(page).toHaveURL(/#\/e2e\/dns\//);
+
+  const descriptionRow = page.locator('tr', { hasText: '説明' });
+  await descriptionRow.getByRole('button', { name: '編集', exact: true }).click();
+  await descriptionRow.locator('input').fill('E2Eで編集した説明');
+  await descriptionRow.getByRole('button', { name: '保存', exact: true }).click();
+
+  await expect(page.getByText('E2Eで編集した説明')).toBeVisible();
+});
+
 test('DNSゾーンを削除すると一覧から消える', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('link', { name: 'DNS' }).click();

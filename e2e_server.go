@@ -71,6 +71,8 @@ func runE2EServer(addr, dist string) error {
 
 	fake.SwitchFactoryFuncToFake()
 	seedServers()
+	seedDatabases()
+	seedNFS()
 	if err := seedDisks(); err != nil {
 		return fmt.Errorf("failed to seed disks: %w", err)
 	}
@@ -217,6 +219,62 @@ func seedServers() {
 			Availability:   types.Availabilities.Available,
 			Tags:           types.Tags{"env:e2e"},
 			Interfaces:     []*iaas.InterfaceView{{ID: ifaceID, IPAddress: s.ip}},
+			CreatedAt:      now,
+		})
+	}
+}
+
+// seedDatabases はIaaS fakeドライバのデータストアにE2Eシナリオ用のデータベースを投入する。
+func seedDatabases() {
+	now := time.Now()
+
+	type seed struct {
+		id     types.ID
+		name   string
+		desc   string
+		status types.EServerInstanceStatus
+	}
+	seeds := []seed{
+		{920000000001, "e2e-db-1", "E2E: 起動中データベース(電源操作シナリオ用)", types.ServerInstanceStatuses.Up},
+		{920000000002, "e2e-doomed-db", "E2E: 削除シナリオ用データベース", types.ServerInstanceStatuses.Down},
+	}
+	for _, s := range seeds {
+		fake.DataStore.Put(fake.ResourceDatabase, e2eZone, s.id, &iaas.Database{
+			ID:             s.id,
+			Name:           s.name,
+			Description:    s.desc,
+			Class:          "database",
+			InstanceStatus: s.status,
+			Availability:   types.Availabilities.Available,
+			Tags:           types.Tags{"env:e2e"},
+			CreatedAt:      now,
+		})
+	}
+}
+
+// seedNFS はIaaS fakeドライバのデータストアにE2Eシナリオ用のNFSを投入する。
+func seedNFS() {
+	now := time.Now()
+
+	type seed struct {
+		id     types.ID
+		name   string
+		desc   string
+		status types.EServerInstanceStatus
+	}
+	seeds := []seed{
+		{930000000001, "e2e-nfs-1", "E2E: 起動中NFS(電源操作シナリオ用)", types.ServerInstanceStatuses.Up},
+		{930000000002, "e2e-doomed-nfs", "E2E: 削除シナリオ用NFS", types.ServerInstanceStatuses.Down},
+	}
+	for _, s := range seeds {
+		fake.DataStore.Put(fake.ResourceNFS, e2eZone, s.id, &iaas.NFS{
+			ID:             s.id,
+			Name:           s.name,
+			Description:    s.desc,
+			Class:          "nfs",
+			InstanceStatus: s.status,
+			Availability:   types.Availabilities.Available,
+			Tags:           types.Tags{"env:e2e"},
 			CreatedAt:      now,
 		})
 	}
