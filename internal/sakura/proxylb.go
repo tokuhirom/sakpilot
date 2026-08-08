@@ -135,6 +135,13 @@ type ProxyLBSettingsInput struct {
 	Servers     []ProxyLBServerInput     `json:"servers"`
 }
 
+// ProxyLBConnectionValueInfo is a single point of the connection activity time series.
+type ProxyLBConnectionValueInfo struct {
+	Time              string  `json:"time"`
+	ActiveConnections float64 `json:"activeConnections"`
+	ConnectionsPerSec float64 `json:"connectionsPerSec"`
+}
+
 type ProxyLBService struct {
 	client *Client
 }
@@ -294,6 +301,50 @@ func (s *ProxyLBService) UpdateSettings(ctx context.Context, id string, input Pr
 	}
 	info := convertProxyLB(result)
 	return &info, nil
+}
+
+// ChangePlan はELBのプラン(CPS)を変更する。リージョン(スタンダード/Anycast)は現在の値を引き継ぐ。
+func (s *ProxyLBService) ChangePlan(ctx context.Context, id string, cps int) (*ProxyLBInfo, error) {
+	op := iaas.NewProxyLBOp(s.client.Caller())
+	proxyLBID := types.StringID(id)
+	current, err := op.Read(ctx, proxyLBID)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := op.ChangePlan(ctx, proxyLBID, &iaas.ProxyLBChangePlanRequest{
+		ServiceClass: types.ProxyLBServiceClass(types.EProxyLBPlan(cps), current.Region),
+	})
+	if err != nil {
+		return nil, err
+	}
+	info := convertProxyLB(result)
+	return &info, nil
+}
+
+// MonitorConnection はELBのアクティブコネクション数・秒間接続数のトラフィックグラフ用データを取得する。
+func (s *ProxyLBService) MonitorConnection(ctx context.Context, id string, start, end int64) ([]ProxyLBConnectionValueInfo, error) {
+	op := iaas.NewProxyLBOp(s.client.Caller())
+	activity, err := op.MonitorConnection(ctx, types.StringID(id), &iaas.MonitorCondition{
+		Start: time.Unix(start, 0),
+		End:   time.Unix(end, 0),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if activity == nil {
+		return nil, nil
+	}
+
+	values := make([]ProxyLBConnectionValueInfo, 0, len(activity.Values))
+	for _, v := range activity.Values {
+		values = append(values, ProxyLBConnectionValueInfo{
+			Time:              v.Time.Format("2006-01-02T15:04:05Z07:00"),
+			ActiveConnections: v.ActiveConnections,
+			ConnectionsPerSec: v.ConnectionsPerSec,
+		})
+	}
+	return values, nil
 }
 
 func (s *ProxyLBService) GetHealth(ctx context.Context, id string) (*ProxyLBHealthInfo, error) {
