@@ -207,6 +207,18 @@
 
 「閲覧中心」制約の撤廃を受け、各節「SDK比較で残る不足」に列挙された未実装機能（主にCreate/Update系）を、(a) 利用頻度・実用価値、(b) 実装複雑度、(c) 誤操作時のリスク（実インフラ作成・課金発生の有無）で並べ替えたロードマップ。上から順に着手することを推奨するが、各Tier内の順序はユーザーの関心に応じて入れ替えてよい。
 
+**Tier 0: E2Eテスト基盤の整備（最優先、2026-08-08決定）**
+
+書き込み系機能（削除・作成・デプロイ）を今後増やしていくにあたり、「フロントエンド操作 → Goバックエンド → クラウドAPI」を貫通するE2Eテストを機能追加より先に整備する。方式は [ADR 0001](docs/adr/0001-e2e-testing-strategy.md) で決定済み: **HTTPブリッジ + Playwright(headless Chromium) + sakumock/自前IaaSモック**。
+
+実装ステップ:
+1. IaaSエンドポイント差し替えの下準備: `internal/sakura/client.go` の `SetEnviron` にプロセス環境を透過させ、環境変数（`SAKPILOT_IAAS_API_ROOT_URL`）で `iaas.SakuraCloudAPIRoot` を書き換えるフックを追加
+2. キーチェーン（`internal/sakura/keyring.go`）のフェイク差し替え対応（ヘッドレスCI用）
+3. E2E用サーバー（`cmd/e2e-server` またはbuild tag）: `App` のメソッドをHTTP JSON-RPCで公開 + `frontend/dist` 静的配信 + `window.go`/`window.runtime` シム注入
+4. 自前IaaSモック（`internal/testing/iaasmock` 等、httptestベース・インメモリ状態）をシナリオに必要なエンドポイントから段階的に実装
+5. Playwrightセットアップと最初のシナリオ（例: ログイン → サーバー一覧 → 電源操作 → 削除確認フロー）
+6. CIへの組み込み（あわせて未実行の `go test` / `npm run test` もCIに追加する）
+
 **Tier 1: 高頻度・低〜中リスクな基本操作（次に着手すべき候補）**
 1. DNS: Create/Update/UpdateSettings（レコード追加・編集は最頻出の日常操作）
 2. PacketFilter: Create/Update（ルール追加・編集）
