@@ -31,7 +31,7 @@
 | NFS | ✅ あり | ✅ | ✅ | 完備。FEテストとResetを追加済み（PR #80） |
 | ObjectStorage | ✅ あり | ✅（バケット・アクセスキー） | (対象外) | バケット作成/削除、アクセスキー作成/削除+FEテストを追加済み |
 | ContainerRegistry | ✅ あり | ✅ | (対象外) | 削除機能+FEテスト(List/Detail)に加え、Create/Update・ユーザー管理(AddUser/UpdateUser/DeleteUser)まで対応済み。読み書き一式が完備 |
-| AppRun (専有/共用) | ✅ あり | 専有型は✅（Cluster/App/ASG/LB） | (対象外) | 専有型・共用型ともFEテスト追加済み。専有型は削除機能を追加。デプロイ（Version Create）は次の対応対象 |
+| AppRun (専有/共用) | ✅ あり | 専有型は✅（Cluster/App/ASG/LB） | (対象外) | 専有型・共用型ともFEテスト追加済み。専有型は削除機能に加えVersion Create（デプロイ）まで対応済み |
 | Bill | ❌ なし | (対象外) | (対象外) | 読み取り専用リソースなので概ね妥当 |
 
 **17リソース中、FEテストが未着手なのは Bill のみ。**
@@ -161,10 +161,11 @@
 
 ### AppRun（専有型 / 共用型）
 - テスト: `AppRunSharedList.test.tsx` あり（ユーザー未設定時の案内・一覧表示・エラー表示・詳細遷移とコンポーネント/トラフィック/バージョン履歴表示・戻る操作をカバー）。`AppRunDedicatedList.test.tsx` も整備済み（cluster→app→version遷移とアクティブバージョン設定・ASGのLB/ワーカーノード表示・非アクティブ化/アクティブ化の成功・失敗フロー・Cluster/Application/ASG/LoadBalancerの削除確認〜成功・失敗フローをカバー。`lb` view単体はUI上到達経路が無く未カバー）
-- バックエンド: `internal/apprun/`（専有型）・`internal/apprunshared/`（共用型）に分離実装。List/Read/`SetActiveVersion`/`ClearActiveVersion`に加え、専有型はCluster/Application/ASG/LoadBalancerの**Delete**を実装
+- バックエンド: `internal/apprun/`（専有型）・`internal/apprunshared/`（共用型）に分離実装。List/Read/`SetActiveVersion`/`ClearActiveVersion`/**CreateApplicationVersion**に加え、専有型はCluster/Application/ASG/LoadBalancerの**Delete**を実装
 - ✅ **対応済み（2026-08-08 追加セッション6）**: AppRun専有型の削除機能一式を実装。`internal/apprun/service.go`に`DeleteCluster`/`DeleteApplication`/`DeleteAutoScalingGroup`/`DeleteLoadBalancer`を追加し、`app.go`に対応するRPCを公開。`AppRunDedicatedList.tsx`のクラスタ一覧・アプリ一覧・ASG一覧・LB一覧の各行に削除ボタンと確認ダイアログを追加
+- ✅ **対応済み（2026-08-08 追加セッション11、Tier1 #6）**: AppRun専有型のVersion Create（デプロイ）を実装。`internal/apprun/service.go`にSDKの`version.CreateParams`を薄くラップした`CreateAppVersionParams`（CPU/Memory/ScalingMode+FixedScale or MinScale・MaxScale・閾値/Image/Cmd/RegistryUsername・Password/ExposedPorts(TargetPort/LoadBalancerPort/UseLetsEncrypt/Host/HealthCheck)/EnvVars(Key/Value/Secret)）と`CreateApplicationVersion`を追加、`app.go`に`CreateAppRunApplicationVersion`のRPCを公開。`AppRunDedicatedList.tsx`のバージョン一覧に「+ デプロイ」ボタンとフルデプロイフォーム（イメージ/コマンド/CPU・メモリ/スケーリングモード切替/公開ポート・ヘルスチェックの追加編集削除/環境変数の追加編集削除）を実装。`internal/apprun/service_test.go`に`sakumock/apprundedicated`のテストサーバーを使った`TestService_CreateApplicationVersion`を追加（実際のAPIリクエスト/レスポンスを検証）
 - SDK比較で残る不足:
-  - 専有型: Cluster/Application/ASG/LoadBalancerの**Create**、**Versionの Delete**、WorkerNodeのUpdate（draining）、Certificate系全般、**Versionの Create（デプロイ）**（いずれも未着手。優先順位は後述の「実装順序」参照）
+  - 専有型: Cluster/Application/ASG/LoadBalancerの**Create**、**Versionの Delete**、WorkerNodeのUpdate（draining）、Certificate系全般（未着手。優先順位は後述の「実装順序」参照）
   - 共用型: ApplicationのCreate/Update/Delete、VersionのDelete、TrafficのUpdate（分散比率変更）、UserのCreate
 - **TODO**: `lb` view（ロードバランサー単体詳細）への遷移導線が無い点は意図的な未実装か実装漏れか要確認
 
@@ -215,6 +216,9 @@
 ### ✅ 完了（2026-08-08 追加セッション10、Tier1 #5）
 - ContainerRegistryのCreate/Update・ユーザー管理（AddUser/UpdateUser/DeleteUser）を実装。`internal/sakura/global.go`に`CreateContainerRegistry`/`UpdateContainerRegistry`（SettingsHashによる楽観ロックのため事前Read必須、`toContainerRegistryInfo`ヘルパーで変換ロジックを共通化）と`AddContainerRegistryUser`/`UpdateContainerRegistryUser`/`DeleteContainerRegistryUser`を追加、`app.go`に対応するRPCを公開。`ContainerRegistryList.tsx`に作成モーダル（名前/説明/アクセスレベル/仮想ドメイン）、`ContainerRegistryDetail.tsx`に基本情報インライン編集とユーザー追加/編集（権限変更・パスワードリセット）/削除UIを実装。`frontend/e2e/containerregistry.spec.ts`でE2Eシナリオを追加した際、ユーザー0件のレジストリで`ListContainerRegistryUsers`がnilポインタ参照を起こす既存バグ（fakeドライバが`(nil, nil)`を返すケースを未考慮）を発見・修正
 
+### ✅ 完了（2026-08-08 追加セッション11、Tier1 #6）
+- AppRun専有型のVersion Create（デプロイ）を実装。フルデプロイフォーム（イメージ/コマンド/CPU・メモリ/スケーリングモード[固定 or CPU使用率]/公開ポート・ヘルスチェック/環境変数）で対応。バックエンド・フロント双方の実装詳細は上記「AppRun（専有型 / 共用型）」節を参照。`internal/apprun/service_test.go`に`sakumock/apprundedicated`テストサーバーを使った実APIリクエストの検証テストを追加
+
 ### 実装順序（2026-08-08 方針転換後の書き込み系機能ロードマップ）
 
 「閲覧中心」制約の撤廃を受け、各節「SDK比較で残る不足」に列挙された未実装機能（主にCreate/Update系）を、(a) 利用頻度・実用価値、(b) 実装複雑度、(c) 誤操作時のリスク（実インフラ作成・課金発生の有無）で並べ替えたロードマップ。上から順に着手することを推奨するが、各Tier内の順序はユーザーの関心に応じて入れ替えてよい。
@@ -239,7 +243,7 @@
 3. ✅ SimpleMonitor: Create/Update/UpdateSettings（監視対象の追加・設定変更） — 2026-08-08対応済み
 4. ✅ GSLB: Create/Update/UpdateSettings — 2026-08-08対応済み
 5. ✅ ContainerRegistry: Create、Update、ユーザー管理（AddUser/UpdateUser/DeleteUser） — 2026-08-08対応済み
-6. AppRun専有型: Version Create（デプロイ）— 着手する場合はフルデプロイフォーム（image/CPU/メモリ/スケーリング/公開ポート/環境変数）として対応する方針（2026-08-08ユーザーに確認済み）
+6. ✅ AppRun専有型: Version Create（デプロイ） — 2026-08-08対応済み
 
 **Tier 2: リソース新規作成系（入力項目・依存関係が多くフォーム設計コストが高い、または実インフラ作成を伴い課金・削除確認等の設計が必要）**
 7. Switch: Create/Update

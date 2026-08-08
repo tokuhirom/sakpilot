@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	apprundedicated "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
+	"github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/version"
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 )
 
@@ -124,6 +125,47 @@ type AppVersionDetailInfo struct {
 	CreatedAt         string            `json:"createdAt"`
 	ExposedPorts      []ExposedPortInfo `json:"exposedPorts"`
 	Env               []EnvVarInfo      `json:"env"`
+}
+
+// CreateHealthCheckParams ヘルスチェック作成パラメータ
+type CreateHealthCheckParams struct {
+	Path            string `json:"path"`
+	IntervalSeconds int32  `json:"intervalSeconds"`
+	TimeoutSeconds  int32  `json:"timeoutSeconds"`
+}
+
+// CreateExposedPortParams 公開ポート作成パラメータ
+type CreateExposedPortParams struct {
+	TargetPort       int32                    `json:"targetPort"`
+	LoadBalancerPort *int32                   `json:"loadBalancerPort,omitempty"`
+	UseLetsEncrypt   bool                     `json:"useLetsEncrypt"`
+	Host             []string                 `json:"host,omitempty"`
+	HealthCheck      *CreateHealthCheckParams `json:"healthCheck,omitempty"`
+}
+
+// CreateEnvVarParams 環境変数作成パラメータ
+type CreateEnvVarParams struct {
+	Key    string  `json:"key"`
+	Value  *string `json:"value,omitempty"`
+	Secret bool    `json:"secret"`
+}
+
+// CreateAppVersionParams アプリケーションバージョン作成パラメータ（デプロイ）
+type CreateAppVersionParams struct {
+	CPU               int64                     `json:"cpu"`
+	Memory            int64                     `json:"memory"`
+	ScalingMode       string                    `json:"scalingMode"` // "manual" or "cpu"
+	FixedScale        *int32                    `json:"fixedScale,omitempty"`
+	MinScale          *int32                    `json:"minScale,omitempty"`
+	MaxScale          *int32                    `json:"maxScale,omitempty"`
+	ScaleInThreshold  *int32                    `json:"scaleInThreshold,omitempty"`
+	ScaleOutThreshold *int32                    `json:"scaleOutThreshold,omitempty"`
+	Image             string                    `json:"image"`
+	Cmd               []string                  `json:"cmd,omitempty"`
+	RegistryUsername  *string                   `json:"registryUsername,omitempty"`
+	RegistryPassword  *string                   `json:"registryPassword,omitempty"`
+	ExposedPorts      []CreateExposedPortParams `json:"exposedPorts,omitempty"`
+	EnvVars           []CreateEnvVarParams      `json:"envVars,omitempty"`
 }
 
 // ASGInfo Auto Scaling Group 情報
@@ -329,6 +371,93 @@ func int32OrZero(p *int32) int {
 		return 0
 	}
 	return int(*p)
+}
+
+// CreateApplicationVersion アプリケーションの新しいバージョンを作成（デプロイ）
+func (s *Service) CreateApplicationVersion(ctx context.Context, applicationID string, params CreateAppVersionParams) (*AppVersionInfo, error) {
+	appID, err := uuid.Parse(applicationID)
+	if err != nil {
+		return nil, err
+	}
+
+	scalingMode := v1.ScalingModeManual
+	if params.ScalingMode == string(v1.ScalingModeCPU) {
+		scalingMode = v1.ScalingModeCPU
+	}
+
+	exposedPorts := make([]version.ExposedPort, 0, len(params.ExposedPorts))
+	for _, p := range params.ExposedPorts {
+		var healthCheck *v1.HealthCheck
+		if p.HealthCheck != nil {
+			healthCheck = &v1.HealthCheck{
+				Path:            p.HealthCheck.Path,
+				IntervalSeconds: p.HealthCheck.IntervalSeconds,
+				TimeoutSeconds:  p.HealthCheck.TimeoutSeconds,
+			}
+		}
+		var lbPort *v1.Port
+		if p.LoadBalancerPort != nil {
+			port := v1.Port(*p.LoadBalancerPort)
+			lbPort = &port
+		}
+		exposedPorts = append(exposedPorts, version.ExposedPort{
+			TargetPort:       v1.Port(p.TargetPort),
+			LoadBalancerPort: lbPort,
+			UseLetsEncrypt:   p.UseLetsEncrypt,
+			Host:             p.Host,
+			HealthCheck:      healthCheck,
+		})
+	}
+
+	envVars := make([]version.EnvironmentVariable, 0, len(params.EnvVars))
+	for _, e := range params.EnvVars {
+		envVars = append(envVars, version.EnvironmentVariable{
+			Key:    e.Key,
+			Value:  e.Value,
+			Secret: e.Secret,
+		})
+	}
+
+	registryPasswordAction := v1.RegistryPasswordActionKeep
+	if params.RegistryPassword != nil && *params.RegistryPassword != "" {
+		registryPasswordAction = v1.RegistryPasswordActionNew
+	}
+
+	versionOp := apprundedicated.NewVersionOp(s.client, v1.ApplicationID(appID))
+	ver, err := versionOp.Create(ctx, version.CreateParams{
+		CPU:                    params.CPU,
+		Memory:                 params.Memory,
+		ScalingMode:            scalingMode,
+		FixedScale:             params.FixedScale,
+		MinScale:               params.MinScale,
+		MaxScale:               params.MaxScale,
+		ScaleInThreshold:       params.ScaleInThreshold,
+		ScaleOutThreshold:      params.ScaleOutThreshold,
+		Image:                  params.Image,
+		Cmd:                    params.Cmd,
+		RegistryUsername:       params.RegistryUsername,
+		RegistryPassword:       params.RegistryPassword,
+		RegistryPasswordAction: registryPasswordAction,
+		ExposedPorts:           exposedPorts,
+		EnvVars:                envVars,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Create レスポンスはバージョン番号のみを返すため、詳細を取得して補完する
+	detail, err := versionOp.Read(ctx, ver.Version)
+	if err != nil {
+		return nil, err
+	}
+
+	createdAt := time.Unix(int64(detail.Created), 0).Format("2006-01-02 15:04:05")
+	return &AppVersionInfo{
+		Version:         int(detail.Version),
+		Image:           detail.Image,
+		ActiveNodeCount: int(detail.ActiveNodeCount),
+		CreatedAt:       createdAt,
+	}, nil
 }
 
 // SetActiveVersion アプリケーションのアクティブバージョンを設定

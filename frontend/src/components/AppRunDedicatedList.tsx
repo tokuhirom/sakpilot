@@ -10,6 +10,7 @@ import {
   GetAppRunLBNodes,
   ClearAppRunActiveVersion,
   SetAppRunActiveVersion,
+  CreateAppRunApplicationVersion,
   DeleteAppRunCluster,
   DeleteAppRunApplication,
   DeleteAppRunASG,
@@ -36,6 +37,54 @@ type DeleteTarget =
   | { kind: 'asg'; id: string; name: string; clusterId: string }
   | { kind: 'lb'; id: string; name: string; clusterId: string; asgId: string };
 
+type ExposedPortFormRow = {
+  targetPort: string;
+  loadBalancerPort: string;
+  useLetsEncrypt: boolean;
+  host: string;
+  healthCheckPath: string;
+  healthCheckIntervalSeconds: string;
+  healthCheckTimeoutSeconds: string;
+};
+
+type EnvVarFormRow = {
+  key: string;
+  value: string;
+  secret: boolean;
+};
+
+type DeployForm = {
+  image: string;
+  cpu: string;
+  memory: string;
+  scalingMode: 'manual' | 'cpu';
+  fixedScale: string;
+  minScale: string;
+  maxScale: string;
+  scaleInThreshold: string;
+  scaleOutThreshold: string;
+  cmd: string;
+  exposedPorts: ExposedPortFormRow[];
+  envVars: EnvVarFormRow[];
+};
+
+function emptyDeployForm(): DeployForm {
+  return {
+    image: '',
+    cpu: '0.1',
+    memory: '256',
+    scalingMode: 'manual',
+    fixedScale: '1',
+    minScale: '1',
+    maxScale: '3',
+    scaleInThreshold: '20',
+    scaleOutThreshold: '80',
+    cmd: '',
+    exposedPorts: [{ targetPort: '8080', loadBalancerPort: '', useLetsEncrypt: false, host: '', healthCheckPath: '', healthCheckIntervalSeconds: '', healthCheckTimeoutSeconds: '' }],
+    envVars: [],
+  };
+}
+
 export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
   const [view, setView] = useState<View>({ type: 'clusters' });
   const [clusters, setClusters] = useState<apprun.ClusterInfo[]>([]);
@@ -53,6 +102,9 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
   const [showVersionMenu, setShowVersionMenu] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<DeleteTarget | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deployForm, setDeployForm] = useState<DeployForm | null>(null);
+  const [deploying, setDeploying] = useState(false);
+  const [deployError, setDeployError] = useState<string | null>(null);
 
   const loadClusters = useCallback(async () => {
     if (!profile) return;
@@ -249,6 +301,170 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
     }
   };
 
+  const handleDeployOpen = () => {
+    setDeployError(null);
+    setDeployForm(emptyDeployForm());
+  };
+
+  const handleDeployCancel = () => {
+    setDeployForm(null);
+    setDeployError(null);
+  };
+
+  const handleExposedPortAdd = () => {
+    if (!deployForm) return;
+    setDeployForm({
+      ...deployForm,
+      exposedPorts: [...deployForm.exposedPorts, { targetPort: '', loadBalancerPort: '', useLetsEncrypt: false, host: '', healthCheckPath: '', healthCheckIntervalSeconds: '', healthCheckTimeoutSeconds: '' }],
+    });
+  };
+
+  const handleExposedPortRemove = (index: number) => {
+    if (!deployForm) return;
+    setDeployForm({
+      ...deployForm,
+      exposedPorts: deployForm.exposedPorts.filter((_, i) => i !== index),
+    });
+  };
+
+  const handleExposedPortChange = (index: number, field: keyof ExposedPortFormRow, value: string | boolean) => {
+    if (!deployForm) return;
+    setDeployForm({
+      ...deployForm,
+      exposedPorts: deployForm.exposedPorts.map((p, i) => (i === index ? { ...p, [field]: value } : p)),
+    });
+  };
+
+  const handleEnvVarAdd = () => {
+    if (!deployForm) return;
+    setDeployForm({
+      ...deployForm,
+      envVars: [...deployForm.envVars, { key: '', value: '', secret: false }],
+    });
+  };
+
+  const handleEnvVarRemove = (index: number) => {
+    if (!deployForm) return;
+    setDeployForm({
+      ...deployForm,
+      envVars: deployForm.envVars.filter((_, i) => i !== index),
+    });
+  };
+
+  const handleEnvVarChange = (index: number, field: keyof EnvVarFormRow, value: string | boolean) => {
+    if (!deployForm) return;
+    setDeployForm({
+      ...deployForm,
+      envVars: deployForm.envVars.map((e, i) => (i === index ? { ...e, [field]: value } : e)),
+    });
+  };
+
+  const handleDeploySubmit = async () => {
+    if (!deployForm || view.type !== 'app') return;
+
+    const cpu = parseFloat(deployForm.cpu);
+    const memory = parseInt(deployForm.memory, 10);
+    if (!deployForm.image.trim()) {
+      setDeployError('コンテナイメージを入力してください');
+      return;
+    }
+    if (isNaN(cpu) || isNaN(memory)) {
+      setDeployError('CPU・メモリを正しく入力してください');
+      return;
+    }
+    if (deployForm.exposedPorts.some((p) => !p.targetPort)) {
+      setDeployError('公開ポートのターゲットポートを入力してください');
+      return;
+    }
+    if (deployForm.envVars.some((e) => !e.key)) {
+      setDeployError('環境変数のキーを入力してください');
+      return;
+    }
+
+    const exposedPorts: apprun.CreateExposedPortParams[] = [];
+    for (const p of deployForm.exposedPorts) {
+      const targetPort = parseInt(p.targetPort, 10);
+      if (isNaN(targetPort)) {
+        setDeployError('ターゲットポートは数値で入力してください');
+        return;
+      }
+      let loadBalancerPort: number | undefined;
+      if (p.loadBalancerPort) {
+        loadBalancerPort = parseInt(p.loadBalancerPort, 10);
+        if (isNaN(loadBalancerPort)) {
+          setDeployError('LBポートは数値で入力してください');
+          return;
+        }
+      }
+      let healthCheck: apprun.CreateHealthCheckParams | undefined;
+      if (p.healthCheckPath) {
+        const intervalSeconds = parseInt(p.healthCheckIntervalSeconds || '10', 10);
+        const timeoutSeconds = parseInt(p.healthCheckTimeoutSeconds || '5', 10);
+        if (isNaN(intervalSeconds) || isNaN(timeoutSeconds)) {
+          setDeployError('ヘルスチェックの間隔・タイムアウトは数値で入力してください');
+          return;
+        }
+        healthCheck = new apprun.CreateHealthCheckParams({ path: p.healthCheckPath, intervalSeconds, timeoutSeconds });
+      }
+      exposedPorts.push(new apprun.CreateExposedPortParams({
+        targetPort,
+        loadBalancerPort,
+        useLetsEncrypt: p.useLetsEncrypt,
+        host: p.host ? p.host.split(',').map((h) => h.trim()).filter(Boolean) : [],
+        healthCheck,
+      }));
+    }
+
+    const envVars: apprun.CreateEnvVarParams[] = deployForm.envVars.map((e) => new apprun.CreateEnvVarParams({
+      key: e.key,
+      value: e.value || undefined,
+      secret: e.secret,
+    }));
+
+    const params: Record<string, unknown> = {
+      cpu,
+      memory,
+      scalingMode: deployForm.scalingMode,
+      image: deployForm.image.trim(),
+      cmd: deployForm.cmd.trim() ? deployForm.cmd.trim().split(/\s+/) : [],
+      exposedPorts,
+      envVars,
+    };
+    if (deployForm.scalingMode === 'manual') {
+      const fixedScale = parseInt(deployForm.fixedScale, 10);
+      if (isNaN(fixedScale)) {
+        setDeployError('固定スケールを正しく入力してください');
+        return;
+      }
+      params.fixedScale = fixedScale;
+    } else {
+      const minScale = parseInt(deployForm.minScale, 10);
+      const maxScale = parseInt(deployForm.maxScale, 10);
+      const scaleInThreshold = parseInt(deployForm.scaleInThreshold, 10);
+      const scaleOutThreshold = parseInt(deployForm.scaleOutThreshold, 10);
+      if ([minScale, maxScale, scaleInThreshold, scaleOutThreshold].some(isNaN)) {
+        setDeployError('スケーリング設定を正しく入力してください');
+        return;
+      }
+      params.minScale = minScale;
+      params.maxScale = maxScale;
+      params.scaleInThreshold = scaleInThreshold;
+      params.scaleOutThreshold = scaleOutThreshold;
+    }
+
+    setDeploying(true);
+    setDeployError(null);
+    try {
+      await CreateAppRunApplicationVersion(profile, view.appId, new apprun.CreateAppVersionParams(params));
+      setDeployForm(null);
+      await loadAppVersions(view.appId);
+    } catch (e) {
+      setDeployError(String(e));
+    } finally {
+      setDeploying(false);
+    }
+  };
+
   const handleGlobalReload = useCallback(() => {
     if (view.type === 'clusters') {
       loadClusters();
@@ -350,6 +566,241 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
           <div className="confirm-actions">
             <button className="btn btn-secondary" onClick={handleDeleteCancel}>キャンセル</button>
             <button className="btn btn-danger" onClick={handleDeleteConfirm}>削除する</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderDeployModal = () => {
+    if (!deployForm) return null;
+    return (
+      <div className="modal-overlay" onClick={handleDeployCancel} style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+      }}>
+        <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+          backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+          padding: '20px', minWidth: '480px', maxWidth: '640px', maxHeight: '85vh', overflowY: 'auto',
+        }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>新しいバージョンをデプロイ</h3>
+
+          <div className="form-group">
+            <label>コンテナイメージ</label>
+            <input
+              type="text"
+              value={deployForm.image}
+              onChange={(e) => setDeployForm({ ...deployForm, image: e.target.value })}
+              placeholder="docker.io/library/nginx:latest"
+              autoFocus
+            />
+          </div>
+          <div className="form-group">
+            <label>コマンド（任意、スペース区切り）</label>
+            <input
+              type="text"
+              value={deployForm.cmd}
+              onChange={(e) => setDeployForm({ ...deployForm, cmd: e.target.value })}
+              placeholder="任意"
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+            <div className="form-group">
+              <label>CPU (vCPU)</label>
+              <input
+                type="text"
+                value={deployForm.cpu}
+                onChange={(e) => setDeployForm({ ...deployForm, cpu: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label>メモリ (MB)</label>
+              <input
+                type="text"
+                value={deployForm.memory}
+                onChange={(e) => setDeployForm({ ...deployForm, memory: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>スケーリングモード</label>
+            <select
+              value={deployForm.scalingMode}
+              onChange={(e) => setDeployForm({ ...deployForm, scalingMode: e.target.value as 'manual' | 'cpu' })}
+            >
+              <option value="manual">固定 (manual)</option>
+              <option value="cpu">CPU使用率に応じて自動 (cpu)</option>
+            </select>
+          </div>
+
+          {deployForm.scalingMode === 'manual' ? (
+            <div className="form-group">
+              <label>固定スケール（インスタンス数）</label>
+              <input
+                type="text"
+                value={deployForm.fixedScale}
+                onChange={(e) => setDeployForm({ ...deployForm, fixedScale: e.target.value })}
+              />
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+              <div className="form-group">
+                <label>最小スケール</label>
+                <input
+                  type="text"
+                  value={deployForm.minScale}
+                  onChange={(e) => setDeployForm({ ...deployForm, minScale: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>最大スケール</label>
+                <input
+                  type="text"
+                  value={deployForm.maxScale}
+                  onChange={(e) => setDeployForm({ ...deployForm, maxScale: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>スケールイン閾値 (%)</label>
+                <input
+                  type="text"
+                  value={deployForm.scaleInThreshold}
+                  onChange={(e) => setDeployForm({ ...deployForm, scaleInThreshold: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>スケールアウト閾値 (%)</label>
+                <input
+                  type="text"
+                  value={deployForm.scaleOutThreshold}
+                  onChange={(e) => setDeployForm({ ...deployForm, scaleOutThreshold: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+
+          <div style={{ marginTop: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={{ margin: 0 }}>公開ポート</label>
+              <button className="btn btn-secondary btn-small" onClick={handleExposedPortAdd}>+ ポート追加</button>
+            </div>
+            {deployForm.exposedPorts.length === 0 ? (
+              <div style={{ color: '#888', fontSize: '0.85rem', marginTop: '0.5rem' }}>公開ポートなし</div>
+            ) : (
+              deployForm.exposedPorts.map((p, index) => (
+                <div key={index} style={{ border: '1px solid #333', borderRadius: '6px', padding: '0.75rem', marginTop: '0.5rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
+                    <input
+                      type="text"
+                      value={p.targetPort}
+                      onChange={(e) => handleExposedPortChange(index, 'targetPort', e.target.value)}
+                      placeholder="ターゲットポート"
+                    />
+                    <input
+                      type="text"
+                      value={p.loadBalancerPort}
+                      onChange={(e) => handleExposedPortChange(index, 'loadBalancerPort', e.target.value)}
+                      placeholder="LBポート（任意）"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    value={p.host}
+                    onChange={(e) => handleExposedPortChange(index, 'host', e.target.value)}
+                    placeholder="ホスト名（カンマ区切り、任意）"
+                    style={{ marginTop: '0.5rem', width: '100%' }}
+                  />
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <input
+                      type="checkbox"
+                      checked={p.useLetsEncrypt}
+                      onChange={(e) => handleExposedPortChange(index, 'useLetsEncrypt', e.target.checked)}
+                    />
+                    Let's Encryptを使用
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <input
+                      type="text"
+                      value={p.healthCheckPath}
+                      onChange={(e) => handleExposedPortChange(index, 'healthCheckPath', e.target.value)}
+                      placeholder="ヘルスチェックパス（任意）"
+                    />
+                    <input
+                      type="text"
+                      value={p.healthCheckIntervalSeconds}
+                      onChange={(e) => handleExposedPortChange(index, 'healthCheckIntervalSeconds', e.target.value)}
+                      placeholder="間隔(秒)"
+                    />
+                    <input
+                      type="text"
+                      value={p.healthCheckTimeoutSeconds}
+                      onChange={(e) => handleExposedPortChange(index, 'healthCheckTimeoutSeconds', e.target.value)}
+                      placeholder="タイムアウト(秒)"
+                    />
+                  </div>
+                  <div style={{ textAlign: 'right', marginTop: '0.5rem' }}>
+                    <button className="btn btn-danger btn-small" onClick={() => handleExposedPortRemove(index)}>削除</button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div style={{ marginTop: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={{ margin: 0 }}>環境変数</label>
+              <button className="btn btn-secondary btn-small" onClick={handleEnvVarAdd}>+ 環境変数追加</button>
+            </div>
+            {deployForm.envVars.length === 0 ? (
+              <div style={{ color: '#888', fontSize: '0.85rem', marginTop: '0.5rem' }}>環境変数なし</div>
+            ) : (
+              deployForm.envVars.map((e, index) => (
+                <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.5rem' }}>
+                  <input
+                    type="text"
+                    value={e.key}
+                    onChange={(ev) => handleEnvVarChange(index, 'key', ev.target.value)}
+                    placeholder="KEY"
+                    style={{ flex: 1 }}
+                  />
+                  <input
+                    type={e.secret ? 'password' : 'text'}
+                    value={e.value}
+                    onChange={(ev) => handleEnvVarChange(index, 'value', ev.target.value)}
+                    placeholder="値"
+                    style={{ flex: 1 }}
+                  />
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', whiteSpace: 'nowrap' }}>
+                    <input
+                      type="checkbox"
+                      checked={e.secret}
+                      onChange={(ev) => handleEnvVarChange(index, 'secret', ev.target.checked)}
+                    />
+                    secret
+                  </label>
+                  <button className="btn btn-danger btn-small" onClick={() => handleEnvVarRemove(index)}>削除</button>
+                </div>
+              ))
+            )}
+          </div>
+
+          {deployError && (
+            <div style={{ marginTop: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+              エラー: {deployError}
+            </div>
+          )}
+          <div className="confirm-actions" style={{ marginTop: '1.5rem' }}>
+            <button className="btn btn-secondary" onClick={handleDeployCancel}>キャンセル</button>
+            <button
+              className="btn btn-primary"
+              onClick={handleDeploySubmit}
+              disabled={deploying || !deployForm.image.trim()}
+            >
+              {deploying ? 'デプロイ中...' : 'デプロイする'}
+            </button>
           </div>
         </div>
       </div>
@@ -533,15 +984,18 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem' }}>
           <h3 style={{ color: '#00adb5', margin: 0 }}>バージョン</h3>
-          {view.activeVersion > 0 && (
-            <button
-              className="btn btn-danger btn-small"
-              onClick={() => handleClearActiveVersion(view.appId, view.clusterId, view.clusterName, view.appName)}
-              disabled={clearingActiveVersion}
-            >
-              {clearingActiveVersion ? '処理中...' : '非アクティブ化'}
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="btn btn-primary btn-small" onClick={handleDeployOpen}>+ デプロイ</button>
+            {view.activeVersion > 0 && (
+              <button
+                className="btn btn-danger btn-small"
+                onClick={() => handleClearActiveVersion(view.appId, view.clusterId, view.clusterName, view.appName)}
+                disabled={clearingActiveVersion}
+              >
+                {clearingActiveVersion ? '処理中...' : '非アクティブ化'}
+              </button>
+            )}
+          </div>
         </div>
         {versions.length === 0 ? (
           <div className="empty-state">バージョンがありません</div>
@@ -602,6 +1056,7 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
             </tbody>
           </table>
         )}
+        {renderDeployModal()}
       </>
     );
   }
