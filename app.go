@@ -408,6 +408,24 @@ func (a *App) DeleteSwitch(profileName, zone, switchId string) error {
 	return service.Delete(a.ctx, zone, switchId)
 }
 
+func (a *App) CreateSwitch(profileName, zone, name, description string, networkMaskLen int, defaultRoute string) (*sakura.SwitchInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewSwitchService(client)
+	return service.Create(a.ctx, zone, name, description, networkMaskLen, defaultRoute)
+}
+
+func (a *App) UpdateSwitch(profileName, zone, switchId, name, description string, networkMaskLen int, defaultRoute string) (*sakura.SwitchInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewSwitchService(client)
+	return service.Update(a.ctx, zone, switchId, name, description, networkMaskLen, defaultRoute)
+}
+
 // PacketFilters
 func (a *App) GetPacketFilters(profileName, zone string) ([]sakura.PacketFilterInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)

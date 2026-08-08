@@ -68,6 +68,9 @@ func runE2EServer(addr, dist string) error {
 
 	fake.SwitchFactoryFuncToFake()
 	seedServers()
+	if err := seedSwitches(); err != nil {
+		return fmt.Errorf("failed to seed switches: %w", err)
+	}
 	if err := seedDNS(); err != nil {
 		return fmt.Errorf("failed to seed DNS zones: %w", err)
 	}
@@ -205,6 +208,26 @@ func seedDNS() error {
 	}
 	if _, err := dnsOp.Create(ctx, &iaas.DNSCreateRequest{
 		Name:        "e2e-doomed.com",
+		Description: "E2E: 削除シナリオ用",
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+// seedSwitches はIaaS fakeドライバのデータストアにE2Eシナリオ用のスイッチを投入する。
+func seedSwitches() error {
+	ctx := context.Background()
+	swOp := iaas.NewSwitchOp(nil)
+
+	if _, err := swOp.Create(ctx, e2eZone, &iaas.SwitchCreateRequest{
+		Name:        "e2e-switch",
+		Description: "E2E: 編集シナリオ用",
+	}); err != nil {
+		return err
+	}
+	if _, err := swOp.Create(ctx, e2eZone, &iaas.SwitchCreateRequest{
+		Name:        "e2e-doomed-switch",
 		Description: "E2E: 削除シナリオ用",
 	}); err != nil {
 		return err
