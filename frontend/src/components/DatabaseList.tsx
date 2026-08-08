@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { GetDatabases, PowerOnDatabase, PowerOffDatabase, DeleteDatabase, GetDatabaseStatus, ResetDatabase } from '../../wailsjs/go/main/App';
+import { GetDatabases, PowerOnDatabase, PowerOffDatabase, DeleteDatabase, GetDatabaseStatus, ResetDatabase, CreateDatabase, GetSwitches } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -10,6 +10,30 @@ interface DatabaseListProps {
   zone: string;
   zones: sakura.ZoneInfo[];
   onZoneChange: (zone: string) => void;
+  onSelectDatabase: (id: string) => void;
+}
+
+const DEFAULT_PORTS: Record<string, number> = {
+  mariadb: 3306,
+  postgres: 5432,
+};
+
+function emptyCreateForm() {
+  return {
+    name: '',
+    description: '',
+    tags: '',
+    plan: '10g',
+    switchId: '',
+    ipAddress: '',
+    networkMaskLen: '24',
+    defaultRoute: '',
+    rdbmsType: 'mariadb',
+    defaultUser: '',
+    userPassword: '',
+    servicePort: String(DEFAULT_PORTS.mariadb),
+    monitoringSuiteEnabled: false,
+  };
 }
 
 interface ConfirmDialog {
@@ -20,13 +44,19 @@ interface ConfirmDialog {
   action: 'powerOn' | 'powerOff' | 'reset' | 'delete';
 }
 
-export function DatabaseList({ profile, zone, zones, onZoneChange }: DatabaseListProps) {
+export function DatabaseList({ profile, zone, zones, onZoneChange, onSelectDatabase }: DatabaseListProps) {
   const [databases, setDatabases] = useState<sakura.DatabaseInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog | null>(null);
   const [pendingDatabases, setPendingDatabases] = useState<Map<string, 'powerOn' | 'powerOff' | 'reset'>>(new Map());
   const pollingIntervalRef = useRef<Record<string, number>>({});
+
+  const [showCreate, setShowCreate] = useState(false);
+  const [switches, setSwitches] = useState<sakura.SwitchInfo[]>([]);
+  const [createForm, setCreateForm] = useState(emptyCreateForm());
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const loadDatabases = useCallback(async () => {
     if (!profile || !zone) {
@@ -144,6 +174,61 @@ export function DatabaseList({ profile, zone, zones, onZoneChange }: DatabaseLis
     }
   };
 
+  const handleCreateOpen = async () => {
+    setCreateForm(emptyCreateForm());
+    setCreateError(null);
+    setShowCreate(true);
+    try {
+      const list = await GetSwitches(profile, zone);
+      setSwitches(list || []);
+    } catch (err) {
+      console.error('[DatabaseList] GetSwitches error:', err);
+      setSwitches([]);
+    }
+  };
+
+  const handleCreateCancel = () => {
+    setShowCreate(false);
+  };
+
+  const handleRDBMSTypeChange = (rdbmsType: string) => {
+    setCreateForm(prev => ({
+      ...prev,
+      rdbmsType,
+      servicePort: String(DEFAULT_PORTS[rdbmsType] ?? prev.servicePort),
+    }));
+  };
+
+  const handleCreateSubmit = async () => {
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const tags = createForm.tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
+      const params = new sakura.CreateDatabaseParams({
+        Name: createForm.name,
+        Description: createForm.description,
+        Tags: tags,
+        Plan: createForm.plan,
+        SwitchID: createForm.switchId,
+        IPAddress: createForm.ipAddress,
+        NetworkMaskLen: parseInt(createForm.networkMaskLen, 10) || 0,
+        DefaultRoute: createForm.defaultRoute,
+        RDBMSType: createForm.rdbmsType,
+        DefaultUser: createForm.defaultUser,
+        UserPassword: createForm.userPassword,
+        ServicePort: parseInt(createForm.servicePort, 10) || 0,
+        MonitoringSuiteEnabled: createForm.monitoringSuiteEnabled,
+      });
+      await CreateDatabase(profile, zone, params);
+      setShowCreate(false);
+      await loadDatabases();
+    } catch (e) {
+      setCreateError(String(e));
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const {
     searchQuery,
     setSearchQuery,
@@ -196,6 +281,7 @@ export function DatabaseList({ profile, zone, zones, onZoneChange }: DatabaseLis
       <div className="header">
         <h2>データベース</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <button className="btn btn-primary btn-small" onClick={handleCreateOpen}>+ データベース作成</button>
           <select
             className="zone-select"
             value={zone}
@@ -227,7 +313,7 @@ export function DatabaseList({ profile, zone, zones, onZoneChange }: DatabaseLis
         </div>
       ) : (
         filteredDatabases.map((db) => (
-          <div key={db.id} className="card">
+          <div key={db.id} className="card" onClick={() => onSelectDatabase(db.id)} style={{ cursor: 'pointer' }}>
             <div className="card-header">
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -386,6 +472,153 @@ export function DatabaseList({ profile, zone, zones, onZoneChange }: DatabaseLis
                 }}
               >
                 {confirmDialog.action === 'powerOn' ? '起動する' : confirmDialog.action === 'powerOff' ? '停止する' : confirmDialog.action === 'reset' ? '再起動する' : '削除する'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreate && (
+        <div className="modal-overlay" onClick={handleCreateCancel} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+            backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+            padding: '20px', minWidth: '360px', maxWidth: '480px', maxHeight: '80vh', overflowY: 'auto',
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>データベース作成</h3>
+            <div className="form-group">
+              <label>名前</label>
+              <input
+                type="text"
+                value={createForm.name}
+                onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                placeholder="my-database"
+                autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <label>説明</label>
+              <input
+                type="text"
+                value={createForm.description}
+                onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
+                placeholder="任意"
+              />
+            </div>
+            <div className="form-group">
+              <label>タグ</label>
+              <input
+                type="text"
+                value={createForm.tags}
+                onChange={(e) => setCreateForm({ ...createForm, tags: e.target.value })}
+                placeholder="カンマ区切り(任意)"
+              />
+            </div>
+            <div className="form-group">
+              <label>プラン</label>
+              <select value={createForm.plan} onChange={(e) => setCreateForm({ ...createForm, plan: e.target.value })}>
+                <option value="10g">10 GB</option>
+                <option value="30g">30 GB</option>
+                <option value="90g">90 GB</option>
+                <option value="240g">240 GB</option>
+                <option value="500g">500 GB</option>
+                <option value="1t">1 TB</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>データベース種別</label>
+              <select value={createForm.rdbmsType} onChange={(e) => handleRDBMSTypeChange(e.target.value)}>
+                <option value="mariadb">MariaDB</option>
+                <option value="postgres">PostgreSQL</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label htmlFor="db-create-switch">接続先スイッチ</label>
+              <select id="db-create-switch" value={createForm.switchId} onChange={(e) => setCreateForm({ ...createForm, switchId: e.target.value })}>
+                <option value="">選択してください</option>
+                {switches.map((sw) => (
+                  <option key={sw.id} value={sw.id}>{sw.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>IPアドレス</label>
+              <input
+                type="text"
+                value={createForm.ipAddress}
+                onChange={(e) => setCreateForm({ ...createForm, ipAddress: e.target.value })}
+                placeholder="192.168.0.11"
+              />
+            </div>
+            <div className="form-group">
+              <label>ネットワークマスク長</label>
+              <input
+                type="number"
+                value={createForm.networkMaskLen}
+                onChange={(e) => setCreateForm({ ...createForm, networkMaskLen: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label>デフォルトルート</label>
+              <input
+                type="text"
+                value={createForm.defaultRoute}
+                onChange={(e) => setCreateForm({ ...createForm, defaultRoute: e.target.value })}
+                placeholder="192.168.0.1"
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="db-create-user">管理ユーザー名</label>
+              <input
+                id="db-create-user"
+                type="text"
+                value={createForm.defaultUser}
+                onChange={(e) => setCreateForm({ ...createForm, defaultUser: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="db-create-password">管理ユーザーパスワード</label>
+              <input
+                id="db-create-password"
+                type="password"
+                value={createForm.userPassword}
+                onChange={(e) => setCreateForm({ ...createForm, userPassword: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label>ポート番号</label>
+              <input
+                type="number"
+                value={createForm.servicePort}
+                onChange={(e) => setCreateForm({ ...createForm, servicePort: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type="checkbox"
+                  checked={createForm.monitoringSuiteEnabled}
+                  onChange={(e) => setCreateForm({ ...createForm, monitoringSuiteEnabled: e.target.checked })}
+                />
+                拡張監視機能(Monitoring Suite)を有効化
+              </label>
+            </div>
+            {createError && (
+              <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                エラー: {createError}
+              </div>
+            )}
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleCreateSubmit}
+                disabled={creating || !createForm.name || !createForm.switchId || !createForm.ipAddress || !createForm.defaultUser || !createForm.userPassword}
+              >
+                {creating ? '作成中...' : '作成する'}
               </button>
             </div>
           </div>

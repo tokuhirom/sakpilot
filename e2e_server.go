@@ -457,6 +457,17 @@ func seedDatabases() {
 			Availability:   types.Availabilities.Available,
 			Tags:           types.Tags{"env:e2e"},
 			CreatedAt:      now,
+			// Conf/CommonSettingは実際のDB作成時には必ず設定される値のため、
+			// fakeドライバのGetParameter(Conf.DatabaseNameを無条件参照する)がnilポインタ参照で
+			// panicしないようにシードデータでも設定しておく。
+			Conf: &iaas.DatabaseRemarkDBConfCommon{
+				DatabaseName:    "MariaDB",
+				DatabaseVersion: "10.11",
+			},
+			CommonSetting: &iaas.DatabaseSettingCommon{
+				ServicePort: 3306,
+				DefaultUser: "e2euser",
+			},
 		})
 	}
 }
