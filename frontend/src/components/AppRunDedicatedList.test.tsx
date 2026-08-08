@@ -18,6 +18,7 @@ import {
   CreateAppRunApplication,
   CreateAppRunCluster,
   CreateAppRunASG,
+  CreateAppRunLoadBalancer,
   UpdateAppRunWorkerNodeDraining,
   DeleteAppRunCluster,
   DeleteAppRunApplication,
@@ -94,6 +95,7 @@ describe('AppRunDedicatedList', () => {
     vi.mocked(CreateAppRunApplication).mockReset();
     vi.mocked(CreateAppRunCluster).mockReset();
     vi.mocked(CreateAppRunASG).mockReset();
+    vi.mocked(CreateAppRunLoadBalancer).mockReset();
     vi.mocked(UpdateAppRunWorkerNodeDraining).mockReset();
     vi.mocked(DeleteAppRunCluster).mockReset();
     vi.mocked(DeleteAppRunApplication).mockReset();
@@ -122,6 +124,9 @@ describe('AppRunDedicatedList', () => {
     );
     vi.mocked(CreateAppRunASG).mockResolvedValue(
       new apprun.ASGInfo({ id: 'asg-2', name: 'new-asg', zone: 'is1a', minNodes: 1, maxNodes: 1, workerNodeCount: 0, interfaces: [] })
+    );
+    vi.mocked(CreateAppRunLoadBalancer).mockResolvedValue(
+      new apprun.LBInfo({ id: 'lb-2', name: 'new-lb', serviceClassPath: 'cloud/apprun/dedicated/lb/1vcpu_2gb' })
     );
     vi.mocked(UpdateAppRunWorkerNodeDraining).mockResolvedValue();
     vi.mocked(DeleteAppRunCluster).mockResolvedValue();
@@ -268,6 +273,96 @@ describe('AppRunDedicatedList', () => {
     expect(screen.getByText('lbnode-1...')).toBeInTheDocument();
     expect(screen.getByText('wnode-12...')).toBeInTheDocument();
     expect(screen.getAllByText('running')).toHaveLength(2);
+  });
+
+  it('creates an LB from the ASG view with the default shared interface and reloads ASG details', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(GetAppRunASGs).mockResolvedValue([makeAsg()]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('my-asg'));
+
+    await user.click(await screen.findByText('+ LB作成'));
+    expect(await screen.findByText('ロードバランサーを作成')).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('my-lb'), 'new-lb');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    await waitFor(() => {
+      expect(CreateAppRunLoadBalancer).toHaveBeenCalledWith('default', 'cluster-1', 'asg-1', expect.objectContaining({
+        name: 'new-lb',
+        serviceClassPath: 'cloud/apprun/dedicated/lb/1vcpu_2gb',
+        nameServers: ['133.242.0.3'],
+        interfaces: [expect.objectContaining({ interfaceIndex: 0, upstream: 'shared' })],
+      }));
+    });
+    expect(GetAppRunLoadBalancers).toHaveBeenCalledWith('default', 'cluster-1', 'asg-1');
+    expect(screen.queryByText('ロードバランサーを作成')).not.toBeInTheDocument();
+  });
+
+  it('reveals VIP/network fields for a non-shared LB interface and includes them on submit', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(GetAppRunASGs).mockResolvedValue([makeAsg()]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('my-asg'));
+    await user.click(await screen.findByText('+ LB作成'));
+    await user.type(screen.getByPlaceholderText('my-lb'), 'new-lb');
+
+    await user.clear(screen.getByPlaceholderText('shared またはスイッチID'));
+    await user.type(screen.getByPlaceholderText('shared またはスイッチID'), 'switch-123');
+    await user.type(screen.getByPlaceholderText('VIP'), '203.0.113.1');
+    await user.type(screen.getByPlaceholderText('仮想ルータID'), '1');
+
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    await waitFor(() => {
+      expect(CreateAppRunLoadBalancer).toHaveBeenCalledWith('default', 'cluster-1', 'asg-1', expect.objectContaining({
+        interfaces: [expect.objectContaining({
+          upstream: 'switch-123',
+          vip: '203.0.113.1',
+          virtualRouterID: 1,
+        })],
+      }));
+    });
+  });
+
+  it('cancels the create-LB form without calling the API', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(GetAppRunASGs).mockResolvedValue([makeAsg()]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('my-asg'));
+    await user.click(await screen.findByText('+ LB作成'));
+    await user.type(screen.getByPlaceholderText('my-lb'), 'new-lb');
+
+    await user.click(screen.getByText('キャンセル'));
+
+    expect(screen.queryByText('ロードバランサーを作成')).not.toBeInTheDocument();
+    expect(CreateAppRunLoadBalancer).not.toHaveBeenCalled();
+  });
+
+  it('shows an error message when creating an LB fails', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(GetAppRunASGs).mockResolvedValue([makeAsg()]);
+    vi.mocked(CreateAppRunLoadBalancer).mockRejectedValue(new Error('quota exceeded'));
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('my-asg'));
+    await user.click(await screen.findByText('+ LB作成'));
+    await user.type(screen.getByPlaceholderText('my-lb'), 'new-lb');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    expect(await screen.findByText(/エラー: Error: quota exceeded/)).toBeInTheDocument();
+    expect(screen.getByText('ロードバランサーを作成')).toBeInTheDocument();
   });
 
   it('clears the active version from the app view', async () => {

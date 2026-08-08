@@ -658,6 +658,64 @@ func TestService_CreateAutoScalingGroup(t *testing.T) {
 	}
 }
 
+func TestService_CreateLoadBalancer(t *testing.T) {
+	srv := mockapprundedicated.NewTestServer(mockapprundedicated.Config{})
+	defer srv.Close()
+	ctx := context.Background()
+	rawClient := newRawClient(t, srv.TestURL())
+
+	clusterID := seedCluster(t, ctx, rawClient)
+	asgResp, err := rawClient.CreateAutoScalingGroup(ctx, &v1.CreateAutoScalingGroup{
+		Name:                   "test-asg",
+		Zone:                   "is1a",
+		WorkerServiceClassPath: "cloud/apprun/dedicated/worker/1vcpu_2gb",
+		MinNodes:               1,
+		MaxNodes:               1,
+		NameServers:            []v1.IPv4{"210.188.224.10"},
+		Interfaces: []v1.AutoScalingGroupNodeInterface{
+			{InterfaceIndex: 0, Upstream: "shared"},
+		},
+	}, v1.CreateAutoScalingGroupParams{ClusterID: clusterID})
+	if err != nil {
+		t.Fatalf("seed CreateAutoScalingGroup: %v", err)
+	}
+	asgID := asgResp.AutoScalingGroup.GetAutoScalingGroupID()
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_APPRUN_DEDICATED", srv.TestURL())
+
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	clusterIDStr := uuid.UUID(clusterID).String()
+	asgIDStr := uuid.UUID(asgID).String()
+
+	created, err := service.CreateLoadBalancer(ctx, clusterIDStr, asgIDStr, apprun.CreateLBParams{
+		Name:             "new-lb",
+		ServiceClassPath: "cloud/apprun/dedicated/lb/1vcpu_2gb",
+		NameServers:      []string{"210.188.224.10"},
+		Interfaces: []apprun.CreateLBInterfaceParams{
+			{InterfaceIndex: 0, Upstream: "shared"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateLoadBalancer: %v", err)
+	}
+	if created.Name != "new-lb" {
+		t.Errorf("Name = %q, want %q", created.Name, "new-lb")
+	}
+
+	lbs, err := service.ListLoadBalancers(ctx, clusterIDStr, asgIDStr)
+	if err != nil {
+		t.Fatalf("ListLoadBalancers: %v", err)
+	}
+	if len(lbs) != 1 || lbs[0].ID != created.ID {
+		t.Fatalf("lbs = %+v, want single LB with ID %q", lbs, created.ID)
+	}
+}
+
 func TestService_UpdateWorkerNodeDraining(t *testing.T) {
 	srv := mockapprundedicated.NewTestServer(mockapprundedicated.Config{})
 	defer srv.Close()

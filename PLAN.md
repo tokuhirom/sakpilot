@@ -175,8 +175,9 @@
 - ✅ **対応済み（2026-08-08 追加セッション25、Tier2 #15完了）**: 共用型の残りタスク（Application Delete・Version Delete・Traffic Update・User Create）を実装。SDKの`ApplicationOp.Delete`/`VersionOp.Delete`/`TrafficOp.Update`/`UserOp.Create`はいずれも既存実装済みだった。`internal/apprunshared/service.go`に`DeleteApplication`/`DeleteVersion`/`UpdateTraffics`/`CreateUser`を追加、`app.go`に対応する4つのRPCを公開。`AppRunSharedList.tsx`の一覧行に削除ボタン、バージョン履歴テーブルに削除ボタン、トラフィック分散カードに分散比率編集モーダル（合計100%のバリデーション付き）、ユーザー未設定時の案内画面に「AppRun共用型を利用開始する」サインアップボタンを追加。sakumockでは`UpdateApplication`(PATCH)を呼ぶたびに新しいバージョンが暗黙生成される仕様のため、`internal/apprunshared/service_test.go`の`TestService_DeleteVersion`ではCreate＋Update×2で3バージョンを作った上で「トラフィック分散対象でも最新版でもない」バージョンを実際に削除できるか試行して検証（作成時刻が同一秒に丸められうるため「最新版」の判定順に依存しない設計とした）。`frontend/e2e/apprun-shared.spec.ts`にアプリ削除シナリオを追加（バージョン削除・トラフィック変更のE2Eは、単一バージョンの状態では意味のある操作にならずsakumockの時刻丸め起因の不確実性もあるため対象外とし、Go側ユニットテストでのみカバー）
 - ✅ **対応済み（2026-08-08 追加セッション26、Tier2 #14一部）**: 専有型のCluster Createを実装。`internal/apprun/service.go`に`CreateClusterParams`（Name/LetsEncryptEmail(任意)/Ports([]{Port,Protocol})/ServicePrincipalID）と`CreateCluster`（SDKの`ClusterOp.Create`をラップ）を追加、`app.go`に`CreateAppRunCluster`のRPCを公開。`AppRunDedicatedList.tsx`のクラスタ一覧に「+ クラスタ作成」ボタンと作成モーダル（クラスタ名/サービスプリンシパルID/Let's Encryptメール(任意)/待ち受けポートの追加編集削除）を実装。`internal/apprun/service_test.go`に`sakumock/apprundedicated`テストサーバーを使った`TestService_CreateCluster`、`AppRunDedicatedList.test.tsx`に作成・バリデーション・キャンセル・エラー表示の4テストを追加
 - ✅ **対応済み（2026-08-08 追加セッション27、Tier2 #14一部）**: 専有型のASG(AutoScalingGroup) Createを実装。`internal/apprun/service.go`に`CreateASGParams`(Name/Zone/NameServers/WorkerServiceClassPath/MinNodes/MaxNodes/Interfaces([]{InterfaceIndex,Upstream,IPPool,NetmaskLen,DefaultGateway,PacketFilterID,ConnectsToLB}))と`CreateAutoScalingGroup`(SDKの`AutoScalingGroupOp.Create`をラップ)を追加、`app.go`に`CreateAppRunASG`のRPCを公開。`AppRunDedicatedList.tsx`のクラスタ詳細のASG一覧に「+ ASG作成」ボタンと作成モーダル(ASG名/ゾーン/ワーカープラン選択/最小・最大ノード数/ネームサーバー(1〜3件)/ネットワークインターフェース(1〜5件、`upstream`が`shared`の場合はIPプール等のネットワーク設定を隠し、それ以外の場合のみIPプール/ネットマスク長/デフォルトゲートウェイ/パケットフィルタIDを入力可能)を実装。ワーカープランはsakumockが許可する4種類の固定`workerServiceClassPath`(1vCPU/2GB〜8vCPU/8GB)からの選択式とした
+- ✅ **対応済み（2026-08-08 追加セッション28、Tier2 #14一部）**: 専有型のLoadBalancer Createを実装。`internal/apprun/service.go`に`CreateLBParams`(Name/ServiceClassPath/NameServers/Interfaces([]{InterfaceIndex,Upstream,IPPool,NetmaskLen,DefaultGateway,Vip,VirtualRouterID,PacketFilterID}))と`CreateLoadBalancer`(SDKの`LoadBalancerOp.Create`をラップ)を追加、`app.go`に`CreateAppRunLoadBalancer`のRPCを公開。`AppRunDedicatedList.tsx`のASG詳細のLB一覧に「+ LB作成」ボタンと作成モーダル(LB名/プラン選択/ネームサーバー(1〜3件)/ネットワークインターフェース(1〜5件、ASG Createと同じく`upstream`が`shared`以外の場合のみIPプール/ネットマスク長/デフォルトゲートウェイ/VIP/仮想ルータID/パケットフィルタIDを入力可能)を実装。プランはsakumockが許可する4種類の固定`serviceClassPath`(1vCPU/2GB〜2vCPU/2GB、通常/冗長構成)からの選択式とした。これで専有型のCreate系(Cluster/ASG/LoadBalancer)は全て完了
 - SDK比較で残る不足:
-  - 専有型: LoadBalancerの**Create**、Certificate系全般（未着手。LBのCreateはVIP/仮想ルータID/IPプール等ネットワーク知識が必要な`Interfaces`配列の入力UIが必要で複雑度が高い。Certificate系はAPI自体はフラットで単純だが新規View追加が必要）
+  - 専有型: Certificate系全般（未着手。API自体はフラットで単純だが新規View追加が必要）
   - 共用型: なし（Read/Write一式が揃った）
 - **TODO**: `lb` view（ロードバランサー単体詳細）への遷移導線が無い点は意図的な未実装か実装漏れか要確認
 
@@ -282,7 +283,7 @@
 11. ✅ Database: Create/Update/UpdateSettings/GetParameter/SetParameter — 2026-08-08対応済み
 12. ✅ NFS: Create/Update — 2026-08-08対応済み
 13. ✅ EnhancedDB: Create/Update/SetPassword — 2026-08-08対応済み
-14. AppRun専有型: LoadBalancerのCreate、Certificate系（VersionのDelete、Application Create、WorkerNodeのUpdate（draining）、Cluster Create、ASG Createは2026-08-08対応済み）
+14. AppRun専有型: Certificate系（VersionのDelete、Application Create、WorkerNodeのUpdate（draining）、Cluster Create、ASG Create、LoadBalancer Createは2026-08-08対応済み）
 15. ✅ AppRun共用型: ApplicationのDelete、VersionのDelete、TrafficのUpdate、UserのCreate — 2026-08-08対応済み（ApplicationのCreate/Updateも2026-08-08対応済み、Tier2 #15完了）
 
 **Tier 3: 低優先度・ニッチ or 複雑度が高い機能**
