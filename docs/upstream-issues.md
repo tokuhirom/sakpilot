@@ -50,6 +50,14 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - 実害: SakPilotの実際のUIフロー(アクセスキーを作成 → そのキーでバケット一覧/オブジェクト一覧を取得)をEnd-to-Endに検証できない。versitygwを追加してもキーの紐付けが再現できないため意味がなく、SakPilotではバケット作成リクエスト自体が(control plane経由のため)成功することのみ確認し、一覧反映やオブジェクト操作はE2E対象外にした(`frontend/e2e/objectstorage.spec.ts` 参照)。これはsakumockの不具合ではなく、現状の設計を把握した上でのSakPilot側の判断。
 - 提案(バグ報告ではなく機能要望): data planeがcontrol planeで発行したアクセスキー/シークレットも(固定ルート資格情報に加えて)受け付けるようにしてもらえると、`versitygw` を用意しさえすればキー発行〜オブジェクト操作までを実際のアプリと同じ資格情報で一気通貫にテストできるようになる。
 
+### 5. `sakumock/apprun` のバージョン `CreatedAt` が秒単位に丸められており、短時間に複数回更新すると「最新バージョン」の判定順が不定になる
+
+- パッケージ: `github.com/sacloud/sakumock/apprun`
+- ファイル: `store_memory.go` の `createVersionLocked`(`time.Now().UTC().Truncate(time.Second)`)、`ListVersions`(`sort.Slice` で `CreatedAt` の降順ソート、デフォルト`SortOrder=desc`)
+- 内容: `Application` を`PATCH`(`ApplicationOp.Update`)するたびに新しい `Version` が暗黙生成される仕様だが、`Version.CreatedAt` は秒未満が切り捨てられるため、同一の壁時計秒内に複数回`Update`を呼ぶと生成された複数バージョンの`CreatedAt`が完全に一致する。`ListVersions`のソートは`CreatedAt`の前後関係のみで比較しており、同値の場合の順序保証(安定ソートや採番順への フォールバック)が無いため、「どのバージョンが`ListVersions`の先頭(＝最新版)として返るか」がリクエストごとに不定になりうる。
+- 実害: AppRun共用型のVersion Delete API(`handleDeleteVersion`)は「`ListVersions`の先頭要素と同じIDは削除不可(最新版のため)」というチェックを行っているため、この不定性がそのままAPIレスポンスの不定性になる。SakPilot側でVersion Delete機能のテストを書く際、「作成直後のバージョンではない、かつ削除不可能な最新版でもない、中間バージョン」を用意しようとしても`CreatedAt`だけでは判別できず、最終的に「削除を試みて失敗したら次の候補を試す」というフォールバック実装(`internal/apprunshared/service_test.go`の`TestService_DeleteVersion`)で回避する必要があった。内部的には`MemoryStore`が`versionSeq`という単調増加のシーケンス番号を持っており(`Version.Name`のサフィックスに埋め込まれている)、実際の生成順序自体は失われていないため、ソートに使えばこの問題自体は容易に解消できるはずである。
+- 提案: `ListVersions`のソートキーに`CreatedAt`だけでなく`versionSeq`(または相当する単調増加ID)をタイブレーカーとして使う、あるいは`Version.CreatedAt`をより高精度(ナノ秒単位)で記録するようにしてほしい。
+
 ## その他メモ(バグではないが気づいた点)
 
 - `fake.InitDataStore()` / `fake.SwitchFactoryFuncToFake()` はいずれも `sync.Once` でプロセス内1回しか実行されない。同一プロセス内で複数のGoテストが同じデータストアを共有することになるため、テスト間で状態がリークする(SakPilotの `internal/sakura/disk_test.go` ではID/存在ベースの検証に倒すことで対応した)。ドキュメントに明記しておいてもらえると、初見でハマる人が減りそう。
