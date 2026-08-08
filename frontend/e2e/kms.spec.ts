@@ -33,3 +33,21 @@ test('KMSキーを削除すると一覧から消える', async ({ page }) => {
   await expect(keyCard(page, 'e2e-doomed-key')).toHaveCount(0, { timeout: 10_000 });
   await expect(keyCard(page, 'e2e-key-1')).toHaveCount(1);
 });
+
+test('KMSキー詳細でローテーション・ステータス変更ができる', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'KMS' }).click();
+  await keyCard(page, 'e2e-key-1').click();
+  await expect(page).toHaveURL(/#\/e2e\/kms\//);
+  await expect(page.getByText('アクティブ', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'ローテーション' }).click();
+  await expect(page.getByText('KMSキー「e2e-key-1」をローテーションしますか？')).toBeVisible();
+  await page.getByRole('button', { name: '実行する' }).click();
+  await expect(page.getByText('KMSキー「e2e-key-1」をローテーションしますか？')).toHaveCount(0);
+
+  await page.getByRole('button', { name: '制限' }).click();
+  await expect(page.getByText('のステータスを')).toBeVisible();
+  await page.getByRole('button', { name: '実行する' }).click();
+  await expect(page.getByText('制限中')).toBeVisible();
+});

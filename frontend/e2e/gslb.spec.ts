@@ -44,6 +44,19 @@ test('GSLB詳細で監視設定とサーバーを編集できる', async ({ page
   await expect(page.getByText('192.0.2.20')).toBeVisible();
 });
 
+test('GSLB詳細で名前・説明を編集できる', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'GSLB' }).click();
+  await gslbRow(page, 'e2e-gslb-target').click();
+  await expect(page).toHaveURL(/#\/e2e\/gslb\//);
+
+  await page.getByRole('button', { name: '編集', exact: true }).click();
+  await page.getByPlaceholder('説明').fill('E2Eで編集した説明');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+
+  await expect(page.getByText('e2e-gslb-target / E2Eで編集した説明')).toBeVisible();
+});
+
 test('GSLBを削除すると一覧から消える', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('link', { name: 'GSLB' }).click();

@@ -52,3 +52,34 @@ test('停止中のサーバーを削除すると一覧から消える', async ({
   // 他のサーバーは残っている
   await expect(serverCard(page, 'e2e-web-1')).toHaveCount(1);
 });
+
+test('停止中のサーバーを起動すると、ポーリング後にステータスがupになる', async ({ page }) => {
+  await page.goto('/');
+  // 直前のテストでe2e-web-1はdownになっている
+  const card = serverCard(page, 'e2e-web-1');
+  await expect(card.locator('.status')).toHaveText('down');
+
+  await card.getByRole('button', { name: '⋮' }).click();
+  await card.getByRole('button', { name: '起動', exact: true }).click();
+
+  await expect(page.getByRole('heading', { name: 'サーバー起動' })).toBeVisible();
+  await page.getByRole('button', { name: '起動する' }).click();
+
+  await expect(card.locator('.status')).toHaveText('up', { timeout: 15_000 });
+});
+
+test('起動中のサーバーを再起動できる', async ({ page }) => {
+  await page.goto('/');
+  // 直前のテストでe2e-web-1はupになっている
+  const card = serverCard(page, 'e2e-web-1');
+  await expect(card.locator('.status')).toHaveText('up');
+
+  await card.getByRole('button', { name: '⋮' }).click();
+  await card.getByRole('button', { name: '再起動', exact: true }).click();
+
+  await expect(page.getByRole('heading', { name: 'サーバー再起動' })).toBeVisible();
+  await page.getByRole('button', { name: '再起動する' }).click();
+
+  // 再起動後もステータスは最終的にupへ戻る
+  await expect(card.locator('.status')).toHaveText('up', { timeout: 15_000 });
+});
