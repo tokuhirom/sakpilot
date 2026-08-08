@@ -265,6 +265,73 @@ func TestService_ApplicationVersionLifecycle(t *testing.T) {
 	}
 }
 
+func TestService_CreateApplicationVersion(t *testing.T) {
+	srv := mockapprundedicated.NewTestServer(mockapprundedicated.Config{})
+	defer srv.Close()
+	ctx := context.Background()
+	rawClient := newRawClient(t, srv.TestURL())
+
+	clusterID := seedCluster(t, ctx, rawClient)
+	appID := seedApplication(t, ctx, rawClient, clusterID)
+	appIDStr := uuid.UUID(appID).String()
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_APPRUN_DEDICATED", srv.TestURL())
+
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	lbPort := int32(443)
+	created, err := service.CreateApplicationVersion(ctx, appIDStr, apprun.CreateAppVersionParams{
+		CPU:         1000,
+		Memory:      512,
+		ScalingMode: "manual",
+		FixedScale:  saclient.Ptr(int32(2)),
+		Image:       "nginx:latest",
+		ExposedPorts: []apprun.CreateExposedPortParams{
+			{
+				TargetPort:       8080,
+				LoadBalancerPort: &lbPort,
+				UseLetsEncrypt:   true,
+				Host:             []string{"example.com"},
+				HealthCheck: &apprun.CreateHealthCheckParams{
+					Path:            "/healthz",
+					IntervalSeconds: 10,
+					TimeoutSeconds:  5,
+				},
+			},
+		},
+		EnvVars: []apprun.CreateEnvVarParams{
+			{Key: "FOO", Value: saclient.Ptr("bar")},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateApplicationVersion: %v", err)
+	}
+	if created.Image != "nginx:latest" {
+		t.Errorf("Image = %q, want %q", created.Image, "nginx:latest")
+	}
+
+	detail, err := service.GetApplicationVersion(ctx, appIDStr, created.Version)
+	if err != nil {
+		t.Fatalf("GetApplicationVersion: %v", err)
+	}
+	if detail.CPU != 1000 {
+		t.Errorf("CPU = %d, want 1000", detail.CPU)
+	}
+	if detail.FixedScale != 2 {
+		t.Errorf("FixedScale = %d, want 2", detail.FixedScale)
+	}
+	if len(detail.Env) != 1 || detail.Env[0].Key != "FOO" || detail.Env[0].Value != "bar" {
+		t.Errorf("Env = %+v, want [{FOO bar false}]", detail.Env)
+	}
+	if len(detail.ExposedPorts) != 1 || detail.ExposedPorts[0].TargetPort != 8080 {
+		t.Errorf("ExposedPorts = %+v, want target port 8080", detail.ExposedPorts)
+	}
+}
+
 func TestService_DeleteCluster(t *testing.T) {
 	srv := mockapprundedicated.NewTestServer(mockapprundedicated.Config{})
 	defer srv.Close()

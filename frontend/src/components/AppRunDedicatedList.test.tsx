@@ -14,6 +14,7 @@ import {
   GetAppRunLBNodes,
   ClearAppRunActiveVersion,
   SetAppRunActiveVersion,
+  CreateAppRunApplicationVersion,
   DeleteAppRunCluster,
   DeleteAppRunApplication,
   DeleteAppRunASG,
@@ -84,6 +85,7 @@ describe('AppRunDedicatedList', () => {
     vi.mocked(GetAppRunLBNodes).mockReset();
     vi.mocked(ClearAppRunActiveVersion).mockReset();
     vi.mocked(SetAppRunActiveVersion).mockReset();
+    vi.mocked(CreateAppRunApplicationVersion).mockReset();
     vi.mocked(DeleteAppRunCluster).mockReset();
     vi.mocked(DeleteAppRunApplication).mockReset();
     vi.mocked(DeleteAppRunASG).mockReset();
@@ -99,6 +101,9 @@ describe('AppRunDedicatedList', () => {
     vi.mocked(GetAppRunLBNodes).mockResolvedValue([]);
     vi.mocked(ClearAppRunActiveVersion).mockResolvedValue();
     vi.mocked(SetAppRunActiveVersion).mockResolvedValue();
+    vi.mocked(CreateAppRunApplicationVersion).mockResolvedValue(
+      new apprun.AppVersionInfo({ version: 3, image: 'nginx:3', activeNodeCount: 0, createdAt: '2026-08-08T00:00:00Z' })
+    );
     vi.mocked(DeleteAppRunCluster).mockResolvedValue();
     vi.mocked(DeleteAppRunApplication).mockResolvedValue();
     vi.mocked(DeleteAppRunASG).mockResolvedValue();
@@ -344,5 +349,103 @@ describe('AppRunDedicatedList', () => {
       expect(DeleteAppRunLoadBalancer).toHaveBeenCalledWith('default', 'cluster-1', 'asg-1', 'lb-1');
     });
     expect(GetAppRunLoadBalancers).toHaveBeenCalledWith('default', 'cluster-1', 'asg-1');
+  });
+
+  it('deploys a new version with default (manual) scaling and reloads the version list', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(GetAppRunApplications).mockResolvedValue([makeApp()]);
+    vi.mocked(GetAppRunApplicationVersions).mockResolvedValue([makeVersion({ version: 1 })]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('my-app'));
+
+    await user.click(await screen.findByText('+ デプロイ'));
+    expect(await screen.findByText('新しいバージョンをデプロイ')).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('docker.io/library/nginx:latest'), 'nginx:latest');
+    await user.click(screen.getByRole('button', { name: 'デプロイする' }));
+
+    await waitFor(() => {
+      expect(CreateAppRunApplicationVersion).toHaveBeenCalledWith(
+        'default',
+        'app-1',
+        expect.objectContaining({ image: 'nginx:latest', scalingMode: 'manual', fixedScale: 1 })
+      );
+    });
+    expect(GetAppRunApplicationVersions).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText('新しいバージョンをデプロイ')).not.toBeInTheDocument();
+  });
+
+  it('requires an image before submitting the deploy form', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(GetAppRunApplications).mockResolvedValue([makeApp()]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('my-app'));
+    await user.click(await screen.findByText('+ デプロイ'));
+
+    expect(screen.getByRole('button', { name: 'デプロイする' })).toBeDisabled();
+    expect(CreateAppRunApplicationVersion).not.toHaveBeenCalled();
+  });
+
+  it('switches to cpu-based scaling and sends min/max scale instead of a fixed scale', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(GetAppRunApplications).mockResolvedValue([makeApp()]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('my-app'));
+    await user.click(await screen.findByText('+ デプロイ'));
+
+    await user.type(screen.getByPlaceholderText('docker.io/library/nginx:latest'), 'nginx:latest');
+    await user.selectOptions(screen.getByDisplayValue('固定 (manual)'), 'cpu');
+    await user.click(screen.getByRole('button', { name: 'デプロイする' }));
+
+    await waitFor(() => {
+      expect(CreateAppRunApplicationVersion).toHaveBeenCalledWith(
+        'default',
+        'app-1',
+        expect.objectContaining({ scalingMode: 'cpu', minScale: 1, maxScale: 3, fixedScale: undefined })
+      );
+    });
+  });
+
+  it('cancels the deploy form without calling the API', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(GetAppRunApplications).mockResolvedValue([makeApp()]);
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('my-app'));
+    await user.click(await screen.findByText('+ デプロイ'));
+    await user.type(screen.getByPlaceholderText('docker.io/library/nginx:latest'), 'nginx:latest');
+
+    await user.click(screen.getByText('キャンセル'));
+
+    expect(screen.queryByText('新しいバージョンをデプロイ')).not.toBeInTheDocument();
+    expect(CreateAppRunApplicationVersion).not.toHaveBeenCalled();
+  });
+
+  it('shows an error message when deploying a version fails', async () => {
+    vi.mocked(GetAppRunClusters).mockResolvedValue([makeCluster()]);
+    vi.mocked(GetAppRunApplications).mockResolvedValue([makeApp()]);
+    vi.mocked(CreateAppRunApplicationVersion).mockRejectedValue(new Error('quota exceeded'));
+    const user = userEvent.setup();
+
+    render(<AppRunDedicatedList profile="default" />);
+    await user.click(await screen.findByText('my-cluster'));
+    await user.click(await screen.findByText('my-app'));
+    await user.click(await screen.findByText('+ デプロイ'));
+    await user.type(screen.getByPlaceholderText('docker.io/library/nginx:latest'), 'nginx:latest');
+    await user.click(screen.getByRole('button', { name: 'デプロイする' }));
+
+    expect(await screen.findByText(/エラー: Error: quota exceeded/)).toBeInTheDocument();
+    expect(screen.getByText('新しいバージョンをデプロイ')).toBeInTheDocument();
   });
 });

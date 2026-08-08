@@ -943,6 +943,14 @@ func (a *App) GetAppRunApplicationVersion(profileName, applicationID string, ver
 	return service.GetApplicationVersion(a.ctx, applicationID, version)
 }
 
+func (a *App) CreateAppRunApplicationVersion(profileName, applicationID string, params apprun.CreateAppVersionParams) (*apprun.AppVersionInfo, error) {
+	service, err := apprun.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateApplicationVersion(a.ctx, applicationID, params)
+}
+
 func (a *App) DeleteAppRunCluster(profileName, clusterID string) error {
 	service, err := apprun.NewService(profileName)
 	if err != nil {
