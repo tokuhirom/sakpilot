@@ -26,6 +26,7 @@ import { MonitorDetail } from './components/MonitorDetail';
 import { DatabaseList } from './components/DatabaseList';
 import { DatabaseDetail } from './components/DatabaseDetail';
 import { NFSList } from './components/NFSList';
+import { NFSDetail } from './components/NFSDetail';
 import { Monitoring } from './components/Monitoring';
 import { MonitoringMetricDetail } from './components/MonitoringMetricDetail';
 import { AppRunDedicatedList } from './components/AppRunDedicatedList';
@@ -182,6 +183,7 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
               <Route path="databases" element={<span className="breadcrumb-item active">データベース</span>} />
               <Route path="databases/:id" element={<DatabaseBreadcrumb profile={profile} />} />
               <Route path="nfs" element={<span className="breadcrumb-item active">NFS</span>} />
+              <Route path="nfs/:id" element={<NFSBreadcrumb profile={profile} />} />
               <Route path="packetfilters" element={<span className="breadcrumb-item active">パケットフィルター</span>} />
               <Route path="packetfilters/:id" element={<PacketFilterBreadcrumb profile={profile} />} />
               <Route path="dns" element={<span className="breadcrumb-item active">DNS</span>} />
@@ -248,7 +250,10 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
             <DatabaseDetailWrapper profile={profile} zone={selectedZone} />
           } />
           <Route path="nfs" element={
-            <NFSList profile={profile} zone={selectedZone} zones={zones} onZoneChange={setSelectedZone} />
+            <NFSListWrapper profile={profile} zone={selectedZone} zones={zones} onZoneChange={setSelectedZone} />
+          } />
+          <Route path="nfs/:id" element={
+            <NFSDetailWrapper profile={profile} zone={selectedZone} />
           } />
           <Route path="switches" element={
             <SwitchListWrapper profile={profile} zone={selectedZone} zones={zones} onZoneChange={setSelectedZone} />
@@ -351,6 +356,25 @@ function DatabaseDetailWrapper({ profile, zone }: { profile: string; zone: strin
   const { id } = useParams<{ id: string }>();
   if (!id) return null;
   return <DatabaseDetail profile={profile} zone={zone} databaseId={id} />;
+}
+
+function NFSListWrapper({ profile, zone, zones, onZoneChange }: { profile: string; zone: string; zones: sakura.ZoneInfo[]; onZoneChange: (zone: string) => void }) {
+  const navigate = useNavigate();
+  return (
+    <NFSList
+      profile={profile}
+      zone={zone}
+      zones={zones}
+      onZoneChange={onZoneChange}
+      onSelectNFS={(id) => navigate(`/${profile}/nfs/${id}`)}
+    />
+  );
+}
+
+function NFSDetailWrapper({ profile, zone }: { profile: string; zone: string }) {
+  const { id } = useParams<{ id: string }>();
+  if (!id) return null;
+  return <NFSDetail profile={profile} zone={zone} nfsId={id} />;
 }
 
 function SwitchListWrapper({ profile, zone, zones, onZoneChange }: { profile: string; zone: string; zones: sakura.ZoneInfo[]; onZoneChange: (zone: string) => void }) {
@@ -508,6 +532,19 @@ function DiskBreadcrumb({ profile }: { profile: string }) {
     <>
       <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/${profile}/disks`)}>
         ディスク
+      </span>
+      <span className="breadcrumb-separator">/</span>
+      <span className="breadcrumb-item active">詳細</span>
+    </>
+  );
+}
+
+function NFSBreadcrumb({ profile }: { profile: string }) {
+  const navigate = useNavigate();
+  return (
+    <>
+      <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/${profile}/nfs`)}>
+        NFS
       </span>
       <span className="breadcrumb-separator">/</span>
       <span className="breadcrumb-item active">詳細</span>

@@ -3,13 +3,26 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NFSList } from './NFSList';
 import { sakura } from '../../wailsjs/go/models';
-import { GetNFSList, PowerOnNFS, PowerOffNFS, DeleteNFS, GetNFSStatus, ResetNFS } from '../../wailsjs/go/main/App';
+import { GetNFSList, PowerOnNFS, PowerOffNFS, DeleteNFS, GetNFSStatus, ResetNFS, CreateNFS, GetSwitches } from '../../wailsjs/go/main/App';
 
 vi.mock('../../wailsjs/go/main/App');
 
 const zones: sakura.ZoneInfo[] = [
   new sakura.ZoneInfo({ id: 'is1a', name: '石狩第1ゾーン' }),
 ];
+
+function makeSwitch(overrides: Partial<sakura.SwitchInfo> = {}): sakura.SwitchInfo {
+  return new sakura.SwitchInfo({
+    id: 'sw-1',
+    name: 'my-switch',
+    description: '',
+    serverCount: 0,
+    networkMaskLen: 0,
+    defaultRoute: '',
+    scope: 'user',
+    ...overrides,
+  });
+}
 
 function makeNFS(overrides: Partial<sakura.NFSInfo> = {}): sakura.NFSInfo {
   return new sakura.NFSInfo({
@@ -37,6 +50,8 @@ describe('NFSList', () => {
     vi.mocked(DeleteNFS).mockReset();
     vi.mocked(GetNFSStatus).mockReset();
     vi.mocked(ResetNFS).mockReset();
+    vi.mocked(CreateNFS).mockReset();
+    vi.mocked(GetSwitches).mockReset();
   });
 
   afterEach(() => {
@@ -46,7 +61,7 @@ describe('NFSList', () => {
   it('lists NFS instances returned by GetNFSList', async () => {
     vi.mocked(GetNFSList).mockResolvedValueOnce([makeNFS()]);
 
-    render(<NFSList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    render(<NFSList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectNFS={() => {}} />);
 
     expect(await screen.findByText('my-nfs')).toBeInTheDocument();
     expect(screen.getByText('192.168.0.21', { exact: false })).toBeInTheDocument();
@@ -56,7 +71,7 @@ describe('NFSList', () => {
   it('shows an empty state when there is no NFS', async () => {
     vi.mocked(GetNFSList).mockResolvedValueOnce([]);
 
-    render(<NFSList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    render(<NFSList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectNFS={() => {}} />);
 
     expect(await screen.findByText('NFSがありません')).toBeInTheDocument();
   });
@@ -65,7 +80,7 @@ describe('NFSList', () => {
     vi.mocked(GetNFSList).mockResolvedValueOnce([makeNFS({ status: 'up' })]);
     const user = userEvent.setup();
 
-    render(<NFSList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    render(<NFSList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectNFS={() => {}} />);
     await screen.findByText('my-nfs');
 
     await user.click(screen.getByRole('button', { name: '⋮' }));
@@ -79,7 +94,7 @@ describe('NFSList', () => {
     vi.mocked(GetNFSList).mockResolvedValueOnce([makeNFS({ status: 'down' })]);
     const user = userEvent.setup();
 
-    render(<NFSList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    render(<NFSList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectNFS={() => {}} />);
     await screen.findByText('my-nfs');
 
     await user.click(screen.getByRole('button', { name: '⋮' }));
@@ -94,7 +109,7 @@ describe('NFSList', () => {
     vi.mocked(DeleteNFS).mockResolvedValueOnce(undefined);
     const user = userEvent.setup();
 
-    render(<NFSList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    render(<NFSList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectNFS={() => {}} />);
     await screen.findByText('my-nfs');
 
     await user.click(screen.getByRole('button', { name: '⋮' }));
@@ -118,7 +133,7 @@ describe('NFSList', () => {
     vi.mocked(PowerOnNFS).mockResolvedValueOnce(undefined);
     vi.mocked(GetNFSStatus).mockResolvedValueOnce('up');
 
-    render(<NFSList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    render(<NFSList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectNFS={() => {}} />);
     await screen.findByText('my-nfs');
 
     // userEventはfakeTimers下では内部delayが解決せず固まるため、クリックはfireEventで行う。
@@ -144,7 +159,7 @@ describe('NFSList', () => {
       .mockResolvedValueOnce([makeNFS({ status: 'up' })]);
     vi.mocked(ResetNFS).mockResolvedValueOnce(undefined);
 
-    render(<NFSList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    render(<NFSList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectNFS={() => {}} />);
     await screen.findByText('my-nfs');
 
     vi.useFakeTimers();
@@ -164,6 +179,38 @@ describe('NFSList', () => {
     expect(GetNFSList).toHaveBeenCalledTimes(2);
     await vi.waitFor(() => {
       expect(screen.queryByText('再起動中...')).not.toBeInTheDocument();
+    });
+  });
+
+  it('creates an NFS via the create modal and reloads the list', async () => {
+    vi.mocked(GetNFSList)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([makeNFS({ name: 'e2e-created-nfs' })]);
+    vi.mocked(GetSwitches).mockResolvedValueOnce([makeSwitch()]);
+    vi.mocked(CreateNFS).mockResolvedValueOnce(makeNFS({ name: 'e2e-created-nfs' }));
+    const user = userEvent.setup();
+
+    render(<NFSList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectNFS={() => {}} />);
+    await screen.findByText('NFSがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ NFS作成' }));
+    expect(await screen.findByRole('option', { name: 'my-switch' })).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('my-nfs'), 'e2e-created-nfs');
+    await user.selectOptions(screen.getByLabelText('接続スイッチ'), 'sw-1');
+    await user.type(screen.getByPlaceholderText('例: 192.168.0.11'), '192.168.0.11');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    await waitFor(() => {
+      expect(CreateNFS).toHaveBeenCalledWith('default', 'is1a', expect.objectContaining({
+        Name: 'e2e-created-nfs',
+        SwitchID: 'sw-1',
+        IPAddress: '192.168.0.11',
+        PlanClass: 'hdd',
+      }));
+    });
+    await waitFor(() => {
+      expect(GetNFSList).toHaveBeenCalledTimes(2);
     });
   });
 });

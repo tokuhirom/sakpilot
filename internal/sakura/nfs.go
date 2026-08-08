@@ -2,8 +2,10 @@ package sakura
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
+	"github.com/sacloud/sacloud-sdk-go/api/iaas/helper/query"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 )
 
@@ -39,22 +41,77 @@ func (s *NFSService) List(ctx context.Context, zone string) ([]NFSInfo, error) {
 
 	nfsList := make([]NFSInfo, 0, len(result.NFS))
 	for _, n := range result.NFS {
-		nfsList = append(nfsList, NFSInfo{
-			ID:             n.ID.String(),
-			Name:           n.Name,
-			Description:    n.Description,
-			Zone:           zone,
-			Status:         string(n.InstanceStatus),
-			IPAddresses:    n.IPAddresses,
-			Tags:           n.Tags,
-			CreatedAt:      n.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			PlanID:         n.PlanID.String(),
-			DefaultRoute:   n.DefaultRoute,
-			NetworkMaskLen: n.NetworkMaskLen,
-			SwitchName:     n.SwitchName,
-		})
+		nfsList = append(nfsList, *nfsFromSDK(zone, n))
 	}
 	return nfsList, nil
+}
+
+func (s *NFSService) Get(ctx context.Context, zone string, nfsID string) (*NFSInfo, error) {
+	nfsOp := iaas.NewNFSOp(s.client.Caller())
+	n, err := nfsOp.Read(ctx, zone, types.StringID(nfsID))
+	if err != nil {
+		return nil, err
+	}
+	return nfsFromSDK(zone, n), nil
+}
+
+// NFSCreateParams はNFS作成時のパラメータ。PlanClass は "hdd"/"ssd"(types.NFSPlanStrings参照)、
+// SizeGB は選択したPlanClassで利用可能なサイズ(HDD: 100/500/1024/2048/4096/8192/12288、SSD: 20/100/500/1024/2048/4096)。
+type NFSCreateParams struct {
+	Name           string
+	Description    string
+	Tags           []string
+	SwitchID       string
+	IPAddress      string
+	NetworkMaskLen int
+	DefaultRoute   string
+	PlanClass      string
+	SizeGB         int
+}
+
+func (s *NFSService) Create(ctx context.Context, zone string, params NFSCreateParams) (*NFSInfo, error) {
+	diskPlanID, ok := types.NFSPlanIDMap[params.PlanClass]
+	if !ok {
+		return nil, fmt.Errorf("invalid NFS plan class: %s", params.PlanClass)
+	}
+
+	noteOp := iaas.NewNoteOp(s.client.Caller())
+	planID, err := query.FindNFSPlanID(ctx, noteOp, zone, diskPlanID, types.ENFSSize(params.SizeGB))
+	if err != nil {
+		return nil, err
+	}
+	if planID.IsEmpty() {
+		return nil, fmt.Errorf("NFS plan not found for class=%s size=%dGB", params.PlanClass, params.SizeGB)
+	}
+
+	nfsOp := iaas.NewNFSOp(s.client.Caller())
+	n, err := nfsOp.Create(ctx, zone, &iaas.NFSCreateRequest{
+		SwitchID:       types.StringID(params.SwitchID),
+		PlanID:         planID,
+		IPAddresses:    []string{params.IPAddress},
+		NetworkMaskLen: params.NetworkMaskLen,
+		DefaultRoute:   params.DefaultRoute,
+		Name:           params.Name,
+		Description:    params.Description,
+		Tags:           params.Tags,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return nfsFromSDK(zone, n), nil
+}
+
+func (s *NFSService) Update(ctx context.Context, zone string, nfsID string, name string, description string, tags []string) (*NFSInfo, error) {
+	nfsOp := iaas.NewNFSOp(s.client.Caller())
+	n, err := nfsOp.Update(ctx, zone, types.StringID(nfsID), &iaas.NFSUpdateRequest{
+		Name:        name,
+		Description: description,
+		Tags:        tags,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return nfsFromSDK(zone, n), nil
 }
 
 func (s *NFSService) PowerOn(ctx context.Context, zone string, nfsID string) error {
@@ -95,4 +152,21 @@ func (s *NFSService) GetStatus(ctx context.Context, zone string, nfsID string) (
 		return "", err
 	}
 	return string(n.InstanceStatus), nil
+}
+
+func nfsFromSDK(zone string, n *iaas.NFS) *NFSInfo {
+	return &NFSInfo{
+		ID:             n.ID.String(),
+		Name:           n.Name,
+		Description:    n.Description,
+		Zone:           zone,
+		Status:         string(n.InstanceStatus),
+		IPAddresses:    n.IPAddresses,
+		Tags:           n.Tags,
+		CreatedAt:      n.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		PlanID:         n.PlanID.String(),
+		DefaultRoute:   n.DefaultRoute,
+		NetworkMaskLen: n.NetworkMaskLen,
+		SwitchName:     n.SwitchName,
+	}
 }
