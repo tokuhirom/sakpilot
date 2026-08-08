@@ -11,11 +11,13 @@ import {
   CreateProxyLB,
   UpdateProxyLB,
   UpdateProxyLBSettings,
+  ChangeProxyLBPlan,
 } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useSearch } from '../hooks/useSearch';
 import { useGlobalReload } from '../hooks/useGlobalReload';
 import { SearchBar } from './SearchBar';
+import { ProxyLBConnectionGraph } from './ProxyLBConnectionGraph';
 
 interface ProxyLBListProps {
   profile: string;
@@ -140,6 +142,10 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
   const [settingsForm, setSettingsForm] = useState<SettingsForm | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [showChangePlan, setShowChangePlan] = useState(false);
+  const [changePlanValue, setChangePlanValue] = useState(100);
+  const [changingPlan, setChangingPlan] = useState(false);
+  const [changePlanError, setChangePlanError] = useState<string | null>(null);
 
   const {
     searchQuery,
@@ -542,6 +548,33 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
     }
   };
 
+  const handleChangePlanOpen = () => {
+    if (!selectedProxyLB) return;
+    const current = PLAN_OPTIONS.find((p) => selectedProxyLB.plan.includes(String(p)));
+    setChangePlanValue(current ?? 100);
+    setChangePlanError(null);
+    setShowChangePlan(true);
+  };
+
+  const handleChangePlanCancel = () => {
+    setShowChangePlan(false);
+  };
+
+  const handleChangePlanSubmit = async () => {
+    if (!selectedProxyLB) return;
+    setChangingPlan(true);
+    setChangePlanError(null);
+    try {
+      const updated = await ChangeProxyLBPlan(profile, selectedProxyLB.id, changePlanValue);
+      setSelectedProxyLB(updated);
+      setShowChangePlan(false);
+    } catch (e) {
+      setChangePlanError(String(e));
+    } finally {
+      setChangingPlan(false);
+    }
+  };
+
   const formatCertDate = (dateString?: string) => {
     if (!dateString) return '-';
     return formatDate(dateString);
@@ -570,15 +603,17 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
   };
 
   const getPlanName = (plan: string) => {
-    if (plan.includes('100')) return '100 CPS';
-    if (plan.includes('500')) return '500 CPS';
-    if (plan.includes('1000')) return '1,000 CPS';
-    if (plan.includes('5000')) return '5,000 CPS';
-    if (plan.includes('10000')) return '10,000 CPS';
-    if (plan.includes('50000')) return '50,000 CPS';
-    if (plan.includes('100000')) return '100,000 CPS';
-    if (plan.includes('400000')) return '400,000 CPS';
-    return plan;
+    switch (plan) {
+      case '100': return '100 CPS';
+      case '500': return '500 CPS';
+      case '1000': return '1,000 CPS';
+      case '5000': return '5,000 CPS';
+      case '10000': return '10,000 CPS';
+      case '50000': return '50,000 CPS';
+      case '100000': return '100,000 CPS';
+      case '400000': return '400,000 CPS';
+      default: return plan;
+    }
   };
 
   const getProxyModeName = (mode: string) => {
@@ -680,7 +715,12 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
               </tr>
               <tr>
                 <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>プラン</td>
-                <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>{getPlanName(selectedProxyLB.plan)}</td>
+                <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>
+                  <span style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    {getPlanName(selectedProxyLB.plan)}
+                    <button className="btn btn-secondary btn-small" onClick={handleChangePlanOpen}>プラン変更</button>
+                  </span>
+                </td>
               </tr>
               <tr>
                 <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>リージョン</td>
@@ -858,6 +898,12 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
           ) : (
             <div style={{ color: '#666' }}>ヘルスステータスを取得できませんでした</div>
           )}
+        </div>
+
+        {/* Traffic Graph */}
+        <div className="card" style={{ marginBottom: '1rem', padding: '1rem', background: '#2a2a2a', borderRadius: '8px' }}>
+          <h4 style={{ color: '#00adb5', marginTop: 0, marginBottom: '1rem' }}>トラフィックグラフ</h4>
+          <ProxyLBConnectionGraph profile={profile} proxyLBId={selectedProxyLB.id} />
         </div>
 
         {/* Certificates */}
@@ -1217,6 +1263,47 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
                 <button className="btn btn-secondary" onClick={handleSettingsEditCancel}>キャンセル</button>
                 <button className="btn btn-primary" onClick={handleSettingsSave} disabled={savingSettings}>
                   {savingSettings ? '保存中...' : '保存する'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showChangePlan && (
+          <div className="modal-overlay" onClick={handleChangePlanCancel} style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+          }}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+              backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+              padding: '20px', minWidth: '320px', maxWidth: '420px',
+            }}>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>プラン変更</h3>
+              <div className="form-group">
+                <label htmlFor="proxylb-change-plan">プラン</label>
+                <select
+                  id="proxylb-change-plan"
+                  value={changePlanValue}
+                  onChange={(e) => setChangePlanValue(parseInt(e.target.value, 10))}
+                >
+                  {PLAN_OPTIONS.map((p) => (
+                    <option key={p} value={p}>{getPlanName(String(p))}</option>
+                  ))}
+                </select>
+              </div>
+              <p style={{ color: '#888', fontSize: '0.85rem' }}>
+                プランを変更すると、実サーバーへの接続が一時的に切断される場合があります。
+              </p>
+              {changePlanError && (
+                <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                  エラー: {changePlanError}
+                </div>
+              )}
+              <div className="confirm-actions">
+                <button className="btn btn-secondary" onClick={handleChangePlanCancel} disabled={changingPlan}>キャンセル</button>
+                <button className="btn btn-primary" onClick={handleChangePlanSubmit} disabled={changingPlan}>
+                  {changingPlan ? '変更中...' : '変更する'}
                 </button>
               </div>
             </div>

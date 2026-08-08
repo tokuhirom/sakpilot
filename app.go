@@ -2055,3 +2055,21 @@ func (a *App) UpdateProxyLBSettings(profileName, proxyLBId string, input sakura.
 	service := sakura.NewProxyLBService(client)
 	return service.UpdateSettings(a.ctx, proxyLBId, input)
 }
+
+func (a *App) ChangeProxyLBPlan(profileName, proxyLBId string, cps int) (*sakura.ProxyLBInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewProxyLBService(client)
+	return service.ChangePlan(a.ctx, proxyLBId, cps)
+}
+
+func (a *App) GetProxyLBMonitorConnection(profileName, proxyLBId string, start, end int64) ([]sakura.ProxyLBConnectionValueInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewProxyLBService(client)
+	return service.MonitorConnection(a.ctx, proxyLBId, start, end)
+}

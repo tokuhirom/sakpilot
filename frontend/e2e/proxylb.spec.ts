@@ -26,6 +26,29 @@ test('ELB詳細でヘルスステータスが確認できる', async ({ page }) 
   await expect(page.getByText('現在のVIP:')).toBeVisible();
 });
 
+test('ELB詳細でプランを変更できる', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'ELB' }).click();
+  await card(page, 'e2e-elb').click();
+
+  await expect(page.getByText('100 CPS')).toBeVisible();
+  await page.getByRole('button', { name: 'プラン変更' }).click();
+  await page.getByLabel('プラン').selectOption('500');
+  await page.getByRole('button', { name: '変更する' }).click();
+
+  await expect(page.getByText('500 CPS')).toBeVisible();
+});
+
+test('ELB詳細でトラフィックグラフが表示される', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'ELB' }).click();
+  await card(page, 'e2e-elb').click();
+
+  const trafficCard = page.locator('.card', { has: page.getByRole('heading', { name: 'トラフィックグラフ' }) });
+  await expect(trafficCard).toBeVisible();
+  await expect(trafficCard.locator('.u-legend')).toContainText('アクティブ接続');
+});
+
 test('ELBを新規作成すると一覧に表示される', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('link', { name: 'ELB' }).click();

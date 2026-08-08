@@ -104,8 +104,7 @@
 - ✅ **対応済み（PR #88）**: 削除機能とFEテストを追加。詳細画面ヘッダーに削除ボタンを配置
 - ✅ **対応済み**: 証明書管理（GetCertificates/SetCertificates/DeleteCertificates/RenewLetsEncryptCert）を追加。詳細画面に「SSL証明書」カードを新設し、プライマリ証明書＋追加証明書（複数可）の設定フォーム、削除確認、Let's Encrypt更新確認ダイアログを実装。取得したPrivateKeyはUIに表示しない（`ProxyLBCertInfo`から除外）方針とした
 - ✅ **対応済み（2026-08-08 Tier2 #9、PR #119）**: Create/Update/UpdateSettingsを追加。作成モーダル（名前・説明・プラン・リージョン・VIPフェイルオーバー）、基本情報のインライン編集、ヘルスチェック/Sorry Server/待ち受けポート/実サーバーの設定編集モーダルを実装。Update系APIは全設定を含むリクエスト構造のため、GSLB/SimpleMonitor等と同じく事前ReadでSettingsHashと未編集項目を取得してから送信する。あわせて`ProxyLBInfo`にHealthCheck/SorryServerを追加（従来欠けており、設定編集モーダルが実データではなくデフォルト値から初期化されるバグになるところだった）。`frontend/e2e/proxylb.spec.ts`にも作成・編集シナリオを追加
-- SDK比較で残る不足: ChangePlan/MonitorConnection（トラフィックグラフ、未着手）
-- **TODO**: トラフィック監視（MonitorConnection）は次点で検討
+- ✅ **対応済み（2026-08-09、Tier3 #20）**: ChangePlan/MonitorConnection（トラフィックグラフ）を追加。プラン変更は`ProxyLBChangePlanRequest.ServiceClass`を`types.ProxyLBServiceClass(plan, region)`で算出して送信（ProxyLBはID再採番を伴わず、Serverのプラン変更とは異なりレスポンスのIDは不変）。トラフィックグラフは`ProxyLBOp.MonitorConnection`の戻り値（ActiveConnections/ConnectionsPerSec時系列）をuPlotで表示する専用コンポーネント`ProxyLBConnectionGraph.tsx`を新設（Monitoring SuiteのPrometheusベースの`MetricGraph.tsx`とはデータソースが異なるため共通化しなかった）。実装中に`getPlanName`が`.includes()`による部分一致判定だったため1000/5000/10000/50000/100000 CPSが誤表示されるバグ（プラン変更モーダルの`<select>`に全プラン分の`<option>`を並べたE2Eテストで顕在化）を発見し、完全一致のswitch文に修正。あわせてuPlot使用コンポーネントのテストに必要な`window.matchMedia`のjsdomモックを`test/setup.ts`に追加
 
 ### SimpleMonitor
 - テスト: `MonitorList.test.tsx`（一覧表示・詳細遷移・削除確認・作成フロー）、`MonitorDetail.test.tsx`（基本情報表示・説明編集・監視設定編集）ともに整備済み。`frontend/e2e/simplemonitor.spec.ts` で作成〜設定編集〜削除までのE2Eもカバー
@@ -292,7 +291,7 @@
 17. ✅ Archive: Create/CreateBlank/CreateFromShared/Share/OpenFTP/CloseFTP — 2026-08-08対応済み
 18. ✅ ObjectStorage: AccountのRead/Delete、PermissionsAPI全般、暗号化/レプリケーション/クォータ設定、S3側のPutObject/DeleteObject — 2026-08-09対応済み
 19. ✅ Monitoring Suite: ストレージ・アクセスキーのCreate/Update/Destroy — 2026-08-09対応済み
-20. ProxyLB: ChangePlan/MonitorConnection（トラフィックグラフ）
+20. ✅ ProxyLB: ChangePlan/MonitorConnection（トラフィックグラフ） — 2026-08-09対応済み
 21. Bill: ByContractYear/ByContractYearMonth（期間絞り込み）/DetailsCSV
 
 **Tier 4: ドキュメント整備（機能追加ではないが、書き込み系機能が一通り揃った段階でユーザーから提案。2026-08-09追加）**
@@ -322,3 +321,10 @@
 - `MonitoringMetricDetail.test.tsx`にuseNavigateのための`MemoryRouter`ラップを追加（既存7テストが`useNavigate() may be used only in the context of a <Router>`で全滅していたのを機に修正）、編集・削除・アクセスキー作成/削除の4テストを追加。`Monitoring.test.tsx`を新規作成（作成/削除/キャンセルフロー5テスト）
 - ユーザーの要望を受け、各サービスで積み重ねてきたUI実装パターン（editingBasic単一フォーム編集、SettingsHash事前Read+楽観ロック、一度きりSecret表示モーダル等）を`docs/ui-implementation-patterns.md`に整理して追加
 - `golangci-lint run`（0 issues）/`go build`/`go vet`/`go test ./...`/`tsc --noEmit`/`npm run test`（264件全パス）/`wails build -tags webkit2_41`を確認してから作成
+
+### ✅ 完了（2026-08-09 追加セッション30、Tier3 #20）
+- ProxyLBのChangePlan/MonitorConnectionを実装。`internal/sakura/proxylb.go`に`ChangePlan`（`types.ProxyLBServiceClass(plan, region)`でServiceClass文字列を算出、現在のRegionを事前Readで引き継ぐ）と`MonitorConnection`（`ProxyLBOp.MonitorConnection`の戻り値をUnix秒start/endで取得しDTOへ変換）を追加、`app.go`に`ChangeProxyLBPlan`/`GetProxyLBMonitorConnection`の2 RPCを公開。ProxyLBのプラン変更はServerと異なりリソース再作成を伴わずID不変（fakeドライバの実装でも確認済み）。
+- トラフィックグラフはMonitoring SuiteのPrometheusベース`MetricGraph.tsx`とデータソース・レスポンス形式が異なる（ConnectionActivity: ActiveConnections/ConnectionsPerSecの単純な時系列）ため、共通化せず専用の`ProxyLBConnectionGraph.tsx`を新設（uPlotで2系列描画、1h/6h/24h/7dの期間切り替え）。`ProxyLBList.tsx`にはプラン表示行に「プラン変更」ボタンと確認モーダル、詳細画面に「トラフィックグラフ」カードを追加。
+- E2Eテスト（`frontend/e2e/proxylb.spec.ts`）でプラン変更モーダルの全`<option>`をレンダリングした際、既存の`getPlanName`が`.includes()`による部分一致判定だったため1000/5000/10000/50000/100000 CPSがそれぞれ100/500/100/500/100 CPSと誤表示されるバグを発見（400000 CPSのみ偶然一致しなかったため見た目上気づかれていなかった）。完全一致のswitch文に修正。
+- uPlotを使うコンポーネントをvitestでレンダリングすると`matchMedia is not a function`でjsdomごと落ちる（`ProxyLBList.test.tsx`が道連れで全滅）ことが判明したため、`frontend/src/test/setup.ts`に`window.matchMedia`の最小モックを追加（今後MetricGraph等uPlot系コンポーネントをテストする際にも有効）。
+- `internal/sakura/proxylb_test.go`を新設（ChangePlan/MonitorConnectionのGoテスト2件）、`frontend/e2e/proxylb.spec.ts`にプラン変更・トラフィックグラフのシナリオ2件を追加。`golangci-lint run`（0 issues）/`go build`/`go test ./...`/`tsc --noEmit`/`npm run test`（264件全パス）/`npx playwright test e2e/proxylb.spec.ts`（8件全パス）を確認してから作成
