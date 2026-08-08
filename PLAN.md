@@ -102,7 +102,8 @@
 - バックエンド: List/Get/GetHealth/**Delete**/**GetCertificates**/**SetCertificates**/**DeleteCertificates**/**RenewLetsEncryptCert** 実装済み
 - ✅ **対応済み（PR #88）**: 削除機能とFEテストを追加。詳細画面ヘッダーに削除ボタンを配置
 - ✅ **対応済み**: 証明書管理（GetCertificates/SetCertificates/DeleteCertificates/RenewLetsEncryptCert）を追加。詳細画面に「SSL証明書」カードを新設し、プライマリ証明書＋追加証明書（複数可）の設定フォーム、削除確認、Let's Encrypt更新確認ダイアログを実装。取得したPrivateKeyはUIに表示しない（`ProxyLBCertInfo`から除外）方針とした
-- SDK比較で残る不足: Create/Update/UpdateSettings/ChangePlan/MonitorConnection（トラフィックグラフ、未着手）
+- ✅ **対応済み（2026-08-08 Tier2 #9、PR #119）**: Create/Update/UpdateSettingsを追加。作成モーダル（名前・説明・プラン・リージョン・VIPフェイルオーバー）、基本情報のインライン編集、ヘルスチェック/Sorry Server/待ち受けポート/実サーバーの設定編集モーダルを実装。Update系APIは全設定を含むリクエスト構造のため、GSLB/SimpleMonitor等と同じく事前ReadでSettingsHashと未編集項目を取得してから送信する。あわせて`ProxyLBInfo`にHealthCheck/SorryServerを追加（従来欠けており、設定編集モーダルが実データではなくデフォルト値から初期化されるバグになるところだった）。`frontend/e2e/proxylb.spec.ts`にも作成・編集シナリオを追加
+- SDK比較で残る不足: ChangePlan/MonitorConnection（トラフィックグラフ、未着手）
 - **TODO**: トラフィック監視（MonitorConnection）は次点で検討
 
 ### SimpleMonitor
@@ -251,7 +252,7 @@
 **Tier 2: リソース新規作成系（入力項目・依存関係が多くフォーム設計コストが高い、または実インフラ作成を伴い課金・削除確認等の設計が必要）**
 7. ✅ Switch: Create/Update — 2026-08-08対応済み
 8. ✅ Disk: Create/Update/ConnectToServer/DisconnectFromServer — 2026-08-08対応済み（CreateWithConfigは対象外、Tier3相当として保留）
-9. ProxyLB: Create/Update/UpdateSettings
+9. ✅ ProxyLB: Create/Update/UpdateSettings — 2026-08-08対応済み
 10. KMS: Create/Update
 11. Database: Create/Update/UpdateSettings/GetParameter/SetParameter
 12. NFS: Create/Update
