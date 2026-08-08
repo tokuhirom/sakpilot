@@ -237,6 +237,145 @@ func (s *Service) ListTraffics(ctx context.Context, appID string) ([]TrafficInfo
 	return traffics, nil
 }
 
+// CreateEnvVarParams コンポーネントに渡す環境変数
+type CreateEnvVarParams struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+// CreateApplicationParams アプリケーション作成パラメータ
+type CreateApplicationParams struct {
+	Name                   string               `json:"name"`
+	Port                   int                  `json:"port"`
+	MinScale               int                  `json:"minScale"`
+	MaxScale               int                  `json:"maxScale"`
+	TimeoutSeconds         int                  `json:"timeoutSeconds"`
+	ScaleTargetConcurrency *int                 `json:"scaleTargetConcurrency,omitempty"`
+	ComponentName          string               `json:"componentName"`
+	Image                  string               `json:"image"`
+	MaxCPU                 string               `json:"maxCpu"`
+	MaxMemory              string               `json:"maxMemory"`
+	RegistryServer         *string              `json:"registryServer,omitempty"`
+	RegistryUsername       *string              `json:"registryUsername,omitempty"`
+	RegistryPassword       *string              `json:"registryPassword,omitempty"`
+	ProbePath              *string              `json:"probePath,omitempty"`
+	ProbePort              *int                 `json:"probePort,omitempty"`
+	EnvVars                []CreateEnvVarParams `json:"envVars,omitempty"`
+}
+
+// UpdateApplicationParams アプリケーション更新パラメータ（スケール・タイムアウト設定）
+type UpdateApplicationParams struct {
+	TimeoutSeconds         *int `json:"timeoutSeconds,omitempty"`
+	Port                   *int `json:"port,omitempty"`
+	MinScale               *int `json:"minScale,omitempty"`
+	MaxScale               *int `json:"maxScale,omitempty"`
+	ScaleTargetConcurrency *int `json:"scaleTargetConcurrency,omitempty"`
+}
+
+// CreateApplication アプリケーションを作成
+func (s *Service) CreateApplication(ctx context.Context, params CreateApplicationParams) (*AppDetailInfo, error) {
+	fmt.Printf("[AppRunShared] CreateApplication: name=%s\n", params.Name)
+	applicationOp := apprun.NewApplicationOp(s.client)
+
+	registry := v1.PostApplicationBodyComponentsItemDeploySourceContainerRegistry{
+		Image: params.Image,
+	}
+	if params.RegistryServer != nil {
+		registry.Server = v1.NewOptNilString(*params.RegistryServer)
+	}
+	if params.RegistryUsername != nil {
+		registry.Username = v1.NewOptNilString(*params.RegistryUsername)
+	}
+	if params.RegistryPassword != nil {
+		registry.Password = v1.NewOptNilString(*params.RegistryPassword)
+	}
+
+	component := v1.PostApplicationBodyComponentsItem{
+		Name:      params.ComponentName,
+		MaxCPU:    v1.PostApplicationBodyComponentsItemMaxCPU(params.MaxCPU),
+		MaxMemory: v1.PostApplicationBodyComponentsItemMaxMemory(params.MaxMemory),
+		DeploySource: v1.PostApplicationBodyComponentsItemDeploySource{
+			ContainerRegistry: v1.NewOptPostApplicationBodyComponentsItemDeploySourceContainerRegistry(registry),
+		},
+	}
+
+	if len(params.EnvVars) > 0 {
+		envItems := make([]v1.PostApplicationBodyComponentsItemEnvItem, 0, len(params.EnvVars))
+		for _, e := range params.EnvVars {
+			envItems = append(envItems, v1.PostApplicationBodyComponentsItemEnvItem{
+				Key:   v1.NewOptString(e.Key),
+				Value: v1.NewOptString(e.Value),
+			})
+		}
+		component.Env = v1.NewOptNilPostApplicationBodyComponentsItemEnvItemArray(envItems)
+	}
+
+	if params.ProbePath != nil {
+		port := 80
+		if params.ProbePort != nil {
+			port = *params.ProbePort
+		}
+		component.Probe = v1.NewOptNilPostApplicationBodyComponentsItemProbe(v1.PostApplicationBodyComponentsItemProbe{
+			HTTPGet: v1.NewOptNilPostApplicationBodyComponentsItemProbeHTTPGet(
+				v1.PostApplicationBodyComponentsItemProbeHTTPGet{
+					Path: *params.ProbePath,
+					Port: port,
+				},
+			),
+		})
+	}
+
+	body := &v1.PostApplicationBody{
+		Name:           params.Name,
+		TimeoutSeconds: params.TimeoutSeconds,
+		Port:           params.Port,
+		MinScale:       params.MinScale,
+		MaxScale:       params.MaxScale,
+		Components:     []v1.PostApplicationBodyComponentsItem{component},
+	}
+	if params.ScaleTargetConcurrency != nil {
+		body.ScaleTargetConcurrency = v1.NewOptInt(*params.ScaleTargetConcurrency)
+	}
+
+	created, err := applicationOp.Create(ctx, body)
+	if err != nil {
+		fmt.Printf("[AppRunShared] CreateApplication: error=%v\n", err)
+		return nil, err
+	}
+
+	return s.GetApplication(ctx, created.ID)
+}
+
+// UpdateApplication アプリケーションのスケール・タイムアウト設定を更新
+func (s *Service) UpdateApplication(ctx context.Context, appID string, params UpdateApplicationParams) (*AppDetailInfo, error) {
+	fmt.Printf("[AppRunShared] UpdateApplication: id=%s\n", appID)
+	applicationOp := apprun.NewApplicationOp(s.client)
+
+	body := &v1.PatchApplicationBody{}
+	if params.TimeoutSeconds != nil {
+		body.TimeoutSeconds = v1.NewOptInt(*params.TimeoutSeconds)
+	}
+	if params.Port != nil {
+		body.Port = v1.NewOptInt(*params.Port)
+	}
+	if params.MinScale != nil {
+		body.MinScale = v1.NewOptInt(*params.MinScale)
+	}
+	if params.MaxScale != nil {
+		body.MaxScale = v1.NewOptInt(*params.MaxScale)
+	}
+	if params.ScaleTargetConcurrency != nil {
+		body.ScaleTargetConcurrency = v1.NewOptInt(*params.ScaleTargetConcurrency)
+	}
+
+	if _, err := applicationOp.Update(ctx, appID, body); err != nil {
+		fmt.Printf("[AppRunShared] UpdateApplication: error=%v\n", err)
+		return nil, err
+	}
+
+	return s.GetApplication(ctx, appID)
+}
+
 // HasUser ユーザーが存在するか確認
 func (s *Service) HasUser(ctx context.Context) (bool, error) {
 	fmt.Printf("[AppRunShared] HasUser: checking...\n")

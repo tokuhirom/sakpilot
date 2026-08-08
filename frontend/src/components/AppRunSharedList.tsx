@@ -5,6 +5,8 @@ import {
   GetAppRunSharedVersions,
   GetAppRunSharedTraffics,
   HasAppRunSharedUser,
+  CreateAppRunSharedApplication,
+  UpdateAppRunSharedApplication,
 } from '../../wailsjs/go/main/App';
 import { apprunshared } from '../../wailsjs/go/models';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -17,6 +19,47 @@ type View =
   | { type: 'list' }
   | { type: 'detail'; appId: string; appName: string };
 
+const MAX_CPU_OPTIONS = ['0.5', '1', '2'];
+const MAX_MEMORY_OPTIONS = ['1Gi', '2Gi', '4Gi'];
+
+interface CreateEnvVarForm {
+  key: string;
+  value: string;
+}
+
+interface CreateApplicationForm {
+  name: string;
+  port: string;
+  minScale: string;
+  maxScale: string;
+  timeoutSeconds: string;
+  componentName: string;
+  image: string;
+  maxCpu: string;
+  maxMemory: string;
+  envVars: CreateEnvVarForm[];
+}
+
+const emptyCreateForm = (): CreateApplicationForm => ({
+  name: '',
+  port: '80',
+  minScale: '0',
+  maxScale: '1',
+  timeoutSeconds: '60',
+  componentName: 'component1',
+  image: '',
+  maxCpu: '0.5',
+  maxMemory: '1Gi',
+  envVars: [],
+});
+
+interface EditApplicationForm {
+  port: string;
+  minScale: string;
+  maxScale: string;
+  timeoutSeconds: string;
+}
+
 export function AppRunSharedList({ profile }: AppRunSharedListProps) {
   const [view, setView] = useState<View>({ type: 'list' });
   const [hasUser, setHasUser] = useState<boolean | null>(null);
@@ -26,6 +69,14 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
   const [traffics, setTraffics] = useState<apprunshared.TrafficInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [createForm, setCreateForm] = useState<CreateApplicationForm | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  const [editForm, setEditForm] = useState<EditApplicationForm | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const checkUser = useCallback(async () => {
     if (!profile) return;
@@ -118,6 +169,126 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
     setTraffics([]);
   };
 
+  const handleCreateOpen = () => {
+    setCreateError(null);
+    setCreateForm(emptyCreateForm());
+  };
+
+  const handleCreateCancel = () => {
+    setCreateForm(null);
+    setCreateError(null);
+  };
+
+  const handleEnvVarAdd = () => {
+    if (!createForm) return;
+    setCreateForm({ ...createForm, envVars: [...createForm.envVars, { key: '', value: '' }] });
+  };
+
+  const handleEnvVarRemove = (index: number) => {
+    if (!createForm) return;
+    setCreateForm({ ...createForm, envVars: createForm.envVars.filter((_, i) => i !== index) });
+  };
+
+  const handleEnvVarChange = (index: number, field: keyof CreateEnvVarForm, value: string) => {
+    if (!createForm) return;
+    setCreateForm({
+      ...createForm,
+      envVars: createForm.envVars.map((e, i) => (i === index ? { ...e, [field]: value } : e)),
+    });
+  };
+
+  const handleCreateSubmit = async () => {
+    if (!createForm || !profile) return;
+    if (!createForm.name.trim()) {
+      setCreateError('アプリ名を入力してください');
+      return;
+    }
+    if (!createForm.image.trim()) {
+      setCreateError('コンテナイメージを入力してください');
+      return;
+    }
+    const port = parseInt(createForm.port, 10);
+    const minScale = parseInt(createForm.minScale, 10);
+    const maxScale = parseInt(createForm.maxScale, 10);
+    const timeoutSeconds = parseInt(createForm.timeoutSeconds, 10);
+    if ([port, minScale, maxScale, timeoutSeconds].some(isNaN)) {
+      setCreateError('ポート・スケール・タイムアウトは数値で入力してください');
+      return;
+    }
+    if (createForm.envVars.some((e) => !e.key)) {
+      setCreateError('環境変数のキーを入力してください');
+      return;
+    }
+
+    setCreating(true);
+    setCreateError(null);
+    try {
+      await CreateAppRunSharedApplication(profile, new apprunshared.CreateApplicationParams({
+        name: createForm.name.trim(),
+        port,
+        minScale,
+        maxScale,
+        timeoutSeconds,
+        componentName: createForm.componentName.trim() || 'component1',
+        image: createForm.image.trim(),
+        maxCpu: createForm.maxCpu,
+        maxMemory: createForm.maxMemory,
+        envVars: createForm.envVars.map((e) => new apprunshared.CreateEnvVarParams({ key: e.key, value: e.value })),
+      }));
+      setCreateForm(null);
+      await loadApps();
+    } catch (e) {
+      setCreateError(String(e));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleEditOpen = () => {
+    if (!appDetail) return;
+    setEditError(null);
+    setEditForm({
+      port: String(appDetail.port),
+      minScale: String(appDetail.minScale),
+      maxScale: String(appDetail.maxScale),
+      timeoutSeconds: String(appDetail.timeoutSeconds),
+    });
+  };
+
+  const handleEditCancel = () => {
+    setEditForm(null);
+    setEditError(null);
+  };
+
+  const handleEditSubmit = async () => {
+    if (!editForm || !profile || view.type !== 'detail') return;
+    const port = parseInt(editForm.port, 10);
+    const minScale = parseInt(editForm.minScale, 10);
+    const maxScale = parseInt(editForm.maxScale, 10);
+    const timeoutSeconds = parseInt(editForm.timeoutSeconds, 10);
+    if ([port, minScale, maxScale, timeoutSeconds].some(isNaN)) {
+      setEditError('ポート・スケール・タイムアウトは数値で入力してください');
+      return;
+    }
+
+    setEditing(true);
+    setEditError(null);
+    try {
+      await UpdateAppRunSharedApplication(profile, view.appId, new apprunshared.UpdateApplicationParams({
+        port,
+        minScale,
+        maxScale,
+        timeoutSeconds,
+      }));
+      setEditForm(null);
+      await loadAppDetail(view.appId);
+    } catch (e) {
+      setEditError(String(e));
+    } finally {
+      setEditing(false);
+    }
+  };
+
   const getStatusClass = (status: string): string => {
     switch (status.toLowerCase()) {
       case 'healthy':
@@ -129,6 +300,229 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
       default:
         return '';
     }
+  };
+
+  const renderCreateModal = () => {
+    if (!createForm) return null;
+    return (
+      <div className="modal-overlay" onClick={handleCreateCancel} style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+      }}>
+        <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+          backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+          padding: '20px', minWidth: '480px', maxWidth: '640px', maxHeight: '85vh', overflowY: 'auto',
+        }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>アプリケーションを作成</h3>
+
+          <div className="form-group">
+            <label>アプリ名</label>
+            <input
+              type="text"
+              value={createForm.name}
+              onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+              placeholder="my-app"
+              autoFocus
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+            <div className="form-group">
+              <label>ポート</label>
+              <input
+                type="text"
+                value={createForm.port}
+                onChange={(e) => setCreateForm({ ...createForm, port: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label>タイムアウト(秒)</label>
+              <input
+                type="text"
+                value={createForm.timeoutSeconds}
+                onChange={(e) => setCreateForm({ ...createForm, timeoutSeconds: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label>最小スケール</label>
+              <input
+                type="text"
+                value={createForm.minScale}
+                onChange={(e) => setCreateForm({ ...createForm, minScale: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label>最大スケール</label>
+              <input
+                type="text"
+                value={createForm.maxScale}
+                onChange={(e) => setCreateForm({ ...createForm, maxScale: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>コンポーネント名</label>
+            <input
+              type="text"
+              value={createForm.componentName}
+              onChange={(e) => setCreateForm({ ...createForm, componentName: e.target.value })}
+            />
+          </div>
+          <div className="form-group">
+            <label>コンテナイメージ</label>
+            <input
+              type="text"
+              value={createForm.image}
+              onChange={(e) => setCreateForm({ ...createForm, image: e.target.value })}
+              placeholder="docker.io/library/nginx:latest"
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+            <div className="form-group">
+              <label>最大CPU (vCPU)</label>
+              <select
+                value={createForm.maxCpu}
+                onChange={(e) => setCreateForm({ ...createForm, maxCpu: e.target.value })}
+              >
+                {MAX_CPU_OPTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>最大メモリ</label>
+              <select
+                value={createForm.maxMemory}
+                onChange={(e) => setCreateForm({ ...createForm, maxMemory: e.target.value })}
+              >
+                {MAX_MEMORY_OPTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div style={{ marginTop: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={{ margin: 0 }}>環境変数</label>
+              <button className="btn btn-secondary btn-small" onClick={handleEnvVarAdd}>+ 環境変数追加</button>
+            </div>
+            {createForm.envVars.length === 0 ? (
+              <div style={{ color: '#888', fontSize: '0.85rem', marginTop: '0.5rem' }}>環境変数なし</div>
+            ) : (
+              createForm.envVars.map((e, index) => (
+                <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.5rem' }}>
+                  <input
+                    type="text"
+                    value={e.key}
+                    onChange={(ev) => handleEnvVarChange(index, 'key', ev.target.value)}
+                    placeholder="KEY"
+                    style={{ flex: 1 }}
+                  />
+                  <input
+                    type="text"
+                    value={e.value}
+                    onChange={(ev) => handleEnvVarChange(index, 'value', ev.target.value)}
+                    placeholder="値"
+                    style={{ flex: 1 }}
+                  />
+                  <button className="btn btn-danger btn-small" onClick={() => handleEnvVarRemove(index)}>削除</button>
+                </div>
+              ))
+            )}
+          </div>
+
+          {createError && (
+            <div style={{ marginTop: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+              エラー: {createError}
+            </div>
+          )}
+          <div className="confirm-actions" style={{ marginTop: '1.5rem' }}>
+            <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+            <button
+              className="btn btn-primary"
+              onClick={handleCreateSubmit}
+              disabled={creating || !createForm.name.trim() || !createForm.image.trim()}
+            >
+              {creating ? '作成中...' : '作成する'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderEditModal = () => {
+    if (!editForm) return null;
+    return (
+      <div className="modal-overlay" onClick={handleEditCancel} style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+      }}>
+        <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+          backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+          padding: '20px', minWidth: '360px',
+        }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>スケール・タイムアウト設定を編集</h3>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+            <div className="form-group">
+              <label htmlFor="apprun-shared-edit-port">ポート</label>
+              <input
+                id="apprun-shared-edit-port"
+                type="text"
+                value={editForm.port}
+                onChange={(e) => setEditForm({ ...editForm, port: e.target.value })}
+                autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="apprun-shared-edit-timeout">タイムアウト(秒)</label>
+              <input
+                id="apprun-shared-edit-timeout"
+                type="text"
+                value={editForm.timeoutSeconds}
+                onChange={(e) => setEditForm({ ...editForm, timeoutSeconds: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="apprun-shared-edit-min-scale">最小スケール</label>
+              <input
+                id="apprun-shared-edit-min-scale"
+                type="text"
+                value={editForm.minScale}
+                onChange={(e) => setEditForm({ ...editForm, minScale: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="apprun-shared-edit-max-scale">最大スケール</label>
+              <input
+                id="apprun-shared-edit-max-scale"
+                type="text"
+                value={editForm.maxScale}
+                onChange={(e) => setEditForm({ ...editForm, maxScale: e.target.value })}
+              />
+            </div>
+          </div>
+
+          {editError && (
+            <div style={{ marginTop: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+              エラー: {editError}
+            </div>
+          )}
+          <div className="confirm-actions" style={{ marginTop: '1.5rem' }}>
+            <button className="btn btn-secondary" onClick={handleEditCancel}>キャンセル</button>
+            <button
+              className="btn btn-primary"
+              onClick={handleEditSubmit}
+              disabled={editing}
+            >
+              {editing ? '保存中...' : '保存する'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // User not set up
@@ -194,7 +588,10 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
         ) : appDetail ? (
           <>
             <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem', background: '#2a2a2a', borderRadius: '8px' }}>
-              <h4 style={{ color: '#00adb5', marginTop: 0, marginBottom: '1rem' }}>基本情報</h4>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h4 style={{ color: '#00adb5', margin: 0 }}>基本情報</h4>
+                <button className="btn btn-secondary btn-small" onClick={handleEditOpen}>編集</button>
+              </div>
               <table style={{ borderCollapse: 'collapse', width: '100%' }}>
                 <tbody>
                   <tr>
@@ -318,6 +715,7 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
             )}
           </>
         ) : null}
+        {renderEditModal()}
       </div>
     );
   }
@@ -327,6 +725,7 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
     <div className="apprun-shared-list">
       <div className="header">
         <h2>AppRun共用型</h2>
+        <button className="btn btn-primary btn-small" onClick={handleCreateOpen}>+ アプリ作成</button>
       </div>
 
       {error && (
@@ -388,6 +787,7 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
           </tbody>
         </table>
       )}
+      {renderCreateModal()}
     </div>
   );
 }
