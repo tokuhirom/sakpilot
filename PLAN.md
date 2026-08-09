@@ -296,7 +296,7 @@
 
 **Tier 4: ドキュメント整備（機能追加ではないが、書き込み系機能が一通り揃った段階でユーザーから提案。2026-08-09追加）**
 
-22. ✅ スクショ付きユーザーマニュアルの整備（Playwrightベース）— 各リソースの主要な操作フロー（作成・編集・削除等）をスクリーンショット付きで説明するユーザー向けドキュメントが現状無い。[[sakpilot-e2e-testing]]で整備済みのE2Eテスト基盤（`frontend/e2e/*.spec.ts`、`go run -tags e2e .`）を流用してスクリーンショットを撮る運用を想定。方針は「専用のドキュメント生成スクリプトを別途書く形」（`frontend/playwright.manual.config.ts` + `frontend/e2e-manual/`、`npm run docs:screenshots`）で決定。2026-08-09対応: 撮影基盤（config・npm script・`docs/manual/images/<resource>/`保存ヘルパー）を整備し、Server（POC）に続きDisk/DNS/Switchの4リソース分を完了（`docs/manual/{server,disk,dns,switch}.md`）。残り10リソース（PacketFilter/GSLB/ProxyLB/SimpleMonitor/Database/EnhancedDB/NFS/ContainerRegistry/KMS/AppRun専有・共用型）は同じ基盤を流用して順次追加予定。Archive/ObjectStorage/Monitoring Suite/Billはe2e_server.goにシードが無いため別途検討（詳細は`docs/manual/README.md`）
+22. ✅ スクショ付きユーザーマニュアルの整備（Playwrightベース）— 各リソースの主要な操作フロー（作成・編集・削除等）をスクリーンショット付きで説明するユーザー向けドキュメントが現状無い。[[sakpilot-e2e-testing]]で整備済みのE2Eテスト基盤（`frontend/e2e/*.spec.ts`、`go run -tags e2e .`）を流用してスクリーンショットを撮る運用を想定。方針は「専用のドキュメント生成スクリプトを別途書く形」（`frontend/playwright.manual.config.ts` + `frontend/e2e-manual/`、`npm run docs:screenshots`）で決定。2026-08-09対応: 撮影基盤（config・npm script・`docs/manual/images/<resource>/`保存ヘルパー）を整備し、Server（POC）→Disk/DNS/Switch→PacketFilter/GSLB/ProxyLB/SimpleMonitor/Database/EnhancedDB/NFS→ContainerRegistry/KMS/AppRun専有・共用型の順にPR #166〜#182で全14リソース分を完了（`docs/manual/*.md`、索引は`docs/manual/README.md`）。これでTier4 #22は完了。Archive/ObjectStorage/Monitoring Suite/Billはe2e_server.goにシードが無いためマニュアル化の対象外（詳細は`docs/manual/README.md`）
 
 **Tier 5: フォームUX見直し（横断的な品質改善、2026-08-09ユーザー指摘により追加）**
 
@@ -441,3 +441,7 @@
 - ユーザーから続行の指示を受け、Disk/DNS/Switchの3リソース分を並行実装（PR #168/#169/#170）。各PRは独立worktreeで進め、共通ファイル（`docs/manual/README.md`/`PLAN.md`）はコンフリクト回避のためマージ後にまとめて更新する運用とした。`docs/manual/disk.md`（スクショ7枚、接続先サーバー変更フォーム含む）、`docs/manual/dns.md`（スクショ6枚、レコード追加/編集/削除含む）、`docs/manual/switch.md`（スクショ5枚、共有スコープの削除ボタン無効化に言及）を追加。
 - `frontend/vite.config.ts`のvitest `exclude`に`e2e-manual/**`を追加（`e2e/**`と同様、Playwright管轄のディレクトリをvitestの対象外にするため）。
 - `npm run docs:screenshots`を実際に実行してスクショ12枚（1枚あたり60〜85KB、合計900KB弱）が生成されることを確認。`golangci-lint run`（Go側の変更なし）/`tsc --noEmit`/`npm run test`を確認してから作成。
+
+### ✅ 完了（2026-08-09 追加セッション45、Tier4 #22完了）
+- 前セッションで完了していたPacketFilter/GSLB/ProxyLB/SimpleMonitor/Database/EnhancedDB/NFS（PR #172〜#178、#179でdisk.spec.tsのstrict mode violation修正）に続き、残りのContainerRegistry（PR #180、スクショ8枚。基本情報編集+ユーザー追加/編集/削除含む。イメージ/タグ一覧は実レジストリAPI接続が必要でfakeドライバ非対応のため対象外）、KMS（PR #181、スクショ7枚。作成/基本情報編集/ローテーション/ステータス変更/削除含む）、AppRun専有型・共用型（PR #182、専有型12枚+共用型5枚。専有型はクラスタ→アプリ/ASG階層でバージョンデプロイ・アクティブ化・ASG詳細のLB/ワーカーノードまでカバー。共用型はトラフィック分散編集・バージョン削除が単一バージョンでは操作不能というsakumock制約により対象外）を実装し、全14リソース分のマニュアル整備が完了。
+- `docs/manual/README.md`から「未整備リソース」の記載を削除し、撮影基盤整備時に予定していた対象リソースが一通り揃った旨に更新。
