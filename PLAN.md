@@ -307,7 +307,14 @@
     - 各フォームの入力欄に「何を入力すればよいか」が分かるplaceholderやヘルプテキストが無い箇所を洗い出し追加する（現状はラベルのみで単位や制約の説明が無い項目が多い）
     - 見直し対象はTier1〜Tier3で実装した機能に限らず、既存の全Create/Updateフォームが対象。範囲が広いため、着手時にリソース単位で区切って段階的にPRを分けるか、ユーザーと相談してスコープを決めること
     - フォームごとに前提（SDK側のバリデーション仕様、必須/任意の別）を確認した上で実装すること。SDK側で判明した制約や挙動の不明点は[[sakpilot-upstream-issues-doc]]の運用に従いdocs/upstream-issues.mdに記録する
-    - **進捗**: DNS/GSLB/ProxyLB/SimpleMonitor/Switch/Disk/Database/NFS/EnhancedDB対応済み。残り: ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/AppRun専有・共用型/Server等
+    - **進捗**: DNS/GSLB/ProxyLB/SimpleMonitor/Switch/Disk/Database/NFS/EnhancedDB/ContainerRegistry対応済み。残り: KMS/Archive/ObjectStorage/Monitoring Suite/AppRun専有・共用型/Server等
+
+### ✅ 完了（2026-08-09 追加セッション40、Tier5 #23 一部・ContainerRegistry）
+- EnhancedDBに続き、コンテナレジストリ(`ContainerRegistryList.tsx`の作成モーダル、`ContainerRegistryDetail.tsx`の基本情報インライン編集・ユーザー追加モーダル・ユーザー編集/パスワード設定の各インライン行内フォーム)を`docs/ui-implementation-patterns.md`のルールに合わせて改修。全5フォームを`<form onSubmit>`+`<button type="submit">`に変換した(ユーザー編集/パスワード設定はテーブルセル内の`<label>`無しインラインフォームのためplaceholderマーカーを使用)。
+- 制約値は`terraform-provider-sakura`の`docs/resources/container_registry.md`で確認: `name`必須、`description`長さ上限512、ユーザーの`name`/`permission`は必須、`password`はSDK上任意(作成時は既存実装がAPI呼び出し前提で必須扱いしていたためrequiredのまま維持、編集時は元々空欄=変更なしという仕様のため任意のまま)。
+- 作成モーダル・ユーザー追加モーダル・パスワード設定行の複合`disabled`条件(`!newName`/`!newUserName || !newUserPassword`/`!password`)という`required`と重複するJSバリデーションを削除(rule 4)。
+- `ContainerRegistryDetail.test.tsx`のパスワード入力欄プレースホルダー参照(`パスワード`→`パスワード *`)を更新。
+- `tsc --noEmit`/`npm run test`(267件全パス)/`npm run build`+`npx playwright test e2e/containerregistry.spec.ts`(4件全パス)/`golangci-lint run`(0 issues、Go側の変更なし)を確認してから作成。
 
 ### ✅ 完了（2026-08-09 追加セッション39、Tier5 #23 一部・EnhancedDB）
 - NFSに続き、エンハンスドDB(`EnhancedDBList.tsx`の作成モーダル、`EnhancedDBDetail.tsx`の基本情報インライン編集・パスワード再設定フォーム)を`docs/ui-implementation-patterns.md`のルールに合わせて改修。3フォームとも`<form onSubmit>`+`<button type="submit">`に変換した。パスワード再設定は「入力→ボタンクリックで確認ダイアログ表示→実行」という間接フローだったため、`onSubmit`で`e.preventDefault()`後に確認ダイアログを開く設計にした(実際のAPI呼び出しは従来通り確認ダイアログの実行ボタンから)。
