@@ -123,7 +123,8 @@ export function DiskList({ profile, zone, zones, onZoneChange, onSelectDisk }: D
     setShowCreate(false);
   };
 
-  const handleCreateSubmit = async () => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setCreating(true);
     setCreateError(null);
     try {
@@ -263,89 +264,95 @@ export function DiskList({ profile, zone, zones, onZoneChange, onSelectDisk }: D
             padding: '20px', minWidth: '320px', maxWidth: '420px',
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>ディスク作成</h3>
-            <div className="form-group">
-              <label>名前</label>
-              <input
-                type="text"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="my-disk"
-                autoFocus
-              />
-            </div>
-            <div className="form-group">
-              <label>説明</label>
-              <input
-                type="text"
-                value={newDescription}
-                onChange={(e) => setNewDescription(e.target.value)}
-                placeholder="任意"
-              />
-            </div>
-            <div className="form-group">
-              <label>タグ</label>
-              <input
-                type="text"
-                value={newTags}
-                onChange={(e) => setNewTags(e.target.value)}
-                placeholder="カンマ区切り(任意)"
-              />
-            </div>
-            <div className="form-group">
-              <label>サイズ(GB)</label>
-              <input
-                type="number"
-                value={newSizeGB}
-                onChange={(e) => setNewSizeGB(e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <label>プラン</label>
-              <select value={newDiskPlan} onChange={(e) => setNewDiskPlan(e.target.value)}>
-                <option value="ssd">SSD</option>
-                <option value="hdd">HDD</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label>接続方式</label>
-              <select value={newConnection} onChange={(e) => setNewConnection(e.target.value)}>
-                <option value="virtio">virtio</option>
-                <option value="ide">ide</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label>コピー元アーカイブ</label>
-              <select value={newSourceArchiveId} onChange={(e) => setNewSourceArchiveId(e.target.value)}>
-                <option value="">なし(空のディスク)</option>
-                {archives.map((a) => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label>接続先サーバー</label>
-              <select value={newServerId} onChange={(e) => setNewServerId(e.target.value)}>
-                <option value="">なし(未接続)</option>
-                {servers.map((srv) => (
-                  <option key={srv.id} value={srv.id}>{srv.name}</option>
-                ))}
-              </select>
-            </div>
-            {createError && (
-              <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
-                エラー: {createError}
+            <form onSubmit={handleCreateSubmit}>
+              <div className="form-group">
+                <label>名前<span className="required-mark">*</span></label>
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="my-disk"
+                  required
+                  autoFocus
+                />
               </div>
-            )}
-            <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
-              <button
-                className="btn btn-primary"
-                onClick={handleCreateSubmit}
-                disabled={creating || !newName}
-              >
-                {creating ? '作成中...' : '作成する'}
-              </button>
-            </div>
+              <div className="form-group">
+                <label>説明</label>
+                <input
+                  type="text"
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  placeholder="任意"
+                  maxLength={512}
+                />
+              </div>
+              <div className="form-group">
+                <label>タグ</label>
+                <input
+                  type="text"
+                  value={newTags}
+                  onChange={(e) => setNewTags(e.target.value)}
+                  placeholder="カンマ区切り(任意)"
+                />
+              </div>
+              <div className="form-group">
+                <label>サイズ(GB)<span className="required-mark">*</span></label>
+                <input
+                  type="number"
+                  value={newSizeGB}
+                  onChange={(e) => setNewSizeGB(e.target.value)}
+                  min={20}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>プラン</label>
+                <select value={newDiskPlan} onChange={(e) => setNewDiskPlan(e.target.value)}>
+                  <option value="ssd">SSD</option>
+                  <option value="hdd">HDD</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>接続方式</label>
+                <select value={newConnection} onChange={(e) => setNewConnection(e.target.value)}>
+                  <option value="virtio">virtio</option>
+                  <option value="ide">ide</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>コピー元アーカイブ</label>
+                <select value={newSourceArchiveId} onChange={(e) => setNewSourceArchiveId(e.target.value)}>
+                  <option value="">なし(空のディスク)</option>
+                  {archives.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>接続先サーバー</label>
+                <select value={newServerId} onChange={(e) => setNewServerId(e.target.value)}>
+                  <option value="">なし(未接続)</option>
+                  {servers.map((srv) => (
+                    <option key={srv.id} value={srv.id}>{srv.name}</option>
+                  ))}
+                </select>
+              </div>
+              {createError && (
+                <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                  エラー: {createError}
+                </div>
+              )}
+              <div className="confirm-actions">
+                <button type="button" className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={creating}
+                >
+                  {creating ? '作成中...' : '作成する'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

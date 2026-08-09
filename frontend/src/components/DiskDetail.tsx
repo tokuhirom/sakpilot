@@ -74,7 +74,8 @@ export function DiskDetail({ profile, zone, diskId }: DiskDetailProps) {
     setBasicError(null);
   };
 
-  const handleBasicSave = async () => {
+  const handleBasicSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSavingBasic(true);
     setBasicError(null);
     try {
@@ -107,8 +108,8 @@ export function DiskDetail({ profile, zone, diskId }: DiskDetailProps) {
     setConnectionError(null);
   };
 
-  const handleConnect = async () => {
-    if (!connectServerId) return;
+  const handleConnect = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSavingConnection(true);
     setConnectionError(null);
     try {
@@ -153,13 +154,14 @@ export function DiskDetail({ profile, zone, diskId }: DiskDetailProps) {
           )}
         </div>
         {editingBasic ? (
-          <div>
+          <form onSubmit={handleBasicSave}>
             <div className="form-group">
-              <label>名前</label>
+              <label>名前<span className="required-mark">*</span></label>
               <input
                 type="text"
                 value={nameInput}
                 onChange={(e) => setNameInput(e.target.value)}
+                required
                 autoFocus
               />
             </div>
@@ -170,6 +172,7 @@ export function DiskDetail({ profile, zone, diskId }: DiskDetailProps) {
                 value={descriptionInput}
                 onChange={(e) => setDescriptionInput(e.target.value)}
                 placeholder="任意"
+                maxLength={512}
               />
             </div>
             <div className="form-group">
@@ -187,12 +190,12 @@ export function DiskDetail({ profile, zone, diskId }: DiskDetailProps) {
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleBasicEditCancel} disabled={savingBasic}>キャンセル</button>
-              <button className="btn btn-primary" onClick={handleBasicSave} disabled={savingBasic || !nameInput}>
+              <button type="button" className="btn btn-secondary" onClick={handleBasicEditCancel} disabled={savingBasic}>キャンセル</button>
+              <button type="submit" className="btn btn-primary" disabled={savingBasic}>
                 {savingBasic ? '保存中...' : '保存する'}
               </button>
             </div>
-          </div>
+          </form>
         ) : (
           <table style={{ borderCollapse: 'collapse' }}>
             <tbody>
@@ -239,12 +242,13 @@ export function DiskDetail({ profile, zone, diskId }: DiskDetailProps) {
           )}
         </div>
         {editingConnection ? (
-          <div>
+          <form onSubmit={handleConnect}>
             <div className="form-group">
-              <label>接続先サーバー</label>
+              <label>接続先サーバー<span className="required-mark">*</span></label>
               <select
                 value={connectServerId}
                 onChange={(e) => setConnectServerId(e.target.value)}
+                required
               >
                 <option value="">選択してください</option>
                 {servers.map((srv) => (
@@ -258,17 +262,17 @@ export function DiskDetail({ profile, zone, diskId }: DiskDetailProps) {
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleConnectionEditCancel} disabled={savingConnection}>キャンセル</button>
+              <button type="button" className="btn btn-secondary" onClick={handleConnectionEditCancel} disabled={savingConnection}>キャンセル</button>
               {diskInfo.serverId && (
-                <button className="btn btn-danger" onClick={handleDisconnect} disabled={savingConnection}>
+                <button type="button" className="btn btn-danger" onClick={handleDisconnect} disabled={savingConnection}>
                   {savingConnection ? '処理中...' : '接続を解除する'}
                 </button>
               )}
-              <button className="btn btn-primary" onClick={handleConnect} disabled={savingConnection || !connectServerId}>
+              <button type="submit" className="btn btn-primary" disabled={savingConnection}>
                 {savingConnection ? '処理中...' : '接続する'}
               </button>
             </div>
-          </div>
+          </form>
         ) : (
           <p style={{ margin: 0 }}>{diskInfo.serverName || '(未接続)'}</p>
         )}

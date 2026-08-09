@@ -307,7 +307,15 @@
     - 各フォームの入力欄に「何を入力すればよいか」が分かるplaceholderやヘルプテキストが無い箇所を洗い出し追加する（現状はラベルのみで単位や制約の説明が無い項目が多い）
     - 見直し対象はTier1〜Tier3で実装した機能に限らず、既存の全Create/Updateフォームが対象。範囲が広いため、着手時にリソース単位で区切って段階的にPRを分けるか、ユーザーと相談してスコープを決めること
     - フォームごとに前提（SDK側のバリデーション仕様、必須/任意の別）を確認した上で実装すること。SDK側で判明した制約や挙動の不明点は[[sakpilot-upstream-issues-doc]]の運用に従いdocs/upstream-issues.mdに記録する
-    - **進捗**: DNS/GSLB/ProxyLB/SimpleMonitor/Switch対応済み。残り: Disk/Database/NFS/EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/AppRun専有・共用型/Server等
+    - **進捗**: DNS/GSLB/ProxyLB/SimpleMonitor/Switch/Disk対応済み。残り: Database/NFS/EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/AppRun専有・共用型/Server等
+
+### ✅ 完了（2026-08-09 追加セッション36、Tier5 #23 一部・Disk）
+- DNS/GSLB/ProxyLB/SimpleMonitor/Switchに続き、ディスク(`DiskList.tsx`の作成モーダル、`DiskDetail.tsx`の基本情報インライン編集・接続先サーバー変更)を`docs/ui-implementation-patterns.md`のルールに合わせて改修。3フォームとも`<form onSubmit>`+`<button type="submit">`に変換した。
+- 制約値は`internal/sakura/disk.go`(SDK呼び出しのみでstructタグ上の範囲情報なし)では判別できなかったため、`terraform-provider-sakura`の`docs/resources/disk.md`で確認: `name`必須、`description`は長さ上限512。サイズは`helper/query`にNFSのような`FindDiskPlanID`が無く自由入力(`SizeMB`をそのまま渡す)のため、既知の最小プランサイズである20GBのみ`min`として設定し、根拠のない上限は付けなかった。
+- 接続先サーバー変更フォームは「接続する」「接続を解除する」の2アクションが同一カード内に共存するため、`<select required>`を含む`<form onSubmit={handleConnect}>`でラップしつつ、`接続を解除する`ボタンのみ`type="button"`のまま独立した`onClick`ハンドラを維持する設計とした(解除には選択必須のバリデーションが不要なため)。
+- 作成モーダルの送信ボタンに残っていた`disabled={... || !newName}`、接続フォームの`disabled={... || !connectServerId}`という`required`と重複するJSバリデーションを削除(rule 4)。
+- `DiskDetail.test.tsx`に接続先サーバー未選択時の送信ブロックを`select.validity.valid`で検証するテストを追加。
+- `tsc --noEmit`/`npm run test`(265件全パス)/`npm run build`+`npx playwright test e2e/disk.spec.ts`(6件全パス)/`golangci-lint run`(0 issues、Go側の変更なし)を確認してから作成。
 
 ### ✅ 完了（2026-08-09 追加セッション35、Tier5 #23 一部・Switch）
 - DNS/GSLB/ProxyLB/SimpleMonitorに続き、スイッチ（`SwitchList.tsx`の作成モーダル、`SwitchDetail.tsx`の基本情報インライン編集）を`docs/ui-implementation-patterns.md`のルールに合わせて改修。2フォームとも`<form onSubmit>`+`<button type="submit">`に変換した。

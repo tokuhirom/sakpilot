@@ -139,4 +139,24 @@ describe('DiskDetail', () => {
     });
     expect(await screen.findByText('(未接続)')).toBeInTheDocument();
   });
+
+  it('blocks connecting via native required validation when no server is selected', async () => {
+    vi.mocked(GetDiskDetail).mockResolvedValueOnce(makeDisk());
+    vi.mocked(GetServers).mockResolvedValueOnce([makeServer()]);
+    const user = userEvent.setup();
+
+    render(<DiskDetail profile="default" zone="is1a" diskId="123456789012" />);
+    await screen.findByText('ディスク詳細: my-disk');
+
+    await user.click(screen.getByRole('button', { name: '変更' }));
+    await waitFor(() => {
+      expect(GetServers).toHaveBeenCalledWith('default', 'is1a');
+    });
+
+    const select = screen.getByRole('combobox') as HTMLSelectElement;
+    await user.click(screen.getByRole('button', { name: '接続する' }));
+
+    expect(select.validity.valid).toBe(false);
+    expect(ConnectDiskToServer).not.toHaveBeenCalled();
+  });
 });
