@@ -1,5 +1,59 @@
 # Changelog
 
+## [v0.0.18](https://github.com/tokuhirom/sakpilot/compare/v0.0.17...v0.0.18) - 2026-08-09
+- feat: AppRun専有型のCluster Createを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/131
+- feat: AppRun専有型のASG(AutoScalingGroup) Createを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/133
+- feat: AppRun専有型のLoadBalancer Createを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/134
+- ci: E2Eテスト失敗時にPlaywrightのtraceをアーティファクト保存する by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/135
+- feat: AppRun専有型のCertificate(証明書) CRUDを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/136
+- feat: サーバーのパワーユーザー機能(ChangePlan/CD-ROM/SendKey/NMI/VNC)を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/137
+- feat: アーカイブのCreate/CreateBlank/CreateFromShared/Share/OpenFTP/CloseFTPを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/138
+- 実クラウドに繋がずGUI確認できるmise taskを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/139
+- feat: オブジェクトストレージのAccount/Permissions/バケット暗号化・レプリケーション・クォータ/S3 Put・DeleteObjectを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/140
+- feat: モニタリングスイートのストレージ・アクセスキーCreate/Update/Destroyを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/141
+- docs: PLAN.mdにスクショ付きマニュアル整備をTier4として追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/142
+- feat: ELBのプラン変更・トラフィックグラフ機能を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/143
+- docs: PLAN.mdにフォームUX見直し(Tier5)を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/144
+- feat: DNS/GSLBフォームにHTML5バリデーションとplaceholderを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/145
+- docs: 必須項目の視覚マーカールールを統一しdocsに明文化 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/146
+- feat: ProxyLBフォームをHTML5 required化ルールに統一 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/147
+- feat: シンプル監視フォームをHTML5 required化ルールに統一 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/148
+- feat: スイッチフォームをHTML5 required化ルールに統一 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/149
+- feat: ディスクフォームをHTML5 required化ルールに統一 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/150
+- feat: データベースフォームをHTML5 required化ルールに統一 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/151
+- feat: NFSフォームをHTML5 required化ルールに統一 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/152
+- feat: エンハンスドDBフォームをHTML5 required化ルールに統一 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/153
+- feat: コンテナレジストリフォームをHTML5 required化ルールに統一 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/154
+- feat: KMSフォームをHTML5 required化ルールに統一 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/155
+- feat: アーカイブフォームをHTML5 required化ルールに統一 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/156
+- feat: ObjectStorageフォームをHTML5 required化ルールに統一 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/157
+- feat: モニタリングスイートフォームをHTML5 required化ルールに統一 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/158
+- feat: サーバーの各種編集フォームをHTML5 required化ルールに統一 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/159
+- docs: PLAN.mdのTier5進捗を更新 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/160
+- Bill: 期間絞り込み(ByContractYear/YearMonth)とCSVダウンロード(DetailsCSV)を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/161
+- AppRun専有型フォームをHTML5 required化ルールに統一 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/162
+- feat: AppRun共用型フォームをHTML5 required化ルールに統一 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/163
+- docs: PLAN.mdのTier5 #23完了を反映 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/164
+- chore: AppRun専有型の到達不能なlb view単体画面を削除 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/165
+- docs: マニュアル更新ルールをCLAUDE.mdに追加、非公式disclaimerをroot READMEに追記 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/167
+- docs: スクショ付きユーザーマニュアルの撮影基盤を新設し、Server分をPOCとして整備 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/166
+- docs: ディスクのスクショ付きユーザーマニュアルを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/168
+- docs: DNSリソースのスクショ付きマニュアルを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/169
+- docs: スイッチのスクショ付きマニュアルを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/170
+- docs: マニュアル索引・PLAN.mdにDisk/DNS/Switch分の追加を反映 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/171
+- docs: パケットフィルターのスクショ付きマニュアルを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/172
+- docs: GSLBのスクショ付きユーザーマニュアルを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/173
+- docs: ELB(ProxyLB)のスクショ付きユーザーマニュアルを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/174
+- docs: シンプル監視のスクショ付きユーザーマニュアルを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/175
+- docs: データベースのスクショ付きユーザーマニュアルを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/176
+- docs: エンハンスドDBのスクショ付きユーザーマニュアルを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/177
+- docs: NFSのスクショ付きユーザーマニュアルを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/178
+- fix: ディスクマニュアル用スクリーンショットspecのstrict mode violationを修正 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/179
+- docs: コンテナレジストリのスクショ付きユーザーマニュアルを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/180
+- docs: KMSのスクショ付きユーザーマニュアルを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/181
+- docs: AppRun専有型・共用型のスクショ付きユーザーマニュアルを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/182
+- docs: PLAN.mdのTier4 #22(スクショ付きマニュアル整備)を完了状態に更新 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/183
+
 ## [v0.0.17](https://github.com/tokuhirom/sakpilot/compare/v0.0.16...v0.0.17) - 2026-08-08
 - test: DiskList/ArchiveListの削除フローにFEテストを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/92
 - feat: SimpleMonitorの詳細取得(Get)と詳細ページを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/94
