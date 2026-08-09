@@ -199,7 +199,8 @@ export function DatabaseList({ profile, zone, zones, onZoneChange, onSelectDatab
     }));
   };
 
-  const handleCreateSubmit = async () => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setCreating(true);
     setCreateError(null);
     try {
@@ -489,138 +490,156 @@ export function DatabaseList({ profile, zone, zones, onZoneChange, onSelectDatab
             padding: '20px', minWidth: '360px', maxWidth: '480px', maxHeight: '80vh', overflowY: 'auto',
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>データベース作成</h3>
-            <div className="form-group">
-              <label>名前</label>
-              <input
-                type="text"
-                value={createForm.name}
-                onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-                placeholder="my-database"
-                autoFocus
-              />
-            </div>
-            <div className="form-group">
-              <label>説明</label>
-              <input
-                type="text"
-                value={createForm.description}
-                onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
-                placeholder="任意"
-              />
-            </div>
-            <div className="form-group">
-              <label>タグ</label>
-              <input
-                type="text"
-                value={createForm.tags}
-                onChange={(e) => setCreateForm({ ...createForm, tags: e.target.value })}
-                placeholder="カンマ区切り(任意)"
-              />
-            </div>
-            <div className="form-group">
-              <label>プラン</label>
-              <select value={createForm.plan} onChange={(e) => setCreateForm({ ...createForm, plan: e.target.value })}>
-                <option value="10g">10 GB</option>
-                <option value="30g">30 GB</option>
-                <option value="90g">90 GB</option>
-                <option value="240g">240 GB</option>
-                <option value="500g">500 GB</option>
-                <option value="1t">1 TB</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label>データベース種別</label>
-              <select value={createForm.rdbmsType} onChange={(e) => handleRDBMSTypeChange(e.target.value)}>
-                <option value="mariadb">MariaDB</option>
-                <option value="postgres">PostgreSQL</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label htmlFor="db-create-switch">接続先スイッチ</label>
-              <select id="db-create-switch" value={createForm.switchId} onChange={(e) => setCreateForm({ ...createForm, switchId: e.target.value })}>
-                <option value="">選択してください</option>
-                {switches.map((sw) => (
-                  <option key={sw.id} value={sw.id}>{sw.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label>IPアドレス</label>
-              <input
-                type="text"
-                value={createForm.ipAddress}
-                onChange={(e) => setCreateForm({ ...createForm, ipAddress: e.target.value })}
-                placeholder="192.168.0.11"
-              />
-            </div>
-            <div className="form-group">
-              <label>ネットワークマスク長</label>
-              <input
-                type="number"
-                value={createForm.networkMaskLen}
-                onChange={(e) => setCreateForm({ ...createForm, networkMaskLen: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label>デフォルトルート</label>
-              <input
-                type="text"
-                value={createForm.defaultRoute}
-                onChange={(e) => setCreateForm({ ...createForm, defaultRoute: e.target.value })}
-                placeholder="192.168.0.1"
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="db-create-user">管理ユーザー名</label>
-              <input
-                id="db-create-user"
-                type="text"
-                value={createForm.defaultUser}
-                onChange={(e) => setCreateForm({ ...createForm, defaultUser: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="db-create-password">管理ユーザーパスワード</label>
-              <input
-                id="db-create-password"
-                type="password"
-                value={createForm.userPassword}
-                onChange={(e) => setCreateForm({ ...createForm, userPassword: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label>ポート番号</label>
-              <input
-                type="number"
-                value={createForm.servicePort}
-                onChange={(e) => setCreateForm({ ...createForm, servicePort: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <form onSubmit={handleCreateSubmit}>
+              <div className="form-group">
+                <label>名前<span className="required-mark">*</span></label>
                 <input
-                  type="checkbox"
-                  checked={createForm.monitoringSuiteEnabled}
-                  onChange={(e) => setCreateForm({ ...createForm, monitoringSuiteEnabled: e.target.checked })}
+                  type="text"
+                  value={createForm.name}
+                  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                  placeholder="my-database"
+                  required
+                  autoFocus
                 />
-                拡張監視機能(Monitoring Suite)を有効化
-              </label>
-            </div>
-            {createError && (
-              <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
-                エラー: {createError}
               </div>
-            )}
-            <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
-              <button
-                className="btn btn-primary"
-                onClick={handleCreateSubmit}
-                disabled={creating || !createForm.name || !createForm.switchId || !createForm.ipAddress || !createForm.defaultUser || !createForm.userPassword}
-              >
-                {creating ? '作成中...' : '作成する'}
-              </button>
-            </div>
+              <div className="form-group">
+                <label>説明</label>
+                <input
+                  type="text"
+                  value={createForm.description}
+                  onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
+                  placeholder="任意"
+                  maxLength={512}
+                />
+              </div>
+              <div className="form-group">
+                <label>タグ</label>
+                <input
+                  type="text"
+                  value={createForm.tags}
+                  onChange={(e) => setCreateForm({ ...createForm, tags: e.target.value })}
+                  placeholder="カンマ区切り(任意)"
+                />
+              </div>
+              <div className="form-group">
+                <label>プラン</label>
+                <select value={createForm.plan} onChange={(e) => setCreateForm({ ...createForm, plan: e.target.value })}>
+                  <option value="10g">10 GB</option>
+                  <option value="30g">30 GB</option>
+                  <option value="90g">90 GB</option>
+                  <option value="240g">240 GB</option>
+                  <option value="500g">500 GB</option>
+                  <option value="1t">1 TB</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>データベース種別</label>
+                <select value={createForm.rdbmsType} onChange={(e) => handleRDBMSTypeChange(e.target.value)}>
+                  <option value="mariadb">MariaDB</option>
+                  <option value="postgres">PostgreSQL</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label htmlFor="db-create-switch">接続先スイッチ<span className="required-mark">*</span></label>
+                <select id="db-create-switch" value={createForm.switchId} onChange={(e) => setCreateForm({ ...createForm, switchId: e.target.value })} required>
+                  <option value="">選択してください</option>
+                  {switches.map((sw) => (
+                    <option key={sw.id} value={sw.id}>{sw.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>IPアドレス<span className="required-mark">*</span></label>
+                <input
+                  type="text"
+                  value={createForm.ipAddress}
+                  onChange={(e) => setCreateForm({ ...createForm, ipAddress: e.target.value })}
+                  placeholder="192.168.0.11"
+                  pattern="^(\d{1,3}\.){3}\d{1,3}$"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>ネットワークマスク長<span className="required-mark">*</span></label>
+                <input
+                  type="number"
+                  value={createForm.networkMaskLen}
+                  onChange={(e) => setCreateForm({ ...createForm, networkMaskLen: e.target.value })}
+                  min={8}
+                  max={29}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>デフォルトルート<span className="required-mark">*</span></label>
+                <input
+                  type="text"
+                  value={createForm.defaultRoute}
+                  onChange={(e) => setCreateForm({ ...createForm, defaultRoute: e.target.value })}
+                  placeholder="192.168.0.1"
+                  pattern="^(\d{1,3}\.){3}\d{1,3}$"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="db-create-user">管理ユーザー名<span className="required-mark">*</span></label>
+                <input
+                  id="db-create-user"
+                  type="text"
+                  value={createForm.defaultUser}
+                  onChange={(e) => setCreateForm({ ...createForm, defaultUser: e.target.value })}
+                  minLength={3}
+                  maxLength={20}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="db-create-password">管理ユーザーパスワード<span className="required-mark">*</span></label>
+                <input
+                  id="db-create-password"
+                  type="password"
+                  value={createForm.userPassword}
+                  onChange={(e) => setCreateForm({ ...createForm, userPassword: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>ポート番号<span className="required-mark">*</span></label>
+                <input
+                  type="number"
+                  value={createForm.servicePort}
+                  onChange={(e) => setCreateForm({ ...createForm, servicePort: e.target.value })}
+                  min={1024}
+                  max={65535}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={createForm.monitoringSuiteEnabled}
+                    onChange={(e) => setCreateForm({ ...createForm, monitoringSuiteEnabled: e.target.checked })}
+                  />
+                  拡張監視機能(Monitoring Suite)を有効化
+                </label>
+              </div>
+              {createError && (
+                <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                  エラー: {createError}
+                </div>
+              )}
+              <div className="confirm-actions">
+                <button type="button" className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={creating}
+                >
+                  {creating ? '作成中...' : '作成する'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

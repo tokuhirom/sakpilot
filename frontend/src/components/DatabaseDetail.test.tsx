@@ -128,7 +128,7 @@ describe('DatabaseDetail', () => {
     await screen.findByText('データベース詳細: my-database');
 
     await user.selectOptions(screen.getByRole('combobox'), 'MariaDB/server.cnf/mysqld/max_connections');
-    await user.type(screen.getByPlaceholderText('値'), '50');
+    await user.type(screen.getByPlaceholderText('値 *'), '50');
     await user.click(screen.getByRole('button', { name: '設定' }));
 
     await waitFor(() => {

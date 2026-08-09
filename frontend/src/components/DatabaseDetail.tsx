@@ -114,7 +114,8 @@ export function DatabaseDetail({ profile, zone, databaseId }: DatabaseDetailProp
     setBasicError(null);
   };
 
-  const handleBasicSave = async () => {
+  const handleBasicSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSavingBasic(true);
     setBasicError(null);
     try {
@@ -140,7 +141,8 @@ export function DatabaseDetail({ profile, zone, databaseId }: DatabaseDetailProp
     setSettingsError(null);
   };
 
-  const handleSettingsSave = async () => {
+  const handleSettingsSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!settingsForm) return;
 
     const servicePort = parseInt(settingsForm.servicePort, 10);
@@ -187,8 +189,8 @@ export function DatabaseDetail({ profile, zone, databaseId }: DatabaseDetailProp
     }
   };
 
-  const handleParamAdd = async () => {
-    if (!newParamName) return;
+  const handleParamAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSavingParam(true);
     setParamError(null);
     try {
@@ -226,14 +228,14 @@ export function DatabaseDetail({ profile, zone, databaseId }: DatabaseDetailProp
           )}
         </div>
         {editingBasic ? (
-          <div>
+          <form onSubmit={handleBasicSave}>
             <div className="form-group">
-              <label>名前</label>
-              <input type="text" value={nameInput} onChange={(e) => setNameInput(e.target.value)} autoFocus />
+              <label>名前<span className="required-mark">*</span></label>
+              <input type="text" value={nameInput} onChange={(e) => setNameInput(e.target.value)} required autoFocus />
             </div>
             <div className="form-group">
               <label>説明</label>
-              <input type="text" value={descriptionInput} onChange={(e) => setDescriptionInput(e.target.value)} placeholder="任意" />
+              <input type="text" value={descriptionInput} onChange={(e) => setDescriptionInput(e.target.value)} placeholder="任意" maxLength={512} />
             </div>
             <div className="form-group">
               <label>タグ</label>
@@ -243,12 +245,12 @@ export function DatabaseDetail({ profile, zone, databaseId }: DatabaseDetailProp
               <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>エラー: {basicError}</div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleBasicEditCancel} disabled={savingBasic}>キャンセル</button>
-              <button className="btn btn-primary" onClick={handleBasicSave} disabled={savingBasic || !nameInput}>
+              <button type="button" className="btn btn-secondary" onClick={handleBasicEditCancel} disabled={savingBasic}>キャンセル</button>
+              <button type="submit" className="btn btn-primary" disabled={savingBasic}>
                 {savingBasic ? '保存中...' : '保存する'}
               </button>
             </div>
-          </div>
+          </form>
         ) : (
           <table style={{ borderCollapse: 'collapse' }}>
             <tbody>
@@ -354,8 +356,8 @@ export function DatabaseDetail({ profile, zone, databaseId }: DatabaseDetailProp
             )}
           </tbody>
         </table>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '1rem' }}>
-          <select value={newParamName} onChange={(e) => setNewParamName(e.target.value)} style={{ flex: 2 }}>
+        <form onSubmit={handleParamAdd} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '1rem' }}>
+          <select value={newParamName} onChange={(e) => setNewParamName(e.target.value)} style={{ flex: 2 }} required>
             <option value="">項目を選択</option>
             {availableParamNames.map((m) => (
               <option key={m.name} value={m.name} title={m.text}>{m.label || m.name}</option>
@@ -365,11 +367,12 @@ export function DatabaseDetail({ profile, zone, databaseId }: DatabaseDetailProp
             type="text"
             value={newParamValue}
             onChange={(e) => setNewParamValue(e.target.value)}
-            placeholder="値"
+            placeholder="値 *"
             style={{ flex: 1 }}
+            required
           />
-          <button className="btn btn-primary btn-small" onClick={handleParamAdd} disabled={savingParam || !newParamName}>設定</button>
-        </div>
+          <button type="submit" className="btn btn-primary btn-small" disabled={savingParam}>設定</button>
+        </form>
         {paramError && (
           <div style={{ marginTop: '0.5rem', color: '#ff6b6b', fontSize: '0.85rem' }}>エラー: {paramError}</div>
         )}
@@ -386,67 +389,69 @@ export function DatabaseDetail({ profile, zone, databaseId }: DatabaseDetailProp
             padding: '20px', minWidth: '360px', maxWidth: '480px', maxHeight: '85vh', overflowY: 'auto',
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>稼働設定を編集</h3>
-            <div className="form-group">
-              <label htmlFor="db-settings-user">管理ユーザー名</label>
-              <input id="db-settings-user" type="text" value={settingsForm.defaultUser} onChange={(e) => setSettingsForm({ ...settingsForm, defaultUser: e.target.value })} />
-            </div>
-            <div className="form-group">
-              <label htmlFor="db-settings-password">管理ユーザーパスワード</label>
-              <input
-                id="db-settings-password"
-                type="password"
-                value={settingsForm.userPassword}
-                onChange={(e) => setSettingsForm({ ...settingsForm, userPassword: e.target.value })}
-                placeholder="変更する場合のみ入力(空欄なら変更しない)"
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="db-settings-replica-user">レプリカユーザー</label>
-              <input id="db-settings-replica-user" type="text" value={settingsForm.replicaUser} onChange={(e) => setSettingsForm({ ...settingsForm, replicaUser: e.target.value })} placeholder="任意" />
-            </div>
-            <div className="form-group">
-              <label htmlFor="db-settings-replica-password">レプリカユーザーパスワード</label>
-              <input
-                id="db-settings-replica-password"
-                type="password"
-                value={settingsForm.replicaPassword}
-                onChange={(e) => setSettingsForm({ ...settingsForm, replicaPassword: e.target.value })}
-                placeholder="変更する場合のみ入力(空欄なら変更しない)"
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="db-settings-port">ポート番号</label>
-              <input id="db-settings-port" type="number" value={settingsForm.servicePort} onChange={(e) => setSettingsForm({ ...settingsForm, servicePort: e.target.value })} />
-            </div>
-            <div className="form-group">
-              <label htmlFor="db-settings-source-network">接続許可ネットワーク</label>
-              <input
-                id="db-settings-source-network"
-                type="text"
-                value={settingsForm.sourceNetwork}
-                onChange={(e) => setSettingsForm({ ...settingsForm, sourceNetwork: e.target.value })}
-                placeholder="カンマ区切り(空欄なら全て許可)"
-              />
-            </div>
-            <div className="form-group">
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <form onSubmit={handleSettingsSave}>
+              <div className="form-group">
+                <label htmlFor="db-settings-user">管理ユーザー名<span className="required-mark">*</span></label>
+                <input id="db-settings-user" type="text" value={settingsForm.defaultUser} onChange={(e) => setSettingsForm({ ...settingsForm, defaultUser: e.target.value })} minLength={3} maxLength={20} required />
+              </div>
+              <div className="form-group">
+                <label htmlFor="db-settings-password">管理ユーザーパスワード</label>
                 <input
-                  type="checkbox"
-                  checked={settingsForm.monitoringSuiteEnabled}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, monitoringSuiteEnabled: e.target.checked })}
+                  id="db-settings-password"
+                  type="password"
+                  value={settingsForm.userPassword}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, userPassword: e.target.value })}
+                  placeholder="変更する場合のみ入力(空欄なら変更しない)"
                 />
-                拡張監視機能(Monitoring Suite)を有効化
-              </label>
-            </div>
-            {settingsError && (
-              <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>エラー: {settingsError}</div>
-            )}
-            <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleSettingsEditCancel} disabled={savingSettings}>キャンセル</button>
-              <button className="btn btn-primary" onClick={handleSettingsSave} disabled={savingSettings}>
-                {savingSettings ? '保存中...' : '保存する'}
-              </button>
-            </div>
+              </div>
+              <div className="form-group">
+                <label htmlFor="db-settings-replica-user">レプリカユーザー</label>
+                <input id="db-settings-replica-user" type="text" value={settingsForm.replicaUser} onChange={(e) => setSettingsForm({ ...settingsForm, replicaUser: e.target.value })} placeholder="任意" />
+              </div>
+              <div className="form-group">
+                <label htmlFor="db-settings-replica-password">レプリカユーザーパスワード</label>
+                <input
+                  id="db-settings-replica-password"
+                  type="password"
+                  value={settingsForm.replicaPassword}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, replicaPassword: e.target.value })}
+                  placeholder="変更する場合のみ入力(空欄なら変更しない)"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="db-settings-port">ポート番号<span className="required-mark">*</span></label>
+                <input id="db-settings-port" type="number" value={settingsForm.servicePort} onChange={(e) => setSettingsForm({ ...settingsForm, servicePort: e.target.value })} min={1024} max={65535} required />
+              </div>
+              <div className="form-group">
+                <label htmlFor="db-settings-source-network">接続許可ネットワーク</label>
+                <input
+                  id="db-settings-source-network"
+                  type="text"
+                  value={settingsForm.sourceNetwork}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, sourceNetwork: e.target.value })}
+                  placeholder="カンマ区切り(空欄なら全て許可)"
+                />
+              </div>
+              <div className="form-group">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={settingsForm.monitoringSuiteEnabled}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, monitoringSuiteEnabled: e.target.checked })}
+                  />
+                  拡張監視機能(Monitoring Suite)を有効化
+                </label>
+              </div>
+              {settingsError && (
+                <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>エラー: {settingsError}</div>
+              )}
+              <div className="confirm-actions">
+                <button type="button" className="btn btn-secondary" onClick={handleSettingsEditCancel} disabled={savingSettings}>キャンセル</button>
+                <button type="submit" className="btn btn-primary" disabled={savingSettings}>
+                  {savingSettings ? '保存中...' : '保存する'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
