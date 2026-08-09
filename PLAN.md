@@ -32,9 +32,9 @@
 | ObjectStorage | ✅ あり | ✅（バケット・アクセスキー・アカウント） | (対象外) | バケット/アクセスキー/アカウントのCreate/Delete、Permissions API、バケット暗号化/レプリケーション/クォータ、S3 Put/DeleteObjectまで対応済み |
 | ContainerRegistry | ✅ あり | ✅ | (対象外) | 削除機能+FEテスト(List/Detail)に加え、Create/Update・ユーザー管理(AddUser/UpdateUser/DeleteUser)まで対応済み。読み書き一式が完備 |
 | AppRun (専有/共用) | ✅ あり | 専有型は✅（Cluster/App/ASG/LB/Certificate）、共用型は✅（App/Version） | (対象外) | 専有型・共用型ともFEテスト追加済み。専有型はCluster/ASG/LoadBalancer/Certificate全リソースのCreate系まで対応済み、共用型はCreate/Update/Delete/Traffic更新/サインアップまで対応済み |
-| Bill | ❌ なし | (対象外) | (対象外) | 読み取り専用リソースなので概ね妥当 |
+| Bill | ✅ あり | (対象外) | (対象外) | 読み取り専用リソース。ByContractYear/ByContractYearMonth（期間絞り込み）とDetailsCSV（CSVダウンロード）まで対応済み（2026-08-09） |
 
-**17リソース中、FEテストが未着手なのは Bill のみ。**
+**17リソース全てでFEテスト対応済み。**
 
 ---
 
@@ -182,10 +182,10 @@
 - **TODO**: `lb` view（ロードバランサー単体詳細）への遷移導線が無い点は意図的な未実装か実装漏れか要確認
 
 ### Bill（請求）
-- テスト: なし。分岐が薄く現状は無理にテスト不要
-- バックエンド: `ListByContract`/`GetDetails` のみ。Create/Update/Delete概念はBillOpに存在しない（読み取り専用リソースのため妥当）
-- SDK比較で不足: ByContractYear/ByContractYearMonth（期間絞り込み）、Read（単一取得）、DetailsCSV（CSVエクスポート）
-- **TODO**: 優先度低。期間絞り込みは請求件数が多いユーザー向けに検討の余地あり
+- テスト: `BillList.test.tsx` 追加済み（一覧表示・年/月絞り込み・詳細表示・CSVダウンロード成功/失敗/キャンセル、2026-08-09）
+- バックエンド: `ListByContract`/`ListByContractYear`/`ListByContractYearMonth`/`GetDetails`/`DownloadDetailsCSV`。Create/Update/Delete概念はBillOpに存在しない（読み取り専用リソースのため妥当）
+- SDK比較で不足: Read（単一取得。一覧から選択する現状UIでは不要と判断）
+- **対応済み（2026-08-09、Tier3 #21）**: ByContractYear/ByContractYearMonthによる期間絞り込みUI、DetailsCSVによるCSVダウンロード（`runtime.SaveFileDialog`でローカル保存、ObjectStorageのダウンロード実装と同じパターン）
 
 ---
 
@@ -292,7 +292,7 @@
 18. ✅ ObjectStorage: AccountのRead/Delete、PermissionsAPI全般、暗号化/レプリケーション/クォータ設定、S3側のPutObject/DeleteObject — 2026-08-09対応済み
 19. ✅ Monitoring Suite: ストレージ・アクセスキーのCreate/Update/Destroy — 2026-08-09対応済み
 20. ✅ ProxyLB: ChangePlan/MonitorConnection（トラフィックグラフ） — 2026-08-09対応済み
-21. Bill: ByContractYear/ByContractYearMonth（期間絞り込み）/DetailsCSV
+21. ✅ Bill: ByContractYear/ByContractYearMonth（期間絞り込み）/DetailsCSV — 2026-08-09対応済み
 
 **Tier 4: ドキュメント整備（機能追加ではないが、書き込み系機能が一通り揃った段階でユーザーから提案。2026-08-09追加）**
 

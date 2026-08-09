@@ -1549,6 +1549,43 @@ func (a *App) GetBillDetails(profileName, memberCode, billID string) ([]sakura.B
 	return service.GetDetails(a.ctx, memberCode, billID)
 }
 
+func (a *App) GetBillsByYear(profileName, accountID string, year int) ([]sakura.BillInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewBillService(client)
+	return service.ListByContractYear(a.ctx, accountID, year)
+}
+
+func (a *App) GetBillsByYearMonth(profileName, accountID string, year, month int) ([]sakura.BillInfo, error) {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return nil, err
+	}
+	service := sakura.NewBillService(client)
+	return service.ListByContractYearMonth(a.ctx, accountID, year, month)
+}
+
+func (a *App) DownloadBillDetailsCSV(profileName, memberCode, billID, defaultFileName string) error {
+	client, err := sakura.NewClientFromProfile(profileName)
+	if err != nil {
+		return err
+	}
+	savePath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		DefaultFilename: defaultFileName,
+		Title:           "請求明細CSVを保存",
+	})
+	if err != nil {
+		return err
+	}
+	if savePath == "" {
+		return fmt.Errorf("cancelled")
+	}
+	service := sakura.NewBillService(client)
+	return service.DownloadDetailsCSV(a.ctx, memberCode, billID, savePath)
+}
+
 // Object Storage
 func (a *App) GetObjectStorageSites(profileName string) ([]sakura.SiteInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
