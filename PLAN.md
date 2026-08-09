@@ -307,7 +307,14 @@
     - 各フォームの入力欄に「何を入力すればよいか」が分かるplaceholderやヘルプテキストが無い箇所を洗い出し追加する（現状はラベルのみで単位や制約の説明が無い項目が多い）
     - 見直し対象はTier1〜Tier3で実装した機能に限らず、既存の全Create/Updateフォームが対象。範囲が広いため、着手時にリソース単位で区切って段階的にPRを分けるか、ユーザーと相談してスコープを決めること
     - フォームごとに前提（SDK側のバリデーション仕様、必須/任意の別）を確認した上で実装すること。SDK側で判明した制約や挙動の不明点は[[sakpilot-upstream-issues-doc]]の運用に従いdocs/upstream-issues.mdに記録する
-    - **進捗**: DNS/GSLB/ProxyLB/SimpleMonitor/Switch/Disk/Database対応済み。残り: NFS/EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/AppRun専有・共用型/Server等
+    - **進捗**: DNS/GSLB/ProxyLB/SimpleMonitor/Switch/Disk/Database/NFS対応済み。残り: EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/AppRun専有・共用型/Server等
+
+### ✅ 完了（2026-08-09 追加セッション38、Tier5 #23 一部・NFS）
+- Databaseに続き、NFS(`NFSList.tsx`の作成モーダル、`NFSDetail.tsx`の基本情報インライン編集)を`docs/ui-implementation-patterns.md`のルールに合わせて改修。2フォームとも`<form onSubmit>`+`<button type="submit">`に変換した。
+- 制約値は`internal/sakura/nfs.go`(SDK呼び出しのみでstructタグ上の範囲情報なし)では判別できなかったため、`terraform-provider-sakura`の`docs/resources/nfs.md`で確認: `name`必須、`description`長さ上限512(1-512文字)、`network_interface`配下の`ip_address`は必須、`netmask`(ネットワークマスク長)は範囲`8-29`必須(Databaseと同じ制約)。`default_route`/`switch_id`はドキュメント未記載だが、フォーム上の実質的な意味に合わせて`switch_id`は必須(接続先が無いと作成できない)、`default_route`は任意のままIPv4の`pattern`のみ付与とした。
+- 作成モーダルの送信ボタンに残っていた`disabled={... || !createForm.name || !createForm.switchId || !createForm.ipAddress}`というrequiredと重複するJSバリデーション、詳細画面編集フォームの`disabled={... || !nameInput}`を削除(rule 4)。
+- `NFSList.test.tsx`に接続先スイッチ未選択時の送信ブロックを`select.validity.valid`で検証するテストを追加。既存テストは`required-mark`付与でラベルのアクセシブルネームが変化したため`getByLabelText`呼び出しに`{ exact: false }`を付与。
+- `tsc --noEmit`/`npm run test`(268件全パス)/`npm run build`+`npx playwright test e2e/nfs.spec.ts`(7件全パス)/`golangci-lint run`(0 issues、Go側の変更なし)を確認してから作成。
 
 ### ✅ 完了（2026-08-09 追加セッション37、Tier5 #23 一部・Database）
 - Diskに続き、データベース(`DatabaseList.tsx`の作成モーダル、`DatabaseDetail.tsx`の基本情報インライン編集・稼働設定編集モーダル・DBパラメータ追加フォーム)を`docs/ui-implementation-patterns.md`のルールに合わせて改修。4フォームとも`<form onSubmit>`+`<button type="submit">`に変換した。
