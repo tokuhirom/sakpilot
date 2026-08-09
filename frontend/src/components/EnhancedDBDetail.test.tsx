@@ -108,13 +108,19 @@ describe('EnhancedDBDetail', () => {
     });
   });
 
-  it('disables the password button until a password is entered', async () => {
+  it('blocks the password submit when the field is empty', async () => {
     vi.mocked(GetEnhancedDB).mockResolvedValueOnce(makeEnhancedDB());
+    const user = userEvent.setup();
 
     render(<EnhancedDBDetail profile="default" enhancedDBId="123456789012" />);
     await screen.findByText('エンハンスドDB詳細: my-enhanced-db');
 
-    expect(screen.getByRole('button', { name: 'パスワードを再設定' })).toBeDisabled();
+    const passwordInput = screen.getByPlaceholderText('管理ユーザーの新しいパスワード') as HTMLInputElement;
+    await user.click(screen.getByRole('button', { name: 'パスワードを再設定' }));
+
+    expect(passwordInput.validity.valid).toBe(false);
+    expect(SetEnhancedDBPassword).not.toHaveBeenCalled();
+    expect(screen.queryByText(/のパスワードを再設定しますか/)).not.toBeInTheDocument();
   });
 
   it('shows an error when setting the password fails', async () => {

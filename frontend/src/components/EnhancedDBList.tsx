@@ -128,7 +128,8 @@ export function EnhancedDBList({ profile, onSelectDB }: EnhancedDBListProps) {
     setShowCreate(false);
   };
 
-  const handleCreateSubmit = async () => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setCreating(true);
     setCreateError(null);
     try {
@@ -247,14 +248,16 @@ export function EnhancedDBList({ profile, onSelectDB }: EnhancedDBListProps) {
             padding: '20px', minWidth: '320px', maxWidth: '420px',
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>エンハンスドDB作成</h3>
+            <form onSubmit={handleCreateSubmit}>
             <div className="form-group">
-              <label>名前</label>
+              <label>名前<span className="required-mark">*</span></label>
               <input
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="my-enhanced-db"
                 autoFocus
+                required
               />
             </div>
             <div className="form-group">
@@ -264,15 +267,17 @@ export function EnhancedDBList({ profile, onSelectDB }: EnhancedDBListProps) {
                 value={newDescription}
                 onChange={(e) => setNewDescription(e.target.value)}
                 placeholder="任意"
+                maxLength={512}
               />
             </div>
             <div className="form-group">
-              <label>DB名</label>
+              <label>DB名<span className="required-mark">*</span></label>
               <input
                 type="text"
                 value={newDatabaseName}
                 onChange={(e) => setNewDatabaseName(e.target.value)}
                 placeholder="mydb"
+                required
               />
             </div>
             <div className="form-group">
@@ -312,15 +317,16 @@ export function EnhancedDBList({ profile, onSelectDB }: EnhancedDBListProps) {
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+              <button type="button" className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
               <button
+                type="submit"
                 className="btn btn-primary"
-                onClick={handleCreateSubmit}
-                disabled={creating || !newName || !newDatabaseName}
+                disabled={creating}
               >
                 {creating ? '作成中...' : '作成する'}
               </button>
             </div>
+            </form>
           </div>
         </div>
       )}
