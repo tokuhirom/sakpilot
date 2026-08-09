@@ -37,7 +37,7 @@ test('スイッチ詳細で名前・説明・ネットワーク設定を編集�
   await expect(page.getByRole('heading', { name: /^スイッチ詳細: / })).toBeVisible();
 
   await page.getByRole('button', { name: '編集' }).click();
-  await page.getByPlaceholder('任意(ルータ接続する場合のみ、例: 28)').fill('28');
+  await page.getByPlaceholder('任意(ルータ接続する場合のみ、26-28)').fill('28');
   await page.getByPlaceholder('任意(例: 192.168.0.1)').fill('192.168.0.1');
   await page.getByRole('button', { name: '保存する' }).click();
 

@@ -5,6 +5,8 @@ import { useSearch } from '../hooks/useSearch';
 import { useGlobalReload } from '../hooks/useGlobalReload';
 import { SearchBar } from './SearchBar';
 
+const IPV4_PATTERN = '^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$';
+
 interface SwitchListProps {
   profile: string;
   zone: string;
@@ -97,7 +99,8 @@ export function SwitchList({ profile, zone, zones, onZoneChange, onSelectSwitch 
     setShowCreate(false);
   };
 
-  const handleCreateSubmit = async () => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setCreating(true);
     setCreateError(null);
     try {
@@ -221,13 +224,15 @@ export function SwitchList({ profile, zone, zones, onZoneChange, onSelectSwitch 
             padding: '20px', minWidth: '320px', maxWidth: '420px',
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>スイッチ作成</h3>
+            <form onSubmit={handleCreateSubmit}>
             <div className="form-group">
-              <label>名前</label>
+              <label>名前<span className="required-mark">*</span></label>
               <input
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="my-switch"
+                required
                 autoFocus
               />
             </div>
@@ -238,6 +243,7 @@ export function SwitchList({ profile, zone, zones, onZoneChange, onSelectSwitch 
                 value={newDescription}
                 onChange={(e) => setNewDescription(e.target.value)}
                 placeholder="任意"
+                maxLength={512}
               />
             </div>
             <div className="form-group">
@@ -246,7 +252,9 @@ export function SwitchList({ profile, zone, zones, onZoneChange, onSelectSwitch 
                 type="number"
                 value={newNetworkMaskLen}
                 onChange={(e) => setNewNetworkMaskLen(e.target.value)}
-                placeholder="任意(ルータ接続する場合のみ、例: 28)"
+                placeholder="任意(ルータ接続する場合のみ、26-28)"
+                min={26}
+                max={28}
               />
             </div>
             <div className="form-group">
@@ -256,6 +264,7 @@ export function SwitchList({ profile, zone, zones, onZoneChange, onSelectSwitch 
                 value={newDefaultRoute}
                 onChange={(e) => setNewDefaultRoute(e.target.value)}
                 placeholder="任意(例: 192.168.0.1)"
+                pattern={IPV4_PATTERN}
               />
             </div>
             {createError && (
@@ -264,15 +273,12 @@ export function SwitchList({ profile, zone, zones, onZoneChange, onSelectSwitch 
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
-              <button
-                className="btn btn-primary"
-                onClick={handleCreateSubmit}
-                disabled={creating || !newName}
-              >
+              <button type="button" className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+              <button type="submit" className="btn btn-primary" disabled={creating}>
                 {creating ? '作成中...' : '作成する'}
               </button>
             </div>
+            </form>
           </div>
         </div>
       )}
