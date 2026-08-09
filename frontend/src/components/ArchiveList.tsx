@@ -157,7 +157,8 @@ export function ArchiveList({ profile, zone, zones, onZoneChange }: ArchiveListP
     setShowCreate(false);
   };
 
-  const handleCreateSubmit = async () => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setCreating(true);
     setCreateError(null);
     try {
@@ -248,7 +249,8 @@ export function ArchiveList({ profile, zone, zones, onZoneChange }: ArchiveListP
     setShowFromShared(false);
   };
 
-  const handleFromSharedSubmit = async () => {
+  const handleFromSharedSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setCreatingFromShared(true);
     setFromSharedError(null);
     try {
@@ -416,6 +418,7 @@ export function ArchiveList({ profile, zone, zones, onZoneChange }: ArchiveListP
             padding: '20px', minWidth: '320px', maxWidth: '420px',
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>アーカイブ作成</h3>
+            <form onSubmit={handleCreateSubmit}>
             <div className="form-group">
               <label htmlFor="archive-create-source">作成方法</label>
               <select id="archive-create-source" value={newSource} onChange={(e) => setNewSource(e.target.value as CreateSource)}>
@@ -425,12 +428,13 @@ export function ArchiveList({ profile, zone, zones, onZoneChange }: ArchiveListP
               </select>
             </div>
             <div className="form-group">
-              <label>名前</label>
+              <label>名前<span className="required-mark">*</span></label>
               <input
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="my-archive"
+                required
                 autoFocus
               />
             </div>
@@ -454,18 +458,20 @@ export function ArchiveList({ profile, zone, zones, onZoneChange }: ArchiveListP
             </div>
             {newSource === 'blank' && (
               <div className="form-group">
-                <label>サイズ(GB)</label>
+                <label>サイズ(GB)<span className="required-mark">*</span></label>
                 <input
                   type="number"
                   value={newSizeGB}
                   onChange={(e) => setNewSizeGB(e.target.value)}
+                  min={20}
+                  required
                 />
               </div>
             )}
             {newSource === 'disk' && (
               <div className="form-group">
-                <label htmlFor="archive-create-source-disk">コピー元ディスク</label>
-                <select id="archive-create-source-disk" value={newSourceDiskId} onChange={(e) => setNewSourceDiskId(e.target.value)}>
+                <label htmlFor="archive-create-source-disk">コピー元ディスク<span className="required-mark">*</span></label>
+                <select id="archive-create-source-disk" value={newSourceDiskId} onChange={(e) => setNewSourceDiskId(e.target.value)} required>
                   <option value="">選択してください</option>
                   {disks.map((d) => (
                     <option key={d.id} value={d.id}>{d.name}</option>
@@ -475,8 +481,8 @@ export function ArchiveList({ profile, zone, zones, onZoneChange }: ArchiveListP
             )}
             {newSource === 'archive' && (
               <div className="form-group">
-                <label htmlFor="archive-create-source-archive">コピー元アーカイブ</label>
-                <select id="archive-create-source-archive" value={newSourceArchiveId} onChange={(e) => setNewSourceArchiveId(e.target.value)}>
+                <label htmlFor="archive-create-source-archive">コピー元アーカイブ<span className="required-mark">*</span></label>
+                <select id="archive-create-source-archive" value={newSourceArchiveId} onChange={(e) => setNewSourceArchiveId(e.target.value)} required>
                   <option value="">選択してください</option>
                   {archives.map((a) => (
                     <option key={a.id} value={a.id}>{a.name}</option>
@@ -490,19 +496,16 @@ export function ArchiveList({ profile, zone, zones, onZoneChange }: ArchiveListP
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+              <button type="button" className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
               <button
+                type="submit"
                 className="btn btn-primary"
-                onClick={handleCreateSubmit}
-                disabled={
-                  creating || !newName ||
-                  (newSource === 'disk' && !newSourceDiskId) ||
-                  (newSource === 'archive' && !newSourceArchiveId)
-                }
+                disabled={creating}
               >
                 {creating ? '作成中...' : '作成する'}
               </button>
             </div>
+            </form>
           </div>
         </div>
       )}
@@ -518,13 +521,16 @@ export function ArchiveList({ profile, zone, zones, onZoneChange }: ArchiveListP
             padding: '20px', minWidth: '320px', maxWidth: '420px',
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>共有キーからアーカイブ複製</h3>
+            <form onSubmit={handleFromSharedSubmit}>
             <div className="form-group">
-              <label>共有キー</label>
+              <label>共有キー<span className="required-mark">*</span></label>
               <input
                 type="text"
                 value={sharedKeyInput}
                 onChange={(e) => setSharedKeyInput(e.target.value)}
                 placeholder="ゾーン:アーカイブID:トークン"
+                pattern="[^:]+:[^:]+:[^:]+"
+                required
                 autoFocus
               />
             </div>
@@ -537,12 +543,13 @@ export function ArchiveList({ profile, zone, zones, onZoneChange }: ArchiveListP
               </select>
             </div>
             <div className="form-group">
-              <label>名前</label>
+              <label>名前<span className="required-mark">*</span></label>
               <input
                 type="text"
                 value={sharedName}
                 onChange={(e) => setSharedName(e.target.value)}
                 placeholder="my-archive"
+                required
               />
             </div>
             <div className="form-group">
@@ -569,15 +576,16 @@ export function ArchiveList({ profile, zone, zones, onZoneChange }: ArchiveListP
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleFromSharedCancel}>キャンセル</button>
+              <button type="button" className="btn btn-secondary" onClick={handleFromSharedCancel}>キャンセル</button>
               <button
+                type="submit"
                 className="btn btn-primary"
-                onClick={handleFromSharedSubmit}
-                disabled={creatingFromShared || !sharedKeyInput || !sharedName}
+                disabled={creatingFromShared}
               >
                 {creatingFromShared ? '複製中...' : '複製する'}
               </button>
             </div>
+            </form>
           </div>
         </div>
       )}

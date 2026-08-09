@@ -193,7 +193,7 @@ describe('ArchiveList', () => {
     await user.click(screen.getByRole('button', { name: '+ アーカイブ作成' }));
     await user.selectOptions(screen.getByLabelText('作成方法'), 'disk');
     await screen.findByText('my-disk');
-    await user.selectOptions(screen.getByLabelText('コピー元ディスク'), '999');
+    await user.selectOptions(screen.getByLabelText('コピー元ディスク', { exact: false }), '999');
     await user.type(screen.getByPlaceholderText('my-archive'), 'from-disk-archive');
     await user.click(screen.getByRole('button', { name: '作成する' }));
 
@@ -244,6 +244,40 @@ describe('ArchiveList', () => {
     await waitFor(() => {
       expect(CloseArchiveFTP).toHaveBeenCalledWith('default', 'is1a', '123456789012');
     });
+  });
+
+  it('blocks archive creation when name is empty', async () => {
+    vi.mocked(GetArchives).mockResolvedValueOnce([]);
+    vi.mocked(GetDisks).mockResolvedValueOnce([]);
+    const user = userEvent.setup();
+
+    render(<ArchiveList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    await screen.findByText('アーカイブがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ アーカイブ作成' }));
+    const nameInput = screen.getByPlaceholderText('my-archive') as HTMLInputElement;
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    expect(nameInput.validity.valid).toBe(false);
+    expect(CreateBlankArchive).not.toHaveBeenCalled();
+    expect(CreateArchive).not.toHaveBeenCalled();
+  });
+
+  it('blocks archive creation from a shared key when the key format is invalid', async () => {
+    vi.mocked(GetArchives).mockResolvedValueOnce([]);
+    const user = userEvent.setup();
+
+    render(<ArchiveList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} />);
+    await screen.findByText('アーカイブがありません');
+
+    await user.click(screen.getByRole('button', { name: '共有キーから複製' }));
+    const keyInput = screen.getByPlaceholderText('ゾーン:アーカイブID:トークン') as HTMLInputElement;
+    await user.type(keyInput, 'invalid-key');
+    await user.type(screen.getByPlaceholderText('my-archive'), 'shared-copy');
+    await user.click(screen.getByRole('button', { name: '複製する' }));
+
+    expect(keyInput.validity.valid).toBe(false);
+    expect(CreateArchiveFromShared).not.toHaveBeenCalled();
   });
 
   it('creates an archive from a shared key', async () => {
