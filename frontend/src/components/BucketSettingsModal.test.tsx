@@ -51,8 +51,8 @@ describe('BucketSettingsModal', () => {
 
     expect(await screen.findByText(/オブジェクト数上限/)).toHaveTextContent('10,000,000');
     expect(screen.getByText(/容量上限/)).toHaveTextContent('10,240');
-    expect(screen.getByPlaceholderText('KMSキーID')).toBeInTheDocument();
-    expect(screen.getByText('複製先バケットを選択')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('KMSキーID *')).toBeInTheDocument();
+    expect(screen.getByText('複製先バケットを選択 *')).toBeInTheDocument();
   });
 
   it('enables encryption and reflects the configured state', async () => {
@@ -62,20 +62,51 @@ describe('BucketSettingsModal', () => {
     render(
       <BucketSettingsModal profile="default" siteId="isk01" bucketName="my-bucket" otherBuckets={[]} onClose={vi.fn()} />
     );
-    await screen.findByPlaceholderText('KMSキーID');
+    await screen.findByPlaceholderText('KMSキーID *');
 
     vi.mocked(GetObjectStorageBucketEncryption).mockResolvedValueOnce(
       makeEncryption({ enabled: true, kmsKeyId: '123456789012', configuredAt: '2026-08-01T00:00:00Z' })
     );
 
     const encryptionSection = screen.getByText('暗号化').closest('section')!;
-    await user.type(screen.getByPlaceholderText('KMSキーID'), '123456789012');
+    await user.type(screen.getByPlaceholderText('KMSキーID *'), '123456789012');
     await user.click(within(encryptionSection).getByRole('button', { name: '有効にする' }));
 
     await waitFor(() => {
       expect(EnableObjectStorageBucketEncryption).toHaveBeenCalledWith('default', 'isk01', 'my-bucket', '123456789012');
     });
     expect(await screen.findByText(/有効（KMSキーID: 123456789012）/)).toBeInTheDocument();
+  });
+
+  it('blocks encryption submit when KMSキーID is empty', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <BucketSettingsModal profile="default" siteId="isk01" bucketName="my-bucket" otherBuckets={[]} onClose={vi.fn()} />
+    );
+    const kmsInput = await screen.findByPlaceholderText('KMSキーID *') as HTMLInputElement;
+
+    const encryptionSection = screen.getByText('暗号化').closest('section')!;
+    await user.click(within(encryptionSection).getByRole('button', { name: '有効にする' }));
+
+    expect(kmsInput.validity.valid).toBe(false);
+    expect(EnableObjectStorageBucketEncryption).not.toHaveBeenCalled();
+  });
+
+  it('blocks replication submit when 複製先バケット is not selected', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <BucketSettingsModal profile="default" siteId="isk01" bucketName="my-bucket" otherBuckets={['dest-bucket']} onClose={vi.fn()} />
+    );
+    await screen.findByText('複製先バケットを選択 *');
+
+    const replicationSection = screen.getByText('レプリケーション').closest('section')!;
+    const targetSelect = within(replicationSection).getByRole('combobox') as HTMLSelectElement;
+    await user.click(within(replicationSection).getByRole('button', { name: '有効にする' }));
+
+    expect(targetSelect.validity.valid).toBe(false);
+    expect(EnableObjectStorageBucketReplication).not.toHaveBeenCalled();
   });
 
   it('disables replication after confirming an enabled state', async () => {
@@ -97,7 +128,7 @@ describe('BucketSettingsModal', () => {
     await waitFor(() => {
       expect(DisableObjectStorageBucketReplication).toHaveBeenCalledWith('default', 'isk01', 'my-bucket');
     });
-    expect(await screen.findByText('複製先バケットを選択')).toBeInTheDocument();
+    expect(await screen.findByText('複製先バケットを選択 *')).toBeInTheDocument();
   });
 
   it('shows an error message when a call fails', async () => {
