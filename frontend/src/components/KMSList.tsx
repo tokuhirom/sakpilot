@@ -137,7 +137,8 @@ export function KMSList({ profile, onSelectKey }: KMSListProps) {
     setShowCreate(false);
   };
 
-  const handleCreateSubmit = async () => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setCreating(true);
     setCreateError(null);
     try {
@@ -259,14 +260,16 @@ export function KMSList({ profile, onSelectKey }: KMSListProps) {
             padding: '20px', minWidth: '320px', maxWidth: '420px',
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>KMSキー作成</h3>
+            <form onSubmit={handleCreateSubmit}>
             <div className="form-group">
-              <label>名前</label>
+              <label>名前<span className="required-mark">*</span></label>
               <input
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="my-key"
                 autoFocus
+                required
               />
             </div>
             <div className="form-group">
@@ -276,6 +279,7 @@ export function KMSList({ profile, onSelectKey }: KMSListProps) {
                 value={newDescription}
                 onChange={(e) => setNewDescription(e.target.value)}
                 placeholder="任意"
+                maxLength={512}
               />
             </div>
             <div className="form-group">
@@ -290,12 +294,13 @@ export function KMSList({ profile, onSelectKey }: KMSListProps) {
             </div>
             {newKeyOrigin === 'imported' && (
               <div className="form-group">
-                <label>キー素材(Base64)</label>
+                <label>キー素材(Base64)<span className="required-mark">*</span></label>
                 <input
                   type="text"
                   value={newPlainKey}
                   onChange={(e) => setNewPlainKey(e.target.value)}
                   placeholder="インポートする鍵データ"
+                  required
                 />
               </div>
             )}
@@ -314,15 +319,16 @@ export function KMSList({ profile, onSelectKey }: KMSListProps) {
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+              <button type="button" className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
               <button
+                type="submit"
                 className="btn btn-primary"
-                onClick={handleCreateSubmit}
-                disabled={creating || !newName || (newKeyOrigin === 'imported' && !newPlainKey)}
+                disabled={creating}
               >
                 {creating ? '作成中...' : '作成する'}
               </button>
             </div>
+            </form>
           </div>
         </div>
       )}

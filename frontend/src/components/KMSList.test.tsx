@@ -120,11 +120,10 @@ describe('KMSList', () => {
     await user.type(screen.getByPlaceholderText('my-key'), 'imported-key');
     await user.selectOptions(screen.getByRole('combobox'), 'imported');
 
-    expect(screen.getByRole('button', { name: '作成する' })).toBeDisabled();
+    const plainKeyInput = screen.getByPlaceholderText('インポートする鍵データ') as HTMLInputElement;
+    await user.click(screen.getByRole('button', { name: '作成する' }));
 
-    await user.type(screen.getByPlaceholderText('インポートする鍵データ'), 'base64keydata');
-
-    expect(screen.getByRole('button', { name: '作成する' })).not.toBeDisabled();
+    expect(plainKeyInput.validity.valid).toBe(false);
     expect(CreateKMSKey).not.toHaveBeenCalled();
   });
 });
