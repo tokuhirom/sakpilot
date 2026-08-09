@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:coverage": "pkill -x sakpilot 2>/dev/null; E2E_COVERAGE=1 playwright test && npm run coverage:go:report",
+    "docs:screenshots": "playwright test --config=playwright.manual.config.ts",
     "coverage:go:report": "cd .. && go tool covdata percent -i=covdata",
     "coverage:go:html": "cd .. && go tool covdata textfmt -i=covdata -o coverage.out && go tool cover -html=coverage.out -o coverage.html && echo 'wrote ../coverage.html'"
   },

@@ -8,7 +8,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
-    // e2e/ はPlaywright管轄(npm run test:e2e)なのでvitestからは除外する
-    exclude: ['node_modules/**', 'e2e/**'],
+    // e2e/・e2e-manual/ はPlaywright管轄(npm run test:e2e / docs:screenshots)なのでvitestからは除外する
+    exclude: ['node_modules/**', 'e2e/**', 'e2e-manual/**'],
   },
 })

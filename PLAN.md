@@ -296,7 +296,7 @@
 
 **Tier 4: ドキュメント整備（機能追加ではないが、書き込み系機能が一通り揃った段階でユーザーから提案。2026-08-09追加）**
 
-22. スクショ付きユーザーマニュアルの整備（Playwrightベース）— 各リソースの主要な操作フロー（作成・編集・削除等）をスクリーンショット付きで説明するユーザー向けドキュメントが現状無い。[[sakpilot-e2e-testing]]で整備済みのE2Eテスト基盤（`frontend/e2e/*.spec.ts`、`go run -tags e2e .`）を流用してスクリーンショットを撮る運用を想定。未着手。着手時は「既存のE2E specにスクショ撮影ステップを追記する形」か「専用のドキュメント生成スクリプトを別途書く形」かをユーザーに相談してからスコープを決めること
+22. ✅ スクショ付きユーザーマニュアルの整備（Playwrightベース）— 各リソースの主要な操作フロー（作成・編集・削除等）をスクリーンショット付きで説明するユーザー向けドキュメントが現状無い。[[sakpilot-e2e-testing]]で整備済みのE2Eテスト基盤（`frontend/e2e/*.spec.ts`、`go run -tags e2e .`）を流用してスクリーンショットを撮る運用を想定。方針は「専用のドキュメント生成スクリプトを別途書く形」（`frontend/playwright.manual.config.ts` + `frontend/e2e-manual/`、`npm run docs:screenshots`）で決定。2026-08-09対応: 撮影基盤（config・npm script・`docs/manual/images/<resource>/`保存ヘルパー）を整備し、Serverリソース1件分をPOCとして完了（`docs/manual/server.md`、スクショ12枚）。残り13リソース（Disk/Switch/PacketFilter/DNS/GSLB/ProxyLB/SimpleMonitor/Database/EnhancedDB/NFS/ContainerRegistry/KMS/AppRun専有・共用型）は同じ基盤を流用して順次追加予定。Archive/ObjectStorage/Monitoring Suite/Billはe2e_server.goにシードが無いため別途検討（詳細は`docs/manual/README.md`）
 
 **Tier 5: フォームUX見直し（横断的な品質改善、2026-08-09ユーザー指摘により追加）**
 
@@ -432,3 +432,10 @@
 - E2Eテスト（`frontend/e2e/proxylb.spec.ts`）でプラン変更モーダルの全`<option>`をレンダリングした際、既存の`getPlanName`が`.includes()`による部分一致判定だったため1000/5000/10000/50000/100000 CPSがそれぞれ100/500/100/500/100 CPSと誤表示されるバグを発見（400000 CPSのみ偶然一致しなかったため見た目上気づかれていなかった）。完全一致のswitch文に修正。
 - uPlotを使うコンポーネントをvitestでレンダリングすると`matchMedia is not a function`でjsdomごと落ちる（`ProxyLBList.test.tsx`が道連れで全滅）ことが判明したため、`frontend/src/test/setup.ts`に`window.matchMedia`の最小モックを追加（今後MetricGraph等uPlot系コンポーネントをテストする際にも有効）。
 - `internal/sakura/proxylb_test.go`を新設（ChangePlan/MonitorConnectionのGoテスト2件）、`frontend/e2e/proxylb.spec.ts`にプラン変更・トラフィックグラフのシナリオ2件を追加。`golangci-lint run`（0 issues）/`go build`/`go test ./...`/`tsc --noEmit`/`npm run test`（264件全パス）/`npx playwright test e2e/proxylb.spec.ts`（8件全パス）を確認してから作成
+
+### ✅ 完了（2026-08-09 追加セッション44、Tier4 #22・Server POC）
+- スクショ付きユーザーマニュアルの撮影基盤を新設。既存の`npm run test:e2e`（CI用回帰テスト、`frontend/playwright.config.ts`/`frontend/e2e/`）とは責務を分離し、`frontend/playwright.manual.config.ts`（`testDir: ./e2e-manual`、workers: 1、webServer/baseURLは既存configを流用）+ `frontend/e2e-manual/helpers.ts`（`docs/manual/images/<resource>/`への保存ヘルパー）+ `frontend/package.json`の`docs:screenshots`スクリプトを追加。CIジョブには含めない手動実行用ツールという位置づけ。
+- ユーザーからの追加指示で、当初想定していた全14リソース対応を縮小し、まずServerリソース1件のみを対象にしたPOC（動作確認込みの完全な実装サンプル）とした。`frontend/e2e-manual/server.spec.ts`（既存`frontend/e2e/servers.spec.ts`/`server-detail.spec.ts`のシード・セレクタを流用し、一覧→操作メニュー→停止確認→詳細→プラン変更→CD-ROM挿入→コンソール操作→NMI確認→VNC接続情報→削除確認、の一連の操作フローで連番スクショ12枚を撮影）と`docs/manual/server.md`を作成。
+- `docs/manual/README.md`を新設し、冒頭に「SakPilotは非公式のサードパーティ製ツールである」旨の注記を目立つ形（引用ブロック+太字）で明記。将来的なGitHub Pages公開の検討に軽く言及（今回はワークフロー追加等はスコープ外）。残り13リソース（Disk/Switch/PacketFilter/DNS/GSLB/ProxyLB/SimpleMonitor/Database/EnhancedDB/NFS/ContainerRegistry/KMS/AppRun専有・共用型）は今回の基盤を流用して順次追加予定である旨、Archive/ObjectStorage/Monitoring Suite/Billはe2e_server.goにシードが無いため別途検討である旨を記載。
+- `frontend/vite.config.ts`のvitest `exclude`に`e2e-manual/**`を追加（`e2e/**`と同様、Playwright管轄のディレクトリをvitestの対象外にするため）。
+- `npm run docs:screenshots`を実際に実行してスクショ12枚（1枚あたり60〜85KB、合計900KB弱）が生成されることを確認。`golangci-lint run`（Go側の変更なし）/`tsc --noEmit`/`npm run test`を確認してから作成。
