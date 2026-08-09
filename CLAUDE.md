@@ -111,6 +111,12 @@ cd frontend && npm run test:watch
 - 基本は `@testing-library/user-event` を使う(実際のブラウザ操作に近いイベントシーケンスを発行する)
 - 例外: `setInterval`によるポーリングを伴う処理(起動/停止後のステータス監視など)をテストする場合、`userEvent`はfakeTimers下では内部delayが解決せず固まる。この場合はクリックに`fireEvent`を使い、待機には(testing-libraryの`waitFor`ではなく、fakeTimers対応の)`vi.waitFor`を使うこと。実例は `src/components/ServerList.test.tsx` の「ポーリング」テストを参照
 
+## ユーザーマニュアルの更新
+
+- `docs/manual/`配下にスクショ付きユーザーマニュアルがある(索引: `docs/manual/README.md`)。新しい画面・操作フロー(作成・編集・削除等)を追加した場合や、既存画面の見た目・操作手順が変わった場合は、対応するリソースのマニュアル(`docs/manual/<resource>.md`)も同じPRで更新すること
+- スクリーンショットは`frontend/e2e-manual/`配下の専用Playwrightスクリプトで撮影する(CI用の`frontend/e2e/`とは別、`cd frontend && npm run docs:screenshots`)。新しいリソースのマニュアルを追加する場合は既存の`frontend/e2e-manual/server.spec.ts`と`frontend/e2e-manual/helpers.ts`を参考にすること
+- まだマニュアルが存在しないリソースに機能追加する場合、そのPRで必ずマニュアルを新設する必要はないが、既にマニュアルがあるリソースについては更新を省略しないこと
+
 ## Git Workflow
 
 - mainブランチに直接コミットしない。必ずブランチを作成してPRを出すこと
