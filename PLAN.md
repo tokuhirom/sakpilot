@@ -307,7 +307,16 @@
     - 各フォームの入力欄に「何を入力すればよいか」が分かるplaceholderやヘルプテキストが無い箇所を洗い出し追加する（現状はラベルのみで単位や制約の説明が無い項目が多い）
     - 見直し対象はTier1〜Tier3で実装した機能に限らず、既存の全Create/Updateフォームが対象。範囲が広いため、着手時にリソース単位で区切って段階的にPRを分けるか、ユーザーと相談してスコープを決めること
     - フォームごとに前提（SDK側のバリデーション仕様、必須/任意の別）を確認した上で実装すること。SDK側で判明した制約や挙動の不明点は[[sakpilot-upstream-issues-doc]]の運用に従いdocs/upstream-issues.mdに記録する
-    - **進捗**: DNS/GSLB対応済み（下記セッション31）。残り: ProxyLB/SimpleMonitor/Switch/Disk/Database/NFS/EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/AppRun専有・共用型/Server等
+    - **進捗**: DNS/GSLB/ProxyLB対応済み。残り: SimpleMonitor/Switch/Disk/Database/NFS/EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/AppRun専有・共用型/Server等
+
+### ✅ 完了（2026-08-09 追加セッション33、Tier5 #23 一部・ProxyLB）
+- DNS/GSLBに続き、ProxyLB（エンハンスドロードバランサ）の全作成/編集フォームを`docs/ui-implementation-patterns.md`のルールに合わせて改修。対象は`ProxyLBList.tsx`（List+Detail両方がこのファイルに実装されている）1ファイルで、ELB作成モーダル、基本情報（名前/説明）インライン編集、ヘルスチェック/Sorry Server/待ち受けポート/実サーバーの設定編集モーダル、SSL証明書設定フォーム、プラン変更モーダルの計6フォームすべてを`<div>`+onClickから`<form onSubmit>`+`<button type="submit">`に変換した。
+- 制約値は`internal/sakura/proxylb.go`のSDK呼び出し（`sacloud-sdk-go`）だけでは`required`/範囲がstructタグに現れず判別できなかったため、`terraform-provider-sakura`の`docs/resources/enhanced_lb.md`（同じSDKを使うTerraformプロバイダのスキーマドキュメント）で実際の必須/任意・値域を確認した: ヘルスチェック監視間隔`delay_loop`は範囲`10-60`、実サーバーの`port`は`1-65535`必須・`ip_address`必須、`group`は長さ`1-10`（任意項目のため`maxLength`のみ付与）。待ち受けポート・Sorry Serverのポートは明示的な範囲記載が無かったためTCP/UDPポート番号の一般的な上限として`1-65535`を適用。
+- 実サーバー行・待ち受けポート行はGSLBの振り分け先サーバー行と同様「ラベル無しの動的追加行」のため、placeholder末尾に半角スペース+`*`方式（`IPアドレス *`/`ポート *`）を適用。IPアドレスにはGSLBと同じIPv4 `pattern`を付与。
+- `handleSettingsSave`に残っていた「待ち受けポート未入力」「実サーバーのIP/ポート未入力」という到達不能になった手書きの存在チェック（rule 4の例に該当する明確な重複）は削除。数値パース失敗の防御チェック(`isNaN`)は`GSLBDetail.tsx`の既存スタイルに合わせて残した（`required`+`type="number"`により実質到達不能だが、参照実装と一貫性を取るため）。
+- 証明書設定フォームはSDK/terraform doc上「証明書を設定する場合はサーバー証明書・秘密鍵が必須、中間証明書は任意」という扱いのため、プライマリ・追加証明書とも該当2項目に`required`+ラベルの`required-mark`を付与。プラン変更モーダルは`<select>`のみで自由入力項目が無いことを確認したため`required`対応は不要だったが、一貫性のため`<form>`化のみ実施。
+- placeholder変更（`名前`→`名前 *`、`IPアドレス`→`IPアドレス *`）に伴い`ProxyLBList.test.tsx`と`frontend/e2e/proxylb.spec.ts`のセレクタを更新。「実サーバーのIPアドレス未入力」テストは`input.validity.valid`ベースの検証に書き換え。
+- `tsc --noEmit`/`npm run test`(264件全パス)/`npm run build`+`npx playwright test e2e/proxylb.spec.ts`(8件全パス、dist再ビルド後)を確認してから作成。Go側の変更は無いため`golangci-lint run`は対象外。
 
 ### ✅ 完了（2026-08-09 追加セッション32、Tier5 #23 ルール整備・視覚マーカー統一）
 - セッション31実装後、ユーザーから「required項目が視覚的に分かるか」を指摘され確認したところ、ラベル付きフィールドは`名前 *`のようにラベルにアスタリスクを付けていた一方、`GSLBDetail.tsx`のラベル無しフィールド（基本情報インライン編集の名前欄、振り分け先サーバー行のIPアドレス・重み）は`required`属性のみでplaceholderにも視覚マーカーが無く、一貫していなかったことが判明。

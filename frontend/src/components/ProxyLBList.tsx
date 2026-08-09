@@ -49,6 +49,8 @@ const emptyCertForm = (): CertForm => ({
 
 const PLAN_OPTIONS = [100, 500, 1000, 5000, 10000, 50000, 100000, 400000];
 
+const IPV4_PATTERN = '^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$';
+
 interface CreateForm {
   name: string;
   description: string;
@@ -319,7 +321,8 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
     }));
   };
 
-  const handleSaveCertificates = async () => {
+  const handleSaveCertificates = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!selectedProxyLB) return;
     setSavingCert(true);
     try {
@@ -377,7 +380,8 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
     setShowCreate(false);
   };
 
-  const handleCreateSubmit = async () => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setCreating(true);
     setCreateError(null);
     try {
@@ -409,7 +413,8 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
     setEditingBasic(false);
   };
 
-  const handleBasicSave = async () => {
+  const handleBasicSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!selectedProxyLB) return;
     setSavingBasic(true);
     try {
@@ -476,30 +481,15 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
     });
   };
 
-  const handleSettingsSave = async () => {
+  const handleSettingsSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!settingsForm || !selectedProxyLB) return;
 
     const delayLoop = parseInt(settingsForm.healthCheckDelayLoop, 10);
-    if (isNaN(delayLoop)) {
-      setSettingsError('監視間隔を正しく入力してください');
-      return;
-    }
-    if (settingsForm.bindPorts.some((bp) => !bp.port)) {
-      setSettingsError('待ち受けポートを入力してください');
-      return;
-    }
     const bindPortNumbers = settingsForm.bindPorts.map((bp) => parseInt(bp.port, 10));
-    if (bindPortNumbers.some(isNaN)) {
-      setSettingsError('待ち受けポートを正しく入力してください');
-      return;
-    }
-    if (settingsForm.servers.some((s) => !s.ipAddress || !s.port)) {
-      setSettingsError('実サーバーのIPアドレス・ポートを入力してください');
-      return;
-    }
     const serverPorts = settingsForm.servers.map((s) => parseInt(s.port, 10));
-    if (serverPorts.some(isNaN)) {
-      setSettingsError('実サーバーのポートを正しく入力してください');
+    if ([delayLoop, ...bindPortNumbers, ...serverPorts].some(isNaN)) {
+      setSettingsError('数値項目を正しく入力してください');
       return;
     }
     let sorryServerPort = 0;
@@ -560,7 +550,8 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
     setShowChangePlan(false);
   };
 
-  const handleChangePlanSubmit = async () => {
+  const handleChangePlanSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!selectedProxyLB) return;
     setChangingPlan(true);
     setChangePlanError(null);
@@ -678,12 +669,13 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
                 <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>名前 / 説明</td>
                 <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>
                   {editingBasic ? (
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <form onSubmit={handleBasicSave} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                       <input
                         type="text"
                         value={nameInput}
                         onChange={(e) => setNameInput(e.target.value)}
-                        placeholder="名前"
+                        placeholder="名前 *"
+                        required
                         autoFocus
                       />
                       <input
@@ -692,11 +684,11 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
                         onChange={(e) => setDescriptionInput(e.target.value)}
                         placeholder="説明"
                       />
-                      <button className="btn btn-primary btn-small" onClick={handleBasicSave} disabled={savingBasic || !nameInput}>
+                      <button type="submit" className="btn btn-primary btn-small" disabled={savingBasic}>
                         {savingBasic ? '保存中...' : '保存'}
                       </button>
-                      <button className="btn btn-secondary btn-small" onClick={handleBasicEditCancel} disabled={savingBasic}>キャンセル</button>
-                    </div>
+                      <button type="button" className="btn btn-secondary btn-small" onClick={handleBasicEditCancel} disabled={savingBasic}>キャンセル</button>
+                    </form>
                   ) : (
                     <span style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                       {selectedProxyLB.name} / {selectedProxyLB.description || '-'}
@@ -965,15 +957,16 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
           {loadingCertificates ? (
             <div className="loading">読み込み中...</div>
           ) : showCertForm ? (
-            <div>
+            <form onSubmit={handleSaveCertificates}>
               <div style={{ marginBottom: '1rem' }}>
                 <h5 style={{ color: '#ccc', marginBottom: '0.5rem' }}>プライマリ証明書</h5>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#888', marginBottom: '0.25rem' }}>サーバー証明書 (PEM)</label>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: '#888', marginBottom: '0.25rem' }}>サーバー証明書 (PEM)<span className="required-mark">*</span></label>
                 <textarea
                   aria-label="プライマリ証明書 サーバー証明書 (PEM)"
                   value={certForm.primaryCert.serverCertificate}
                   onChange={(e) => updatePrimaryCertField('serverCertificate', e.target.value)}
                   rows={4}
+                  required
                   style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.75rem', marginBottom: '0.5rem' }}
                 />
                 <label style={{ display: 'block', fontSize: '0.75rem', color: '#888', marginBottom: '0.25rem' }}>中間証明書 (PEM)</label>
@@ -984,12 +977,13 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
                   rows={4}
                   style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.75rem', marginBottom: '0.5rem' }}
                 />
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#888', marginBottom: '0.25rem' }}>秘密鍵 (PEM)</label>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: '#888', marginBottom: '0.25rem' }}>秘密鍵 (PEM)<span className="required-mark">*</span></label>
                 <textarea
                   aria-label="プライマリ証明書 秘密鍵 (PEM)"
                   value={certForm.primaryCert.privateKey}
                   onChange={(e) => updatePrimaryCertField('privateKey', e.target.value)}
                   rows={4}
+                  required
                   style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.75rem' }}
                 />
               </div>
@@ -998,16 +992,17 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
                 <div key={idx} style={{ marginBottom: '1rem', paddingTop: '0.5rem', borderTop: '1px solid #444' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                     <h5 style={{ color: '#ccc', margin: 0 }}>追加証明書 {idx + 1}</h5>
-                    <button className="btn btn-secondary btn-small" onClick={() => handleRemoveAdditionalCert(idx)}>
+                    <button type="button" className="btn btn-secondary btn-small" onClick={() => handleRemoveAdditionalCert(idx)}>
                       削除
                     </button>
                   </div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#888', marginBottom: '0.25rem' }}>サーバー証明書 (PEM)</label>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#888', marginBottom: '0.25rem' }}>サーバー証明書 (PEM)<span className="required-mark">*</span></label>
                   <textarea
                     aria-label={`追加証明書 ${idx + 1} サーバー証明書 (PEM)`}
                     value={cert.serverCertificate}
                     onChange={(e) => updateAdditionalCertField(idx, 'serverCertificate', e.target.value)}
                     rows={4}
+                    required
                     style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.75rem', marginBottom: '0.5rem' }}
                   />
                   <label style={{ display: 'block', fontSize: '0.75rem', color: '#888', marginBottom: '0.25rem' }}>中間証明書 (PEM)</label>
@@ -1018,31 +1013,32 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
                     rows={4}
                     style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.75rem', marginBottom: '0.5rem' }}
                   />
-                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#888', marginBottom: '0.25rem' }}>秘密鍵 (PEM)</label>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#888', marginBottom: '0.25rem' }}>秘密鍵 (PEM)<span className="required-mark">*</span></label>
                   <textarea
                     aria-label={`追加証明書 ${idx + 1} 秘密鍵 (PEM)`}
                     value={cert.privateKey}
                     onChange={(e) => updateAdditionalCertField(idx, 'privateKey', e.target.value)}
                     rows={4}
+                    required
                     style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.75rem' }}
                   />
                 </div>
               ))}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
-                <button className="btn btn-secondary btn-small" onClick={handleAddAdditionalCert}>
+                <button type="button" className="btn btn-secondary btn-small" onClick={handleAddAdditionalCert}>
                   + 追加証明書を追加
                 </button>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button className="btn btn-secondary" onClick={handleCancelCertForm} disabled={savingCert}>
+                  <button type="button" className="btn btn-secondary" onClick={handleCancelCertForm} disabled={savingCert}>
                     キャンセル
                   </button>
-                  <button className="btn btn-primary" onClick={handleSaveCertificates} disabled={savingCert}>
+                  <button type="submit" className="btn btn-primary" disabled={savingCert}>
                     {savingCert ? '保存中...' : '保存'}
                   </button>
                 </div>
               </div>
-            </div>
+            </form>
           ) : certificates?.primaryCert ? (
             <table style={{ borderCollapse: 'collapse', width: '100%' }}>
               <tbody>
@@ -1103,6 +1099,7 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
             }}>
               <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>設定を編集</h3>
 
+              <form onSubmit={handleSettingsSave}>
               <h4 style={{ color: '#00adb5', margin: '1rem 0' }}>ヘルスチェック</h4>
               <div className="form-group">
                 <label>プロトコル</label>
@@ -1136,11 +1133,15 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
                 </>
               )}
               <div className="form-group">
-                <label>監視間隔(秒)</label>
+                <label>監視間隔(秒)<span className="required-mark">*</span></label>
                 <input
                   type="number"
                   value={settingsForm.healthCheckDelayLoop}
                   onChange={(e) => setSettingsForm({ ...settingsForm, healthCheckDelayLoop: e.target.value })}
+                  min={10}
+                  max={60}
+                  step={1}
+                  required
                 />
               </div>
 
@@ -1152,23 +1153,28 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
                     type="text"
                     value={settingsForm.sorryServerIpAddress}
                     onChange={(e) => setSettingsForm({ ...settingsForm, sorryServerIpAddress: e.target.value })}
-                    placeholder="任意"
+                    placeholder="任意 (例: 192.0.2.1)"
+                    pattern={IPV4_PATTERN}
+                    title="IPv4アドレスの形式で入力してください"
                   />
                 </div>
                 <div className="form-group" style={{ flex: 1 }}>
                   <label>ポート</label>
                   <input
-                    type="text"
+                    type="number"
                     value={settingsForm.sorryServerPort}
                     onChange={(e) => setSettingsForm({ ...settingsForm, sorryServerPort: e.target.value })}
                     placeholder="任意"
+                    min={1}
+                    max={65535}
+                    step={1}
                   />
                 </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '1rem 0' }}>
                 <h4 style={{ color: '#00adb5', margin: 0 }}>待ち受けポート</h4>
-                <button className="btn btn-secondary btn-small" onClick={handleBindPortAdd}>+ ポート追加</button>
+                <button type="button" className="btn btn-secondary btn-small" onClick={handleBindPortAdd}>+ ポート追加</button>
               </div>
               {settingsForm.bindPorts.length === 0 ? (
                 <p style={{ color: '#666', fontSize: '0.85rem' }}>待ち受けポートが登録されていません</p>
@@ -1187,7 +1193,11 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
                       type="number"
                       value={bp.port}
                       onChange={(e) => handleBindPortChange(index, 'port', e.target.value)}
-                      placeholder="ポート"
+                      placeholder="ポート *"
+                      min={1}
+                      max={65535}
+                      step={1}
+                      required
                       style={{ width: '90px' }}
                     />
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', whiteSpace: 'nowrap' }}>
@@ -1206,14 +1216,14 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
                       />
                       HTTP/2
                     </label>
-                    <button className="btn btn-danger btn-small" onClick={() => handleBindPortRemove(index)}>削除</button>
+                    <button type="button" className="btn btn-danger btn-small" onClick={() => handleBindPortRemove(index)}>削除</button>
                   </div>
                 ))
               )}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '1rem 0' }}>
                 <h4 style={{ color: '#00adb5', margin: 0 }}>実サーバー</h4>
-                <button className="btn btn-secondary btn-small" onClick={handleServerAdd}>+ サーバー追加</button>
+                <button type="button" className="btn btn-secondary btn-small" onClick={handleServerAdd}>+ サーバー追加</button>
               </div>
               {settingsForm.servers.length === 0 ? (
                 <p style={{ color: '#666', fontSize: '0.85rem' }}>実サーバーが登録されていません</p>
@@ -1224,14 +1234,21 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
                       type="text"
                       value={server.ipAddress}
                       onChange={(e) => handleServerChange(index, 'ipAddress', e.target.value)}
-                      placeholder="IPアドレス"
+                      placeholder="IPアドレス *"
+                      pattern={IPV4_PATTERN}
+                      title="IPv4アドレスの形式で入力してください"
+                      required
                       style={{ flex: 2 }}
                     />
                     <input
                       type="number"
                       value={server.port}
                       onChange={(e) => handleServerChange(index, 'port', e.target.value)}
-                      placeholder="ポート"
+                      placeholder="ポート *"
+                      min={1}
+                      max={65535}
+                      step={1}
+                      required
                       style={{ width: '90px' }}
                     />
                     <input
@@ -1239,6 +1256,7 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
                       value={server.serverGroup}
                       onChange={(e) => handleServerChange(index, 'serverGroup', e.target.value)}
                       placeholder="グループ(任意)"
+                      maxLength={10}
                       style={{ flex: 1 }}
                     />
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', whiteSpace: 'nowrap' }}>
@@ -1249,7 +1267,7 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
                       />
                       有効
                     </label>
-                    <button className="btn btn-danger btn-small" onClick={() => handleServerRemove(index)}>削除</button>
+                    <button type="button" className="btn btn-danger btn-small" onClick={() => handleServerRemove(index)}>削除</button>
                   </div>
                 ))
               )}
@@ -1260,11 +1278,12 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
                 </div>
               )}
               <div className="confirm-actions">
-                <button className="btn btn-secondary" onClick={handleSettingsEditCancel}>キャンセル</button>
-                <button className="btn btn-primary" onClick={handleSettingsSave} disabled={savingSettings}>
+                <button type="button" className="btn btn-secondary" onClick={handleSettingsEditCancel}>キャンセル</button>
+                <button type="submit" className="btn btn-primary" disabled={savingSettings}>
                   {savingSettings ? '保存中...' : '保存する'}
                 </button>
               </div>
+              </form>
             </div>
           </div>
         )}
@@ -1280,6 +1299,7 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
               padding: '20px', minWidth: '320px', maxWidth: '420px',
             }}>
               <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>プラン変更</h3>
+              <form onSubmit={handleChangePlanSubmit}>
               <div className="form-group">
                 <label htmlFor="proxylb-change-plan">プラン</label>
                 <select
@@ -1301,11 +1321,12 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
                 </div>
               )}
               <div className="confirm-actions">
-                <button className="btn btn-secondary" onClick={handleChangePlanCancel} disabled={changingPlan}>キャンセル</button>
-                <button className="btn btn-primary" onClick={handleChangePlanSubmit} disabled={changingPlan}>
+                <button type="button" className="btn btn-secondary" onClick={handleChangePlanCancel} disabled={changingPlan}>キャンセル</button>
+                <button type="submit" className="btn btn-primary" disabled={changingPlan}>
                   {changingPlan ? '変更中...' : '変更する'}
                 </button>
               </div>
+              </form>
             </div>
           </div>
         )}
@@ -1416,13 +1437,15 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
             padding: '20px', minWidth: '320px', maxWidth: '420px',
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>ELB作成</h3>
+            <form onSubmit={handleCreateSubmit}>
             <div className="form-group">
-              <label>名前</label>
+              <label>名前<span className="required-mark">*</span></label>
               <input
                 type="text"
                 value={createForm.name}
                 onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
                 placeholder="my-elb"
+                required
                 autoFocus
               />
             </div>
@@ -1477,15 +1500,16 @@ export function ProxyLBList({ profile }: ProxyLBListProps) {
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+              <button type="button" className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
               <button
+                type="submit"
                 className="btn btn-primary"
-                onClick={handleCreateSubmit}
-                disabled={creating || !createForm.name}
+                disabled={creating}
               >
                 {creating ? '作成中...' : '作成する'}
               </button>
             </div>
+            </form>
           </div>
         </div>
       )}
