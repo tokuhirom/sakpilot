@@ -328,7 +328,7 @@ describe('ProxyLBList', () => {
     await user.click(screen.getByRole('button', { name: '設定を編集' }));
     await user.click(screen.getByRole('button', { name: '+ ポート追加' }));
     await user.click(screen.getByRole('button', { name: '+ サーバー追加' }));
-    await user.type(screen.getByPlaceholderText('IPアドレス'), '192.0.2.10');
+    await user.type(screen.getByPlaceholderText('IPアドレス *'), '192.0.2.10');
     await user.click(screen.getByRole('button', { name: '保存する' }));
 
     await waitFor(() => {
@@ -343,7 +343,7 @@ describe('ProxyLBList', () => {
     });
   });
 
-  it('shows a validation error when a server IP address is missing', async () => {
+  it('blocks submission via HTML5 validation when a server IP address is missing', async () => {
     vi.mocked(GetProxyLBs).mockResolvedValueOnce([makeProxyLB()]);
     vi.mocked(GetProxyLBDetail).mockResolvedValueOnce(makeProxyLB());
     vi.mocked(GetProxyLBHealth).mockResolvedValueOnce(makeHealth());
@@ -356,9 +356,10 @@ describe('ProxyLBList', () => {
 
     await user.click(screen.getByRole('button', { name: '設定を編集' }));
     await user.click(screen.getByRole('button', { name: '+ サーバー追加' }));
+    const ipInput = screen.getByPlaceholderText('IPアドレス *') as HTMLInputElement;
     await user.click(screen.getByRole('button', { name: '保存する' }));
 
-    expect(await screen.findByText('エラー: 実サーバーのIPアドレス・ポートを入力してください')).toBeInTheDocument();
+    expect(ipInput.validity.valid).toBe(false);
     expect(UpdateProxyLBSettings).not.toHaveBeenCalled();
   });
 });

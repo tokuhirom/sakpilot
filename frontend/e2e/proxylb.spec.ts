@@ -66,7 +66,7 @@ test('ELB詳細で名前・説明を編集できる', async ({ page }) => {
   await card(page, 'e2e-elb').click();
 
   await page.getByRole('button', { name: '編集', exact: true }).click();
-  await page.getByPlaceholder('名前').fill('e2e-elb-renamed');
+  await page.getByPlaceholder('名前 *').fill('e2e-elb-renamed');
   await page.getByPlaceholder('説明').fill('E2Eで編集');
   await page.getByRole('button', { name: '保存' }).click();
 
@@ -81,7 +81,7 @@ test('ELB詳細で待ち受けポート・実サーバーを編集できる', as
   await page.getByRole('button', { name: '設定を編集' }).click();
   await page.getByRole('button', { name: '+ ポート追加' }).click();
   await page.getByRole('button', { name: '+ サーバー追加' }).click();
-  await page.getByPlaceholder('IPアドレス').fill('192.0.2.50');
+  await page.getByPlaceholder('IPアドレス *').fill('192.0.2.50');
   await page.getByRole('button', { name: '保存する' }).click();
 
   await expect(page.getByText('192.0.2.50')).toBeVisible();
