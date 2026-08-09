@@ -24,8 +24,10 @@
 | NFS | [nfs.md](nfs.md) |
 | コンテナレジストリ | [containerregistry.md](containerregistry.md) |
 | KMS | [kms.md](kms.md) |
+| AppRun専有型 | [apprun-dedicated.md](apprun-dedicated.md) |
+| AppRun共用型 | [apprun-shared.md](apprun-shared.md) |
 
-上記以外のリソース(AppRun専有型/共用型 等)は未整備です。撮影スクリプト・configはリソース非依存の共通基盤として作成済みのため、これを流用して順次追加予定です。
+これで撮影基盤整備時に予定していた対象リソースは一通り整備が完了しました。
 
 ### 今回未対応のリソース
 
