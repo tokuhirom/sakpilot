@@ -156,7 +156,7 @@ describe('MonitoringMetricDetail', () => {
 
     renderDetail();
     await user.click(await screen.findByRole('button', { name: '編集' }));
-    const nameField = screen.getByLabelText('名前');
+    const nameField = screen.getByLabelText('名前', { exact: false });
     await user.clear(nameField);
     await user.type(nameField, 'renamed-storage');
     await user.type(screen.getByLabelText('説明'), 'updated');
@@ -166,6 +166,19 @@ describe('MonitoringMetricDetail', () => {
       expect(UpdateMSMetricsStorage).toHaveBeenCalledWith('default', 'storage-1', 'renamed-storage', 'updated');
     });
     expect(await screen.findByText('メトリクスストレージ: renamed-storage')).toBeInTheDocument();
+  });
+
+  it('blocks saving basic info when the name is cleared', async () => {
+    const user = userEvent.setup();
+
+    renderDetail();
+    await user.click(await screen.findByRole('button', { name: '編集' }));
+    const nameField = screen.getByLabelText('名前', { exact: false }) as HTMLInputElement;
+    await user.clear(nameField);
+    await user.click(screen.getByRole('button', { name: '保存する' }));
+
+    expect(nameField.validity.valid).toBe(false);
+    expect(UpdateMSMetricsStorage).not.toHaveBeenCalled();
   });
 
   it('deletes the storage after confirmation', async () => {

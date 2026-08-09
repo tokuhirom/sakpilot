@@ -156,7 +156,8 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
     setBasicError(null);
   };
 
-  const handleBasicSave = async () => {
+  const handleBasicSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSavingBasic(true);
     setBasicError(null);
     try {
@@ -192,7 +193,8 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
     setShowCreateKey(false);
   };
 
-  const handleCreateKeySubmit = async () => {
+  const handleCreateKeySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setCreatingKey(true);
     setCreateKeyError(null);
     try {
@@ -263,15 +265,17 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
           )}
         </div>
         {editingBasic ? (
-          <div>
+          <form onSubmit={handleBasicSave}>
             <div className="form-group">
-              <label htmlFor="ms-storage-edit-name">名前</label>
+              <label htmlFor="ms-storage-edit-name">名前<span className="required-mark">*</span></label>
               <input
                 id="ms-storage-edit-name"
                 type="text"
                 value={nameInput}
                 onChange={(e) => setNameInput(e.target.value)}
                 autoFocus
+                required
+                maxLength={64}
               />
             </div>
             <div className="form-group">
@@ -282,6 +286,7 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
                 value={descriptionInput}
                 onChange={(e) => setDescriptionInput(e.target.value)}
                 placeholder="任意"
+                maxLength={512}
               />
             </div>
             {basicError && (
@@ -290,12 +295,12 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleBasicEditCancel} disabled={savingBasic}>キャンセル</button>
-              <button className="btn btn-primary" onClick={handleBasicSave} disabled={savingBasic || !nameInput}>
+              <button type="button" className="btn btn-secondary" onClick={handleBasicEditCancel} disabled={savingBasic}>キャンセル</button>
+              <button type="submit" className="btn btn-primary" disabled={savingBasic}>
                 {savingBasic ? '保存中...' : '保存する'}
               </button>
             </div>
-          </div>
+          </form>
         ) : (
           <table className="table">
             <tbody>
@@ -449,28 +454,31 @@ export function MonitoringMetricDetail({ profile, storageId }: MonitoringMetricD
             padding: '20px', minWidth: '320px', maxWidth: '420px',
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>アクセスキー作成</h3>
-            <div className="form-group">
-              <label htmlFor="ms-key-create-description">説明</label>
-              <input
-                id="ms-key-create-description"
-                type="text"
-                value={newKeyDescription}
-                onChange={(e) => setNewKeyDescription(e.target.value)}
-                placeholder="任意"
-                autoFocus
-              />
-            </div>
-            {createKeyError && (
-              <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
-                エラー: {createKeyError}
+            <form onSubmit={handleCreateKeySubmit}>
+              <div className="form-group">
+                <label htmlFor="ms-key-create-description">説明</label>
+                <input
+                  id="ms-key-create-description"
+                  type="text"
+                  value={newKeyDescription}
+                  onChange={(e) => setNewKeyDescription(e.target.value)}
+                  placeholder="任意"
+                  maxLength={512}
+                  autoFocus
+                />
               </div>
-            )}
-            <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleCreateKeyCancel}>キャンセル</button>
-              <button className="btn btn-primary" onClick={handleCreateKeySubmit} disabled={creatingKey}>
-                {creatingKey ? '作成中...' : '作成する'}
-              </button>
-            </div>
+              {createKeyError && (
+                <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                  エラー: {createKeyError}
+                </div>
+              )}
+              <div className="confirm-actions">
+                <button type="button" className="btn btn-secondary" onClick={handleCreateKeyCancel}>キャンセル</button>
+                <button type="submit" className="btn btn-primary" disabled={creatingKey}>
+                  {creatingKey ? '作成中...' : '作成する'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -57,13 +57,25 @@ describe('Monitoring', () => {
 
     renderMonitoring();
     await user.click(await screen.findByRole('button', { name: '+ ストレージ作成' }));
-    await user.type(screen.getByLabelText('名前'), 'my-log-storage');
+    await user.type(screen.getByLabelText('名前', { exact: false }), 'my-log-storage');
     await user.click(screen.getByRole('button', { name: '作成する' }));
 
     await waitFor(() => {
       expect(CreateMSLogsStorage).toHaveBeenCalledWith('default', 'my-log-storage', '');
     });
     expect(GetMSLogs).toHaveBeenCalledTimes(2);
+  });
+
+  it('blocks submission when the name is empty', async () => {
+    const user = userEvent.setup();
+
+    renderMonitoring();
+    await user.click(await screen.findByRole('button', { name: '+ ストレージ作成' }));
+    const nameInput = screen.getByLabelText('名前', { exact: false }) as HTMLInputElement;
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    expect(nameInput.validity.valid).toBe(false);
+    expect(CreateMSLogsStorage).not.toHaveBeenCalled();
   });
 
   it('cancels the create modal without calling the API', async () => {
