@@ -32,7 +32,7 @@ function toSettingsForm(monitor: sakura.SimpleMonitorDetailInfo): SettingsForm {
     delayLoop: String(monitor.delayLoop),
     maxCheckAttempts: String(monitor.maxCheckAttempts),
     retryInterval: String(monitor.retryInterval),
-    timeout: String(monitor.timeout),
+    timeout: String(monitor.timeout || 10),
     enabled: monitor.enabled,
     notifyEmailEnabled: monitor.notifyEmailEnabled,
     notifySlackEnabled: monitor.notifySlackEnabled,
@@ -88,7 +88,8 @@ export function MonitorDetail({ profile, monitorId }: MonitorDetailProps) {
     setEditingDescription(false);
   };
 
-  const handleDescriptionSave = async () => {
+  const handleDescriptionSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSavingDescription(true);
     try {
       const updated = await UpdateSimpleMonitor(profile, monitorId, descriptionInput);
@@ -112,17 +113,14 @@ export function MonitorDetail({ profile, monitorId }: MonitorDetailProps) {
     setSettingsError(null);
   };
 
-  const handleSettingsSave = async () => {
+  const handleSettingsSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!settingsForm) return;
     const delayLoop = parseInt(settingsForm.delayLoop, 10);
     const maxCheckAttempts = parseInt(settingsForm.maxCheckAttempts, 10);
     const retryInterval = parseInt(settingsForm.retryInterval, 10);
     const timeout = parseInt(settingsForm.timeout, 10);
     const notifyInterval = parseInt(settingsForm.notifyInterval, 10);
-    if ([delayLoop, maxCheckAttempts, retryInterval, timeout, notifyInterval].some(isNaN)) {
-      setSettingsError('数値項目を正しく入力してください');
-      return;
-    }
 
     const settings = new sakura.SimpleMonitorSettingsInput({
       delayLoop,
@@ -185,18 +183,19 @@ export function MonitorDetail({ profile, monitorId }: MonitorDetailProps) {
               <td style={{ padding: '0.5rem 1rem 0.5rem 0', color: '#888', textAlign: 'left' }}>説明</td>
               <td style={{ padding: '0.5rem 0', textAlign: 'left' }}>
                 {editingDescription ? (
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <form onSubmit={handleDescriptionSave} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                     <input
                       type="text"
                       value={descriptionInput}
                       onChange={(e) => setDescriptionInput(e.target.value)}
+                      maxLength={512}
                       autoFocus
                     />
-                    <button className="btn btn-primary btn-small" onClick={handleDescriptionSave} disabled={savingDescription}>
+                    <button type="submit" className="btn btn-primary btn-small" disabled={savingDescription}>
                       {savingDescription ? '保存中...' : '保存'}
                     </button>
-                    <button className="btn btn-secondary btn-small" onClick={handleDescriptionCancel} disabled={savingDescription}>キャンセル</button>
-                  </div>
+                    <button type="button" className="btn btn-secondary btn-small" onClick={handleDescriptionCancel} disabled={savingDescription}>キャンセル</button>
+                  </form>
                 ) : (
                   <span style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                     {monitor.description || '-'}
@@ -305,6 +304,7 @@ export function MonitorDetail({ profile, monitorId }: MonitorDetailProps) {
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>監視設定を編集</h3>
 
+            <form onSubmit={handleSettingsSave}>
             <div className="form-group">
               <label>
                 <input
@@ -317,35 +317,51 @@ export function MonitorDetail({ profile, monitorId }: MonitorDetailProps) {
               </label>
             </div>
             <div className="form-group">
-              <label>チェック間隔(秒)</label>
+              <label>チェック間隔(秒)<span className="required-mark">*</span></label>
               <input
                 type="number"
                 value={settingsForm.delayLoop}
                 onChange={(e) => setSettingsForm({ ...settingsForm, delayLoop: e.target.value })}
+                min={60}
+                max={3600}
+                step={1}
+                required
               />
             </div>
             <div className="form-group">
-              <label>最大リトライ回数</label>
+              <label>最大リトライ回数<span className="required-mark">*</span></label>
               <input
                 type="number"
                 value={settingsForm.maxCheckAttempts}
                 onChange={(e) => setSettingsForm({ ...settingsForm, maxCheckAttempts: e.target.value })}
+                min={1}
+                max={10}
+                step={1}
+                required
               />
             </div>
             <div className="form-group">
-              <label>リトライ間隔(秒)</label>
+              <label>リトライ間隔(秒)<span className="required-mark">*</span></label>
               <input
                 type="number"
                 value={settingsForm.retryInterval}
                 onChange={(e) => setSettingsForm({ ...settingsForm, retryInterval: e.target.value })}
+                min={10}
+                max={3600}
+                step={1}
+                required
               />
             </div>
             <div className="form-group">
-              <label>タイムアウト(秒)</label>
+              <label>タイムアウト(秒)<span className="required-mark">*</span></label>
               <input
                 type="number"
                 value={settingsForm.timeout}
                 onChange={(e) => setSettingsForm({ ...settingsForm, timeout: e.target.value })}
+                min={10}
+                max={30}
+                step={1}
+                required
               />
             </div>
 
@@ -367,10 +383,13 @@ export function MonitorDetail({ profile, monitorId }: MonitorDetailProps) {
             <div className="form-group">
               <label>ポート</label>
               <input
-                type="text"
+                type="number"
                 value={settingsForm.port}
                 onChange={(e) => setSettingsForm({ ...settingsForm, port: e.target.value })}
                 placeholder="80"
+                min={1}
+                max={65535}
+                step={1}
               />
             </div>
             <div className="form-group">
@@ -379,7 +398,7 @@ export function MonitorDetail({ profile, monitorId }: MonitorDetailProps) {
                 type="text"
                 value={settingsForm.path}
                 onChange={(e) => setSettingsForm({ ...settingsForm, path: e.target.value })}
-                placeholder="/"
+                placeholder="/(http/httpsのみ)"
               />
             </div>
             <div className="form-group">
@@ -388,15 +407,19 @@ export function MonitorDetail({ profile, monitorId }: MonitorDetailProps) {
                 type="text"
                 value={settingsForm.host}
                 onChange={(e) => setSettingsForm({ ...settingsForm, host: e.target.value })}
+                placeholder="example.com"
               />
             </div>
             <div className="form-group">
               <label>期待するステータスコード</label>
               <input
-                type="text"
+                type="number"
                 value={settingsForm.status}
                 onChange={(e) => setSettingsForm({ ...settingsForm, status: e.target.value })}
                 placeholder="200"
+                min={100}
+                max={599}
+                step={1}
               />
             </div>
             <div className="form-group">
@@ -405,6 +428,7 @@ export function MonitorDetail({ profile, monitorId }: MonitorDetailProps) {
                 type="text"
                 value={settingsForm.containsString}
                 onChange={(e) => setSettingsForm({ ...settingsForm, containsString: e.target.value })}
+                placeholder="OK(http/httpsのみ)"
               />
             </div>
 
@@ -433,21 +457,25 @@ export function MonitorDetail({ profile, monitorId }: MonitorDetailProps) {
             </div>
             {settingsForm.notifySlackEnabled && (
               <div className="form-group">
-                <label>Slack Incoming Webhook URL</label>
+                <label>Slack Incoming Webhook URL<span className="required-mark">*</span></label>
                 <input
-                  type="text"
+                  type="url"
                   value={settingsForm.slackWebhooksUrl}
                   onChange={(e) => setSettingsForm({ ...settingsForm, slackWebhooksUrl: e.target.value })}
                   placeholder="https://hooks.slack.com/services/..."
+                  required
                 />
               </div>
             )}
             <div className="form-group">
-              <label>通知間隔(秒)</label>
+              <label>通知間隔(秒)<span className="required-mark">*</span></label>
               <input
                 type="number"
                 value={settingsForm.notifyInterval}
                 onChange={(e) => setSettingsForm({ ...settingsForm, notifyInterval: e.target.value })}
+                min={1}
+                step={1}
+                required
               />
             </div>
 
@@ -457,11 +485,12 @@ export function MonitorDetail({ profile, monitorId }: MonitorDetailProps) {
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleSettingsEditCancel}>キャンセル</button>
-              <button className="btn btn-primary" onClick={handleSettingsSave} disabled={savingSettings}>
+              <button type="button" className="btn btn-secondary" onClick={handleSettingsEditCancel}>キャンセル</button>
+              <button type="submit" className="btn btn-primary" disabled={savingSettings}>
                 {savingSettings ? '保存中...' : '保存する'}
               </button>
             </div>
+            </form>
           </div>
         </div>
       )}

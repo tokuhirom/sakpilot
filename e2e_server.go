@@ -648,6 +648,7 @@ func seedSimpleMonitors() error {
 		Target:      "e2e-monitor-target.example.com",
 		Description: "E2E: 設定編集シナリオ用",
 		DelayLoop:   60,
+		Timeout:     10,
 		Enabled:     true,
 		HealthCheck: &iaas.SimpleMonitorHealthCheck{
 			Protocol: types.SimpleMonitorProtocols.Ping,
@@ -659,6 +660,7 @@ func seedSimpleMonitors() error {
 		Target:      "e2e-doomed-monitor.example.com",
 		Description: "E2E: 削除シナリオ用",
 		DelayLoop:   60,
+		Timeout:     10,
 		Enabled:     true,
 		HealthCheck: &iaas.SimpleMonitorHealthCheck{
 			Protocol: types.SimpleMonitorProtocols.Ping,

@@ -112,7 +112,8 @@ export function MonitorList({ profile, onSelectMonitor }: MonitorListProps) {
     setShowCreate(false);
   };
 
-  const handleCreateSubmit = async () => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setCreating(true);
     setCreateError(null);
     try {
@@ -210,13 +211,15 @@ export function MonitorList({ profile, onSelectMonitor }: MonitorListProps) {
             padding: '20px', minWidth: '320px', maxWidth: '420px',
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>シンプル監視作成</h3>
+            <form onSubmit={handleCreateSubmit}>
             <div className="form-group">
-              <label>ターゲット(ホスト名/IPアドレス)</label>
+              <label>ターゲット(ホスト名/IPアドレス)<span className="required-mark">*</span></label>
               <input
                 type="text"
                 value={newTarget}
                 onChange={(e) => setNewTarget(e.target.value)}
                 placeholder="example.com"
+                required
                 autoFocus
               />
             </div>
@@ -238,6 +241,7 @@ export function MonitorList({ profile, onSelectMonitor }: MonitorListProps) {
                 value={newDescription}
                 onChange={(e) => setNewDescription(e.target.value)}
                 placeholder="任意"
+                maxLength={512}
               />
             </div>
             <p style={{ color: '#888', fontSize: '0.8rem', margin: '0 0 1rem' }}>
@@ -249,15 +253,12 @@ export function MonitorList({ profile, onSelectMonitor }: MonitorListProps) {
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
-              <button
-                className="btn btn-primary"
-                onClick={handleCreateSubmit}
-                disabled={creating || !newTarget}
-              >
+              <button type="button" className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+              <button type="submit" className="btn btn-primary" disabled={creating}>
                 {creating ? '作成中...' : '作成する'}
               </button>
             </div>
+            </form>
           </div>
         </div>
       )}
