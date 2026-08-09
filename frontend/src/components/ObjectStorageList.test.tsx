@@ -183,6 +183,17 @@ describe('ObjectStorageList', () => {
 
       expect(await screen.findByText('エラー: bucket already exists')).toBeInTheDocument();
     });
+
+    it('blocks submit when バケット名 is empty', async () => {
+      const user = await goToBucketsView();
+
+      await user.click(screen.getByRole('button', { name: '+ バケット作成' }));
+      await user.click(screen.getByRole('button', { name: '作成する' }));
+
+      const nameInput = screen.getByPlaceholderText('my-bucket') as HTMLInputElement;
+      expect(nameInput.validity.valid).toBe(false);
+      expect(CreateObjectStorageBucket).not.toHaveBeenCalled();
+    });
   });
 
   describe('bucket delete', () => {

@@ -78,6 +78,35 @@ describe('ObjectStoragePermissions', () => {
     expect(await screen.findByText('my-bucket(R)')).toBeInTheDocument();
   });
 
+  it('blocks submit when 表示名 is empty', async () => {
+    const user = userEvent.setup();
+    vi.mocked(GetObjectStoragePermissions).mockResolvedValueOnce([]);
+    render(<ObjectStoragePermissions profile="default" siteId="isk01" bucketNames={['my-bucket']} onClose={vi.fn()} />);
+    await screen.findByText('パーミッションがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ 作成' }));
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    const nameInput = screen.getByPlaceholderText('読み取り専用アプリ') as HTMLInputElement;
+    expect(nameInput.validity.valid).toBe(false);
+    expect(CreateObjectStoragePermission).not.toHaveBeenCalled();
+  });
+
+  it('blocks submit when no bucket is available to select', async () => {
+    const user = userEvent.setup();
+    vi.mocked(GetObjectStoragePermissions).mockResolvedValueOnce([]);
+    render(<ObjectStoragePermissions profile="default" siteId="isk01" bucketNames={[]} onClose={vi.fn()} />);
+    await screen.findByText('パーミッションがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ 作成' }));
+    await user.type(screen.getByPlaceholderText('読み取り専用アプリ'), 'readonly');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    const bucketSelect = screen.getByRole('combobox') as HTMLSelectElement;
+    expect(bucketSelect.validity.valid).toBe(false);
+    expect(CreateObjectStoragePermission).not.toHaveBeenCalled();
+  });
+
   it('deletes a permission after confirmation', async () => {
     const user = userEvent.setup();
     vi.mocked(GetObjectStoragePermissions).mockResolvedValueOnce([makePermission()]);

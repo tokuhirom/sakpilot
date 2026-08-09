@@ -343,8 +343,9 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
     }
   };
 
-  const handleSaveSecret = async () => {
-    if (!selectedSite || !selectedAccessKeyId || !secretKey) return;
+  const handleSaveSecretSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSite || !selectedAccessKeyId) return;
 
     try {
       await SaveObjectStorageSecretKey(selectedSite.id, selectedAccessKeyId, secretKey);
@@ -393,8 +394,9 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
     setShowCreateBucket(false);
   };
 
-  const handleCreateBucketSubmit = async () => {
-    if (!profile || !selectedSite || !newBucketName) return;
+  const handleCreateBucketSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile || !selectedSite) return;
 
     setCreatingBucket(true);
     setCreateBucketError(null);
@@ -981,38 +983,41 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
 
             {selectedAccessKeyId && (
               <>
-                <div style={{ flex: 1, minWidth: '200px' }}>
-                  <label style={{ fontSize: '0.75rem', color: '#888', display: 'block', marginBottom: '0.25rem' }}>
-                    シークレットキー {secretSaved && <span style={{ color: '#4ade80' }}>(保存済み)</span>}
-                  </label>
-                  <input
-                    type="password"
-                    value={secretKey}
-                    onChange={(e) => {
-                      setSecretKey(e.target.value);
-                      setSecretSaved(false);
-                    }}
-                    placeholder="Secret Access Key"
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem',
-                      borderRadius: '4px',
-                      border: '1px solid #444',
-                      backgroundColor: '#0f0f1a',
-                      color: '#fff',
-                      fontSize: '0.85rem',
-                    }}
-                  />
-                </div>
-                {!secretSaved && secretKey && (
-                  <button
-                    className="btn btn-primary"
-                    onClick={handleSaveSecret}
-                    style={{ padding: '0.5rem 1rem' }}
-                  >
-                    保存
-                  </button>
-                )}
+                <form onSubmit={handleSaveSecretSubmit} style={{ display: 'contents' }}>
+                  <div style={{ flex: 1, minWidth: '200px' }}>
+                    <label style={{ fontSize: '0.75rem', color: '#888', display: 'block', marginBottom: '0.25rem' }}>
+                      シークレットキー<span className="required-mark">*</span> {secretSaved && <span style={{ color: '#4ade80' }}>(保存済み)</span>}
+                    </label>
+                    <input
+                      type="password"
+                      value={secretKey}
+                      onChange={(e) => {
+                        setSecretKey(e.target.value);
+                        setSecretSaved(false);
+                      }}
+                      placeholder="Secret Access Key"
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        borderRadius: '4px',
+                        border: '1px solid #444',
+                        backgroundColor: '#0f0f1a',
+                        color: '#fff',
+                        fontSize: '0.85rem',
+                      }}
+                    />
+                  </div>
+                  {!secretSaved && secretKey && (
+                    <button
+                      type="submit"
+                      className="btn btn-primary"
+                      style={{ padding: '0.5rem 1rem' }}
+                    >
+                      保存
+                    </button>
+                  )}
+                </form>
                 {secretSaved && (
                   <>
                     <button
@@ -1139,42 +1144,45 @@ export function ObjectStorageList({ profile, onBreadcrumbChange }: ObjectStorage
               padding: '20px', minWidth: '320px', maxWidth: '420px',
             }}>
               <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>バケット作成</h3>
-              <div className="form-group">
-                <label>バケット名</label>
-                <input
-                  type="text"
-                  value={newBucketName}
-                  onChange={(e) => setNewBucketName(e.target.value)}
-                  placeholder="my-bucket"
-                  autoFocus
-                />
-              </div>
-              {selectedSite.id === 'arc02' && (
+              <form onSubmit={handleCreateBucketSubmit}>
                 <div className="form-group">
-                  <label>プラン（アーカイブサイト）</label>
+                  <label>バケット名<span className="required-mark">*</span></label>
                   <input
                     type="text"
-                    value={newBucketPlan}
-                    onChange={(e) => setNewBucketPlan(e.target.value)}
-                    placeholder="プラン名"
+                    value={newBucketName}
+                    onChange={(e) => setNewBucketName(e.target.value)}
+                    placeholder="my-bucket"
+                    required
+                    autoFocus
                   />
                 </div>
-              )}
-              {createBucketError && (
-                <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
-                  エラー: {createBucketError}
+                {selectedSite.id === 'arc02' && (
+                  <div className="form-group">
+                    <label>プラン（アーカイブサイト）</label>
+                    <input
+                      type="text"
+                      value={newBucketPlan}
+                      onChange={(e) => setNewBucketPlan(e.target.value)}
+                      placeholder="プラン名"
+                    />
+                  </div>
+                )}
+                {createBucketError && (
+                  <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                    エラー: {createBucketError}
+                  </div>
+                )}
+                <div className="confirm-actions">
+                  <button type="button" className="btn btn-secondary" onClick={handleCreateBucketCancel}>キャンセル</button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={creatingBucket}
+                  >
+                    {creatingBucket ? '作成中...' : '作成する'}
+                  </button>
                 </div>
-              )}
-              <div className="confirm-actions">
-                <button className="btn btn-secondary" onClick={handleCreateBucketCancel}>キャンセル</button>
-                <button
-                  className="btn btn-primary"
-                  onClick={handleCreateBucketSubmit}
-                  disabled={creatingBucket || !newBucketName}
-                >
-                  {creatingBucket ? '作成中...' : '作成する'}
-                </button>
-              </div>
+              </form>
             </div>
           </div>
         )}

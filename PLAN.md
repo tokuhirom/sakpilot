@@ -307,7 +307,15 @@
     - 各フォームの入力欄に「何を入力すればよいか」が分かるplaceholderやヘルプテキストが無い箇所を洗い出し追加する（現状はラベルのみで単位や制約の説明が無い項目が多い）
     - 見直し対象はTier1〜Tier3で実装した機能に限らず、既存の全Create/Updateフォームが対象。範囲が広いため、着手時にリソース単位で区切って段階的にPRを分けるか、ユーザーと相談してスコープを決めること
     - フォームごとに前提（SDK側のバリデーション仕様、必須/任意の別）を確認した上で実装すること。SDK側で判明した制約や挙動の不明点は[[sakpilot-upstream-issues-doc]]の運用に従いdocs/upstream-issues.mdに記録する
-    - **進捗**: DNS/GSLB/ProxyLB/SimpleMonitor/Switch/Disk/Database/NFS/EnhancedDB/ContainerRegistry/KMS/Archive対応済み。残り: ObjectStorage/Monitoring Suite/AppRun専有・共用型/Server等
+    - **進捗**: DNS/GSLB/ProxyLB/SimpleMonitor/Switch/Disk/Database/NFS/EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage対応済み。残り: Monitoring Suite/AppRun専有・共用型/Server等
+
+### ✅ 完了（2026-08-09 追加セッション43、Tier5 #23 一部・ObjectStorage）
+- Archiveに続き、オブジェクトストレージ(`ObjectStorageList.tsx`のバケット作成モーダル・シークレットキー保存フォーム、`BucketSettingsModal.tsx`の暗号化有効化/レプリケーション有効化フォーム、`ObjectStoragePermissions.tsx`のパーミッション作成/編集モーダル)を`docs/ui-implementation-patterns.md`のルールに合わせて改修。計5フォームを`<form onSubmit>`+`<button type="submit">`に変換した。
+- 制約値は`terraform-provider-sakura`の`docs/resources/object_storage_bucket.md`/`object_storage_permission.md`/`object_storage_bucket_encryption_config.md`/`object_storage_bucket_replication_config.md`で確認: バケット名・パーミッション表示名・バケット制御のバケット名・KMSキーID・レプリケーション複製先バケットはいずれも必須の文字列で、形式やmin/max等の追加制約は無し(パターン・数値範囲は付与せず)。プラン（アーカイブサイト向け）はSDK上任意のため未対応のまま。
+- ラベルの無いKMSキーID入力・複製先/バケット制御の`<select>`はplaceholder末尾または先頭の空`<option>`テキストに`*`マーカーを付与する形で統一(セレクトへのマーカー付与はこのPRで新規に採用したパターン)。
+- バケット作成の`disabled={creatingBucket || !newBucketName}`、暗号化/レプリケーション有効化ボタンの`!kmsKeyId`/`!targetBucket`、パーミッションフォームの`!displayName || controls.some((c) => !c.bucketName)`というrequiredと重複するJSバリデーション(および到達不能な`if (!kmsKeyId) return`等のガード)を削除(rule 4)。
+- `ObjectStorageList.test.tsx`/`BucketSettingsModal.test.tsx`/`ObjectStoragePermissions.test.tsx`にそれぞれ必須項目未入力時の送信ブロックを`input.validity.valid`/`select.validity.valid`で検証するテストを新規追加(計5件)。
+- `tsc --noEmit`/`npm run test`(274件全パス)/`npm run build`+`npx playwright test e2e/objectstorage.spec.ts`(4件全パス)/`golangci-lint run`はGo側の変更が無いためスキップを確認してから作成。
 
 ### ✅ 完了（2026-08-09 追加セッション42、Tier5 #23 一部・Archive）
 - KMSに続き、アーカイブ(`ArchiveList.tsx`の作成モーダル・共有キーから複製モーダル)を`docs/ui-implementation-patterns.md`のルールに合わせて改修。2フォームとも`<form onSubmit>`+`<button type="submit">`に変換した。

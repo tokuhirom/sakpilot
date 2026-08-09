@@ -104,8 +104,8 @@ export function ObjectStoragePermissions({ profile, siteId, bucketNames, onClose
     setControls((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const submitForm = async () => {
-    if (!displayName || controls.length === 0 || controls.some((c) => !c.bucketName)) return;
+  const submitForm = async (e: React.FormEvent) => {
+    e.preventDefault();
 
     setFormBusy(true);
     setFormError(null);
@@ -294,57 +294,61 @@ export function ObjectStoragePermissions({ profile, siteId, bucketNames, onClose
             padding: '20px', minWidth: '420px', maxWidth: '520px',
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>{editingId ? 'パーミッション編集' : 'パーミッション作成'}</h3>
-            <div className="form-group">
-              <label>表示名</label>
-              <input
-                type="text"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="読み取り専用アプリ"
-                autoFocus
-              />
-            </div>
-            <label style={{ fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>バケット制御</label>
-            {controls.map((c, i) => (
-              <div key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <select
-                  value={c.bucketName}
-                  onChange={(e) => updateControl(i, { bucketName: e.target.value })}
-                  style={{ flex: 1, padding: '0.4rem', fontSize: '0.85rem' }}
-                >
-                  <option value="">バケットを選択</option>
-                  {bucketNames.map((b) => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
-                </select>
-                <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                  <input type="checkbox" checked={c.canRead} onChange={(e) => updateControl(i, { canRead: e.target.checked })} />
-                  読み取り
-                </label>
-                <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                  <input type="checkbox" checked={c.canWrite} onChange={(e) => updateControl(i, { canWrite: e.target.checked })} />
-                  書き込み
-                </label>
-                <button className="btn btn-secondary btn-small" onClick={() => removeControlRow(i)} disabled={controls.length === 1}>×</button>
+            <form onSubmit={submitForm}>
+              <div className="form-group">
+                <label>表示名<span className="required-mark">*</span></label>
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="読み取り専用アプリ"
+                  required
+                  autoFocus
+                />
               </div>
-            ))}
-            <button className="btn btn-secondary btn-small" onClick={addControlRow} style={{ marginBottom: '1rem' }}>+ バケットを追加</button>
+              <label style={{ fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>バケット制御</label>
+              {controls.map((c, i) => (
+                <div key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <select
+                    value={c.bucketName}
+                    onChange={(e) => updateControl(i, { bucketName: e.target.value })}
+                    required
+                    style={{ flex: 1, padding: '0.4rem', fontSize: '0.85rem' }}
+                  >
+                    <option value="">バケットを選択 *</option>
+                    {bucketNames.map((b) => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
+                  <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <input type="checkbox" checked={c.canRead} onChange={(e) => updateControl(i, { canRead: e.target.checked })} />
+                    読み取り
+                  </label>
+                  <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <input type="checkbox" checked={c.canWrite} onChange={(e) => updateControl(i, { canWrite: e.target.checked })} />
+                    書き込み
+                  </label>
+                  <button type="button" className="btn btn-secondary btn-small" onClick={() => removeControlRow(i)} disabled={controls.length === 1}>×</button>
+                </div>
+              ))}
+              <button type="button" className="btn btn-secondary btn-small" onClick={addControlRow} style={{ marginBottom: '1rem' }}>+ バケットを追加</button>
 
-            {formError && (
-              <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
-                エラー: {formError}
+              {formError && (
+                <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                  エラー: {formError}
+                </div>
+              )}
+              <div className="confirm-actions">
+                <button type="button" className="btn btn-secondary" onClick={closeForm}>キャンセル</button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={formBusy}
+                >
+                  {formBusy ? '処理中...' : editingId ? '更新する' : '作成する'}
+                </button>
               </div>
-            )}
-            <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={closeForm}>キャンセル</button>
-              <button
-                className="btn btn-primary"
-                onClick={submitForm}
-                disabled={formBusy || !displayName || controls.some((c) => !c.bucketName)}
-              >
-                {formBusy ? '処理中...' : editingId ? '更新する' : '作成する'}
-              </button>
-            </div>
+            </form>
           </div>
         </div>
       )}

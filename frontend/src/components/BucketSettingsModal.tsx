@@ -71,8 +71,8 @@ export function BucketSettingsModal({ profile, siteId, bucketName, otherBuckets,
     load();
   }, [load]);
 
-  const handleEnableEncryption = async () => {
-    if (!kmsKeyId) return;
+  const handleEnableEncryptionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setEncryptionBusy(true);
     setError(null);
     try {
@@ -101,8 +101,8 @@ export function BucketSettingsModal({ profile, siteId, bucketName, otherBuckets,
     }
   };
 
-  const handleEnableReplication = async () => {
-    if (!targetBucket) return;
+  const handleEnableReplicationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setReplicationBusy(true);
     setError(null);
     try {
@@ -167,18 +167,19 @@ export function BucketSettingsModal({ profile, siteId, bucketName, otherBuckets,
                   </button>
                 </>
               ) : (
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <form onSubmit={handleEnableEncryptionSubmit} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   <input
                     type="text"
                     value={kmsKeyId}
                     onChange={(e) => setKmsKeyId(e.target.value)}
-                    placeholder="KMSキーID"
+                    placeholder="KMSキーID *"
+                    required
                     style={{ flex: 1, padding: '0.4rem', fontSize: '0.85rem' }}
                   />
-                  <button className="btn btn-primary btn-small" onClick={handleEnableEncryption} disabled={encryptionBusy || !kmsKeyId}>
+                  <button type="submit" className="btn btn-primary btn-small" disabled={encryptionBusy}>
                     {encryptionBusy ? '処理中...' : '有効にする'}
                   </button>
-                </div>
+                </form>
               )}
             </section>
 
@@ -197,21 +198,22 @@ export function BucketSettingsModal({ profile, siteId, bucketName, otherBuckets,
                   </button>
                 </>
               ) : (
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <form onSubmit={handleEnableReplicationSubmit} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   <select
                     value={targetBucket}
                     onChange={(e) => setTargetBucket(e.target.value)}
+                    required
                     style={{ flex: 1, padding: '0.4rem', fontSize: '0.85rem' }}
                   >
-                    <option value="">複製先バケットを選択</option>
+                    <option value="">複製先バケットを選択 *</option>
                     {otherBuckets.map((b) => (
                       <option key={b} value={b}>{b}</option>
                     ))}
                   </select>
-                  <button className="btn btn-primary btn-small" onClick={handleEnableReplication} disabled={replicationBusy || !targetBucket}>
+                  <button type="submit" className="btn btn-primary btn-small" disabled={replicationBusy}>
                     {replicationBusy ? '処理中...' : '有効にする'}
                   </button>
-                </div>
+                </form>
               )}
             </section>
 
