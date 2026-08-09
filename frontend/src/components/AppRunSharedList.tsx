@@ -219,28 +219,13 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
     });
   };
 
-  const handleCreateSubmit = async () => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!createForm || !profile) return;
-    if (!createForm.name.trim()) {
-      setCreateError('アプリ名を入力してください');
-      return;
-    }
-    if (!createForm.image.trim()) {
-      setCreateError('コンテナイメージを入力してください');
-      return;
-    }
     const port = parseInt(createForm.port, 10);
     const minScale = parseInt(createForm.minScale, 10);
     const maxScale = parseInt(createForm.maxScale, 10);
     const timeoutSeconds = parseInt(createForm.timeoutSeconds, 10);
-    if ([port, minScale, maxScale, timeoutSeconds].some(isNaN)) {
-      setCreateError('ポート・スケール・タイムアウトは数値で入力してください');
-      return;
-    }
-    if (createForm.envVars.some((e) => !e.key)) {
-      setCreateError('環境変数のキーを入力してください');
-      return;
-    }
 
     setCreating(true);
     setCreateError(null);
@@ -251,7 +236,7 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
         minScale,
         maxScale,
         timeoutSeconds,
-        componentName: createForm.componentName.trim() || 'component1',
+        componentName: createForm.componentName.trim(),
         image: createForm.image.trim(),
         maxCpu: createForm.maxCpu,
         maxMemory: createForm.maxMemory,
@@ -282,16 +267,13 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
     setEditError(null);
   };
 
-  const handleEditSubmit = async () => {
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!editForm || !profile || view.type !== 'detail') return;
     const port = parseInt(editForm.port, 10);
     const minScale = parseInt(editForm.minScale, 10);
     const maxScale = parseInt(editForm.maxScale, 10);
     const timeoutSeconds = parseInt(editForm.timeoutSeconds, 10);
-    if ([port, minScale, maxScale, timeoutSeconds].some(isNaN)) {
-      setEditError('ポート・スケール・タイムアウトは数値で入力してください');
-      return;
-    }
 
     setEditing(true);
     setEditError(null);
@@ -383,13 +365,12 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
     setTrafficForm(trafficForm.map((t, i) => (i === index ? { ...t, percent: value } : t)));
   };
 
-  const handleTrafficEditSubmit = async () => {
+  const handleTrafficEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!trafficForm || !profile || view.type !== 'detail') return;
     const percents = trafficForm.map((t) => parseInt(t.percent, 10));
-    if (percents.some(isNaN)) {
-      setTrafficError('割合は数値で入力してください');
-      return;
-    }
+    // 複数入力の合計が100%になるかというクロスフィールドの制約はHTML5の
+    // required/min/max属性だけでは表現できないため、引き続きJSでチェックする
     if (percents.reduce((sum, p) => sum + p, 0) !== 100) {
       setTrafficError('割合の合計は100%にしてください');
       return;
@@ -455,86 +436,107 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
           padding: '20px', minWidth: '480px', maxWidth: '640px', maxHeight: '85vh', overflowY: 'auto',
         }}>
           <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>アプリケーションを作成</h3>
+          <form onSubmit={handleCreateSubmit}>
 
           <div className="form-group">
-            <label>アプリ名</label>
+            <label>アプリ名<span className="required-mark">*</span></label>
             <input
               type="text"
               value={createForm.name}
               onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
               placeholder="my-app"
+              maxLength={255}
+              required
               autoFocus
             />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
             <div className="form-group">
-              <label>ポート</label>
+              <label>ポート<span className="required-mark">*</span></label>
               <input
-                type="text"
+                type="number"
                 value={createForm.port}
                 onChange={(e) => setCreateForm({ ...createForm, port: e.target.value })}
+                min={1}
+                max={65535}
+                required
               />
             </div>
             <div className="form-group">
-              <label>タイムアウト(秒)</label>
+              <label>タイムアウト(秒)<span className="required-mark">*</span></label>
               <input
-                type="text"
+                type="number"
                 value={createForm.timeoutSeconds}
                 onChange={(e) => setCreateForm({ ...createForm, timeoutSeconds: e.target.value })}
+                min={1}
+                max={300}
+                required
               />
             </div>
             <div className="form-group">
-              <label>最小スケール</label>
+              <label>最小スケール<span className="required-mark">*</span></label>
               <input
-                type="text"
+                type="number"
                 value={createForm.minScale}
                 onChange={(e) => setCreateForm({ ...createForm, minScale: e.target.value })}
+                min={0}
+                max={10}
+                required
               />
             </div>
             <div className="form-group">
-              <label>最大スケール</label>
+              <label>最大スケール<span className="required-mark">*</span></label>
               <input
-                type="text"
+                type="number"
                 value={createForm.maxScale}
                 onChange={(e) => setCreateForm({ ...createForm, maxScale: e.target.value })}
+                min={1}
+                max={10}
+                required
               />
             </div>
           </div>
 
           <div className="form-group">
-            <label>コンポーネント名</label>
+            <label>コンポーネント名<span className="required-mark">*</span></label>
             <input
               type="text"
               value={createForm.componentName}
               onChange={(e) => setCreateForm({ ...createForm, componentName: e.target.value })}
+              maxLength={255}
+              required
             />
           </div>
           <div className="form-group">
-            <label>コンテナイメージ</label>
+            <label>コンテナイメージ<span className="required-mark">*</span></label>
             <input
               type="text"
               value={createForm.image}
               onChange={(e) => setCreateForm({ ...createForm, image: e.target.value })}
               placeholder="docker.io/library/nginx:latest"
+              maxLength={128}
+              required
             />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
             <div className="form-group">
-              <label>最大CPU (vCPU)</label>
+              <label>最大CPU (vCPU)<span className="required-mark">*</span></label>
               <select
                 value={createForm.maxCpu}
                 onChange={(e) => setCreateForm({ ...createForm, maxCpu: e.target.value })}
+                required
               >
                 {MAX_CPU_OPTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
               </select>
             </div>
             <div className="form-group">
-              <label>最大メモリ</label>
+              <label>最大メモリ<span className="required-mark">*</span></label>
               <select
                 value={createForm.maxMemory}
                 onChange={(e) => setCreateForm({ ...createForm, maxMemory: e.target.value })}
+                required
               >
                 {MAX_MEMORY_OPTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
               </select>
@@ -544,7 +546,7 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
           <div style={{ marginTop: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <label style={{ margin: 0 }}>環境変数</label>
-              <button className="btn btn-secondary btn-small" onClick={handleEnvVarAdd}>+ 環境変数追加</button>
+              <button type="button" className="btn btn-secondary btn-small" onClick={handleEnvVarAdd}>+ 環境変数追加</button>
             </div>
             {createForm.envVars.length === 0 ? (
               <div style={{ color: '#888', fontSize: '0.85rem', marginTop: '0.5rem' }}>環境変数なし</div>
@@ -555,7 +557,8 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
                     type="text"
                     value={e.key}
                     onChange={(ev) => handleEnvVarChange(index, 'key', ev.target.value)}
-                    placeholder="KEY"
+                    placeholder="KEY *"
+                    required
                     style={{ flex: 1 }}
                   />
                   <input
@@ -565,7 +568,7 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
                     placeholder="値"
                     style={{ flex: 1 }}
                   />
-                  <button className="btn btn-danger btn-small" onClick={() => handleEnvVarRemove(index)}>削除</button>
+                  <button type="button" className="btn btn-danger btn-small" onClick={() => handleEnvVarRemove(index)}>削除</button>
                 </div>
               ))
             )}
@@ -577,15 +580,16 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
             </div>
           )}
           <div className="confirm-actions" style={{ marginTop: '1.5rem' }}>
-            <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+            <button type="button" className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
             <button
+              type="submit"
               className="btn btn-primary"
-              onClick={handleCreateSubmit}
-              disabled={creating || !createForm.name.trim() || !createForm.image.trim()}
+              disabled={creating}
             >
               {creating ? '作成中...' : '作成する'}
             </button>
           </div>
+          </form>
         </div>
       </div>
     );
@@ -604,43 +608,56 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
           padding: '20px', minWidth: '360px',
         }}>
           <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>スケール・タイムアウト設定を編集</h3>
+          <form onSubmit={handleEditSubmit}>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
             <div className="form-group">
-              <label htmlFor="apprun-shared-edit-port">ポート</label>
+              <label htmlFor="apprun-shared-edit-port">ポート<span className="required-mark">*</span></label>
               <input
                 id="apprun-shared-edit-port"
-                type="text"
+                type="number"
                 value={editForm.port}
                 onChange={(e) => setEditForm({ ...editForm, port: e.target.value })}
+                min={1}
+                max={65535}
+                required
                 autoFocus
               />
             </div>
             <div className="form-group">
-              <label htmlFor="apprun-shared-edit-timeout">タイムアウト(秒)</label>
+              <label htmlFor="apprun-shared-edit-timeout">タイムアウト(秒)<span className="required-mark">*</span></label>
               <input
                 id="apprun-shared-edit-timeout"
-                type="text"
+                type="number"
                 value={editForm.timeoutSeconds}
                 onChange={(e) => setEditForm({ ...editForm, timeoutSeconds: e.target.value })}
+                min={1}
+                max={300}
+                required
               />
             </div>
             <div className="form-group">
-              <label htmlFor="apprun-shared-edit-min-scale">最小スケール</label>
+              <label htmlFor="apprun-shared-edit-min-scale">最小スケール<span className="required-mark">*</span></label>
               <input
                 id="apprun-shared-edit-min-scale"
-                type="text"
+                type="number"
                 value={editForm.minScale}
                 onChange={(e) => setEditForm({ ...editForm, minScale: e.target.value })}
+                min={0}
+                max={10}
+                required
               />
             </div>
             <div className="form-group">
-              <label htmlFor="apprun-shared-edit-max-scale">最大スケール</label>
+              <label htmlFor="apprun-shared-edit-max-scale">最大スケール<span className="required-mark">*</span></label>
               <input
                 id="apprun-shared-edit-max-scale"
-                type="text"
+                type="number"
                 value={editForm.maxScale}
                 onChange={(e) => setEditForm({ ...editForm, maxScale: e.target.value })}
+                min={1}
+                max={10}
+                required
               />
             </div>
           </div>
@@ -651,15 +668,16 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
             </div>
           )}
           <div className="confirm-actions" style={{ marginTop: '1.5rem' }}>
-            <button className="btn btn-secondary" onClick={handleEditCancel}>キャンセル</button>
+            <button type="button" className="btn btn-secondary" onClick={handleEditCancel}>キャンセル</button>
             <button
+              type="submit"
               className="btn btn-primary"
-              onClick={handleEditSubmit}
               disabled={editing}
             >
               {editing ? '保存中...' : '保存する'}
             </button>
           </div>
+          </form>
         </div>
       </div>
     );
@@ -709,17 +727,21 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
           padding: '20px', minWidth: '360px',
         }}>
           <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>トラフィック分散を編集</h3>
+          <form onSubmit={handleTrafficEditSubmit}>
 
           {trafficForm.map((t, index) => (
             <div key={index} className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <label htmlFor={`apprun-shared-traffic-${index}`} style={{ flex: 1, margin: 0, fontFamily: 'monospace' }}>
-                {t.isLatestVersion ? '(最新)' : t.versionName}
+                {t.isLatestVersion ? '(最新)' : t.versionName}<span className="required-mark">*</span>
               </label>
               <input
                 id={`apprun-shared-traffic-${index}`}
-                type="text"
+                type="number"
                 value={t.percent}
                 onChange={(e) => handleTrafficPercentChange(index, e.target.value)}
+                min={0}
+                max={100}
+                required
                 style={{ width: '70px' }}
               />
               <span>%</span>
@@ -736,15 +758,16 @@ export function AppRunSharedList({ profile }: AppRunSharedListProps) {
             </div>
           )}
           <div className="confirm-actions" style={{ marginTop: '1.5rem' }}>
-            <button className="btn btn-secondary" onClick={handleTrafficEditCancel}>キャンセル</button>
+            <button type="button" className="btn btn-secondary" onClick={handleTrafficEditCancel}>キャンセル</button>
             <button
+              type="submit"
               className="btn btn-primary"
-              onClick={handleTrafficEditSubmit}
               disabled={savingTraffics}
             >
               {savingTraffics ? '保存中...' : '保存する'}
             </button>
           </div>
+          </form>
         </div>
       </div>
     );
