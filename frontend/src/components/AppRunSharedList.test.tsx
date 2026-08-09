@@ -199,7 +199,10 @@ describe('AppRunSharedList', () => {
 
     await user.click(screen.getByRole('button', { name: '+ アプリ作成' }));
     await user.type(screen.getByPlaceholderText('my-app'), 'new-app');
-    expect(screen.getByRole('button', { name: '作成する' })).toBeDisabled();
+    const imageInput = screen.getByPlaceholderText('docker.io/library/nginx:latest') as HTMLInputElement;
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    expect(imageInput.validity.valid).toBe(false);
     expect(CreateAppRunSharedApplication).not.toHaveBeenCalled();
   });
 
