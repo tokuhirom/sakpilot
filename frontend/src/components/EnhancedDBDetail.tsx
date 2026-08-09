@@ -88,7 +88,8 @@ export function EnhancedDBDetail({ profile, enhancedDBId }: EnhancedDBDetailProp
     setBasicError(null);
   };
 
-  const handleBasicSave = async () => {
+  const handleBasicSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSavingBasic(true);
     setBasicError(null);
     try {
@@ -134,14 +135,15 @@ export function EnhancedDBDetail({ profile, enhancedDBId }: EnhancedDBDetailProp
           )}
         </div>
         {editingBasic ? (
-          <div>
+          <form onSubmit={handleBasicSave}>
             <div className="form-group">
-              <label>名前</label>
+              <label>名前<span className="required-mark">*</span></label>
               <input
                 type="text"
                 value={nameInput}
                 onChange={(e) => setNameInput(e.target.value)}
                 autoFocus
+                required
               />
             </div>
             <div className="form-group">
@@ -151,6 +153,7 @@ export function EnhancedDBDetail({ profile, enhancedDBId }: EnhancedDBDetailProp
                 value={descriptionInput}
                 onChange={(e) => setDescriptionInput(e.target.value)}
                 placeholder="任意"
+                maxLength={512}
               />
             </div>
             <div className="form-group">
@@ -168,12 +171,12 @@ export function EnhancedDBDetail({ profile, enhancedDBId }: EnhancedDBDetailProp
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleBasicEditCancel} disabled={savingBasic}>キャンセル</button>
-              <button className="btn btn-primary" onClick={handleBasicSave} disabled={savingBasic || !nameInput}>
+              <button type="button" className="btn btn-secondary" onClick={handleBasicEditCancel} disabled={savingBasic}>キャンセル</button>
+              <button type="submit" className="btn btn-primary" disabled={savingBasic}>
                 {savingBasic ? '保存中...' : '保存する'}
               </button>
             </div>
-          </div>
+          </form>
         ) : (
           <table style={{ borderCollapse: 'collapse' }}>
             <tbody>
@@ -233,27 +236,30 @@ export function EnhancedDBDetail({ profile, enhancedDBId }: EnhancedDBDetailProp
 
       <div className="card" style={{ padding: '1rem', background: '#2a2a2a', borderRadius: '8px' }}>
         <h4 style={{ color: '#00adb5', marginTop: 0, marginBottom: '1rem' }}>パスワード再設定</h4>
-        <div className="form-group">
-          <label>新しいパスワード</label>
-          <input
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="管理ユーザーの新しいパスワード"
-          />
-        </div>
-        {passwordError && (
-          <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
-            エラー: {passwordError}
+        <form onSubmit={(e) => { e.preventDefault(); setConfirmSetPassword(true); }}>
+          <div className="form-group">
+            <label>新しいパスワード<span className="required-mark">*</span></label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="管理ユーザーの新しいパスワード"
+              required
+            />
           </div>
-        )}
-        <button
-          className="btn btn-secondary btn-small"
-          onClick={() => setConfirmSetPassword(true)}
-          disabled={savingPassword || !newPassword}
-        >
-          {savingPassword ? '設定中...' : 'パスワードを再設定'}
-        </button>
+          {passwordError && (
+            <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+              エラー: {passwordError}
+            </div>
+          )}
+          <button
+            type="submit"
+            className="btn btn-secondary btn-small"
+            disabled={savingPassword}
+          >
+            {savingPassword ? '設定中...' : 'パスワードを再設定'}
+          </button>
+        </form>
       </div>
 
       {confirmSetPassword && (

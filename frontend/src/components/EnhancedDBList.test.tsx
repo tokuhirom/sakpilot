@@ -112,7 +112,7 @@ describe('EnhancedDBList', () => {
     expect(await screen.findByText('new-db')).toBeInTheDocument();
   });
 
-  it('requires name and database name before allowing create', async () => {
+  it('blocks create submit when name or database name is empty', async () => {
     vi.mocked(GetEnhancedDBs).mockResolvedValueOnce([]);
     const user = userEvent.setup();
 
@@ -120,14 +120,16 @@ describe('EnhancedDBList', () => {
     await screen.findByText('エンハンスドDBがありません');
 
     await user.click(screen.getByRole('button', { name: '+ 作成' }));
+    await user.click(screen.getByRole('button', { name: '作成する' }));
 
-    expect(screen.getByRole('button', { name: '作成する' })).toBeDisabled();
+    const nameInput = screen.getByPlaceholderText('my-enhanced-db') as HTMLInputElement;
+    const dbNameInput = screen.getByPlaceholderText('mydb') as HTMLInputElement;
+    expect(nameInput.validity.valid).toBe(false);
+    expect(CreateEnhancedDB).not.toHaveBeenCalled();
 
-    await user.type(screen.getByPlaceholderText('my-enhanced-db'), 'new-db');
-    expect(screen.getByRole('button', { name: '作成する' })).toBeDisabled();
-
-    await user.type(screen.getByPlaceholderText('mydb'), 'newdb');
-    expect(screen.getByRole('button', { name: '作成する' })).not.toBeDisabled();
+    await user.type(nameInput, 'new-db');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+    expect(dbNameInput.validity.valid).toBe(false);
     expect(CreateEnhancedDB).not.toHaveBeenCalled();
   });
 });

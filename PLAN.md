@@ -307,7 +307,14 @@
     - 各フォームの入力欄に「何を入力すればよいか」が分かるplaceholderやヘルプテキストが無い箇所を洗い出し追加する（現状はラベルのみで単位や制約の説明が無い項目が多い）
     - 見直し対象はTier1〜Tier3で実装した機能に限らず、既存の全Create/Updateフォームが対象。範囲が広いため、着手時にリソース単位で区切って段階的にPRを分けるか、ユーザーと相談してスコープを決めること
     - フォームごとに前提（SDK側のバリデーション仕様、必須/任意の別）を確認した上で実装すること。SDK側で判明した制約や挙動の不明点は[[sakpilot-upstream-issues-doc]]の運用に従いdocs/upstream-issues.mdに記録する
-    - **進捗**: DNS/GSLB/ProxyLB/SimpleMonitor/Switch/Disk/Database/NFS対応済み。残り: EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/AppRun専有・共用型/Server等
+    - **進捗**: DNS/GSLB/ProxyLB/SimpleMonitor/Switch/Disk/Database/NFS/EnhancedDB対応済み。残り: ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/AppRun専有・共用型/Server等
+
+### ✅ 完了（2026-08-09 追加セッション39、Tier5 #23 一部・EnhancedDB）
+- NFSに続き、エンハンスドDB(`EnhancedDBList.tsx`の作成モーダル、`EnhancedDBDetail.tsx`の基本情報インライン編集・パスワード再設定フォーム)を`docs/ui-implementation-patterns.md`のルールに合わせて改修。3フォームとも`<form onSubmit>`+`<button type="submit">`に変換した。パスワード再設定は「入力→ボタンクリックで確認ダイアログ表示→実行」という間接フローだったため、`onSubmit`で`e.preventDefault()`後に確認ダイアログを開く設計にした(実際のAPI呼び出しは従来通り確認ダイアログの実行ボタンから)。
+- 制約値は`terraform-provider-sakura`の`docs/resources/enhanced_db.md`で確認: `name`/`database_name`/`password`はいずれも必須(文字数・パターン制約はドキュメント記載なし)、`description`は長さ上限512。
+- 作成モーダルの複合`disabled`条件(`!newName || !newDatabaseName`)、パスワード再設定ボタンの`!newPassword`という`required`と重複するJSバリデーションを削除(rule 4)。
+- `EnhancedDBList.test.tsx`/`EnhancedDBDetail.test.tsx`のボタン`disabled`状態を検証していたテストを、`input.validity.valid`と送信APIが呼ばれないことを確認する形に書き換えた(rule 4)。
+- `tsc --noEmit`/`npm run test`(267件全パス)/`npm run build`+`npx playwright test e2e/enhanceddb.spec.ts`(5件全パス)/`golangci-lint run`(0 issues、Go側の変更なし)を確認してから作成。
 
 ### ✅ 完了（2026-08-09 追加セッション38、Tier5 #23 一部・NFS）
 - Databaseに続き、NFS(`NFSList.tsx`の作成モーダル、`NFSDetail.tsx`の基本情報インライン編集)を`docs/ui-implementation-patterns.md`のルールに合わせて改修。2フォームとも`<form onSubmit>`+`<button type="submit">`に変換した。
