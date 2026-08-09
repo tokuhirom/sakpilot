@@ -307,7 +307,13 @@
     - 各フォームの入力欄に「何を入力すればよいか」が分かるplaceholderやヘルプテキストが無い箇所を洗い出し追加する（現状はラベルのみで単位や制約の説明が無い項目が多い）
     - 見直し対象はTier1〜Tier3で実装した機能に限らず、既存の全Create/Updateフォームが対象。範囲が広いため、着手時にリソース単位で区切って段階的にPRを分けるか、ユーザーと相談してスコープを決めること
     - フォームごとに前提（SDK側のバリデーション仕様、必須/任意の別）を確認した上で実装すること。SDK側で判明した制約や挙動の不明点は[[sakpilot-upstream-issues-doc]]の運用に従いdocs/upstream-issues.mdに記録する
-    - **進捗**: DNS/GSLB/ProxyLB対応済み。残り: SimpleMonitor/Switch/Disk/Database/NFS/EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/AppRun専有・共用型/Server等
+    - **進捗**: DNS/GSLB/ProxyLB/SimpleMonitor対応済み。残り: Switch/Disk/Database/NFS/EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/AppRun専有・共用型/Server等
+
+### ✅ 完了（2026-08-09 追加セッション34、Tier5 #23 一部・SimpleMonitor）
+- DNS/GSLB/ProxyLBに続き、シンプル監視（`MonitorList.tsx`の作成モーダル、`MonitorDetail.tsx`の説明インライン編集・監視設定編集モーダル）を`docs/ui-implementation-patterns.md`のルールに合わせて改修。3フォームすべてを`<form onSubmit>`+`<button type="submit">`に変換した。
+- 制約値は`internal/sakura/global.go`のSDK呼び出しだけでは判別できなかったため、`terraform-provider-sakura`の`docs/resources/simple_monitor.md`で確認: `delay_loop`は`60-3600`、`max_check_attempts`は`1-10`、`retry_interval`は`10-3600`、`timeout`は`10-30`（いずれも設定時の範囲、監視設定編集フォームでは常に既存値が入るため`required`も付与）。ヘルスチェックの`port`/`期待するステータスコード`はプロトコルによって使わない場合があるため`required`は付けず、`type="number"`(port: 1-65535、status: 100-599)のみ付与。`target`はIP/FQDN両対応で単一のpatternに収められないためplaceholderのみ。`通知間隔`はドキュメント上明確な範囲が見当たらなかったため`required`+`min=1`のみ付与（根拠のない上限は付けない）。Slack Webhook URLはSlack/Discord両対応のためpatternでは縛らず`type="url"`化し、有効化時のみ表示されるフィールドのため常に`required`にした。
+- 実装中に、`iaas-api-go`の`SimpleMonitor.GetTimeout()`だけ他の設定項目(`GetDelayLoop`等)と異なりゼロ値フォールバックが無いことが判明。既存のE2Eシード（`e2e_server.go`の`seedSimpleMonitors`）が`Timeout`を未設定のまま作成していたため、新設した`required min=10`と衝突して監視設定を保存できなくなるバグを作り込みかけた。シード側に`Timeout: 10`を明示する対応に加え、実運用でも同じ状況（他ツール経由で作成された`Timeout`未設定のリソース）が起こり得るため`MonitorDetail.tsx`の`toSettingsForm`で`monitor.timeout || 10`のフォールバックを追加。詳細は`docs/upstream-issues.md`に記録。
+- `tsc --noEmit`/`npm run test`(264件全パス)/`npm run build`+`npx playwright test e2e/simplemonitor.spec.ts`(5件全パス)/`golangci-lint run`(0 issues)/`go build ./...`/`go test -tags e2e ./...`を確認してから作成。
 
 ### ✅ 完了（2026-08-09 追加セッション33、Tier5 #23 一部・ProxyLB）
 - DNS/GSLBに続き、ProxyLB（エンハンスドロードバランサ）の全作成/編集フォームを`docs/ui-implementation-patterns.md`のルールに合わせて改修。対象は`ProxyLBList.tsx`（List+Detail両方がこのファイルに実装されている）1ファイルで、ELB作成モーダル、基本情報（名前/説明）インライン編集、ヘルスチェック/Sorry Server/待ち受けポート/実サーバーの設定編集モーダル、SSL証明書設定フォーム、プラン変更モーダルの計6フォームすべてを`<div>`+onClickから`<form onSubmit>`+`<button type="submit">`に変換した。
