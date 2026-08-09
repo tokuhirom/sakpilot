@@ -105,7 +105,8 @@ export function ServerDetail({ profile, zone, serverId }: ServerDetailProps) {
     setPlanError(null);
   };
 
-  const handlePlanSave = async () => {
+  const handlePlanSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSavingPlan(true);
     setPlanError(null);
     try {
@@ -142,8 +143,8 @@ export function ServerDetail({ profile, zone, serverId }: ServerDetailProps) {
     setCdromError(null);
   };
 
-  const handleInsertCDROM = async () => {
-    if (!selectedCDROMId) return;
+  const handleInsertCDROM = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSavingCDROM(true);
     setCdromError(null);
     try {
@@ -267,24 +268,26 @@ export function ServerDetail({ profile, zone, serverId }: ServerDetailProps) {
           )}
         </div>
         {editingPlan ? (
-          <div>
+          <form onSubmit={handlePlanSave}>
             {serverInfo.status.toLowerCase() === 'up' && (
               <p style={{ color: '#f59e0b', fontSize: '0.85rem' }}>プラン変更にはサーバーが停止している必要があります</p>
             )}
             <div className="form-group">
-              <label>CPU (コア数)</label>
+              <label>CPU (コア数)<span className="required-mark">*</span></label>
               <input
                 type="number"
                 min={1}
+                required
                 value={cpuInput}
                 onChange={(e) => setCpuInput(Number(e.target.value))}
               />
             </div>
             <div className="form-group">
-              <label>メモリ (GB)</label>
+              <label>メモリ (GB)<span className="required-mark">*</span></label>
               <input
                 type="number"
                 min={1}
+                required
                 value={memoryInput}
                 onChange={(e) => setMemoryInput(Number(e.target.value))}
               />
@@ -295,12 +298,12 @@ export function ServerDetail({ profile, zone, serverId }: ServerDetailProps) {
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handlePlanEditCancel} disabled={savingPlan}>キャンセル</button>
-              <button className="btn btn-primary" onClick={handlePlanSave} disabled={savingPlan}>
+              <button type="button" className="btn btn-secondary" onClick={handlePlanEditCancel} disabled={savingPlan}>キャンセル</button>
+              <button type="submit" className="btn btn-primary" disabled={savingPlan}>
                 {savingPlan ? '保存中...' : '保存する'}
               </button>
             </div>
-          </div>
+          </form>
         ) : (
           <p style={{ margin: 0 }}>{serverInfo.cpu} vCPU / {serverInfo.memory} GB</p>
         )}
@@ -314,12 +317,13 @@ export function ServerDetail({ profile, zone, serverId }: ServerDetailProps) {
           )}
         </div>
         {editingCDROM ? (
-          <div>
+          <form onSubmit={handleInsertCDROM}>
             <div className="form-group">
-              <label>挿入するCD-ROM</label>
+              <label>挿入するCD-ROM<span className="required-mark">*</span></label>
               <select
                 value={selectedCDROMId}
                 onChange={(e) => setSelectedCDROMId(e.target.value)}
+                required
               >
                 <option value="">選択してください</option>
                 {cdroms.map((c) => (
@@ -333,17 +337,17 @@ export function ServerDetail({ profile, zone, serverId }: ServerDetailProps) {
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleCDROMEditCancel} disabled={savingCDROM}>キャンセル</button>
+              <button type="button" className="btn btn-secondary" onClick={handleCDROMEditCancel} disabled={savingCDROM}>キャンセル</button>
               {serverInfo.cdromId && (
-                <button className="btn btn-danger" onClick={handleEjectCDROM} disabled={savingCDROM}>
+                <button type="button" className="btn btn-danger" onClick={handleEjectCDROM} disabled={savingCDROM}>
                   {savingCDROM ? '処理中...' : '排出する'}
                 </button>
               )}
-              <button className="btn btn-primary" onClick={handleInsertCDROM} disabled={savingCDROM || !selectedCDROMId}>
+              <button type="submit" className="btn btn-primary" disabled={savingCDROM}>
                 {savingCDROM ? '処理中...' : '挿入する'}
               </button>
             </div>
-          </div>
+          </form>
         ) : (
           <p style={{ margin: 0 }}>{serverInfo.cdromId || '(未挿入)'}</p>
         )}
