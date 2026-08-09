@@ -16,8 +16,9 @@
 | DNS | [dns.md](dns.md) |
 | スイッチ | [switch.md](switch.md) |
 | パケットフィルター | [packetfilter.md](packetfilter.md) |
+| GSLB | [gslb.md](gslb.md) |
 
-上記以外のリソース(GSLB・ProxyLB(ELB)・シンプル監視・データベース・エンハンスドDB・NFS・コンテナレジストリ・KMS・AppRun専有型/共用型 等)は未整備です。撮影スクリプト・configはリソース非依存の共通基盤として作成済みのため、これを流用して順次追加予定です。
+上記以外のリソース(ProxyLB(ELB)・シンプル監視・データベース・エンハンスドDB・NFS・コンテナレジストリ・KMS・AppRun専有型/共用型 等)は未整備です。撮影スクリプト・configはリソース非依存の共通基盤として作成済みのため、これを流用して順次追加予定です。
 
 ### 今回未対応のリソース
 
