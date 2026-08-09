@@ -20,8 +20,9 @@
 | ELB(ProxyLB) | [elb.md](elb.md) |
 | シンプル監視 | [simplemonitor.md](simplemonitor.md) |
 | データベース | [database.md](database.md) |
+| エンハンスドDB | [enhanceddb.md](enhanceddb.md) |
 
-上記以外のリソース(エンハンスドDB・NFS・コンテナレジストリ・KMS・AppRun専有型/共用型 等)は未整備です。撮影スクリプト・configはリソース非依存の共通基盤として作成済みのため、これを流用して順次追加予定です。
+上記以外のリソース(NFS・コンテナレジストリ・KMS・AppRun専有型/共用型 等)は未整備です。撮影スクリプト・configはリソース非依存の共通基盤として作成済みのため、これを流用して順次追加予定です。
 
 ### 今回未対応のリソース
 
