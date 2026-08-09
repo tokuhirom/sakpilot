@@ -194,7 +194,8 @@ export function NFSList({ profile, zone, zones, onZoneChange, onSelectNFS }: NFS
     setCreateForm(prev => ({ ...prev, planClass, sizeGB: String(sizes[0]) }));
   };
 
-  const handleCreateSubmit = async () => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setCreating(true);
     setCreateError(null);
     try {
@@ -482,14 +483,16 @@ export function NFSList({ profile, zone, zones, onZoneChange, onSelectNFS }: NFS
             padding: '20px', minWidth: '320px', maxWidth: '420px', maxHeight: '80vh', overflowY: 'auto',
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>NFS作成</h3>
+            <form onSubmit={handleCreateSubmit}>
             <div className="form-group">
-              <label>名前</label>
+              <label>名前<span className="required-mark">*</span></label>
               <input
                 type="text"
                 value={createForm.name}
                 onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
                 placeholder="my-nfs"
                 autoFocus
+                required
               />
             </div>
             <div className="form-group">
@@ -499,6 +502,7 @@ export function NFSList({ profile, zone, zones, onZoneChange, onSelectNFS }: NFS
                 value={createForm.description}
                 onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
                 placeholder="任意"
+                maxLength={512}
               />
             </div>
             <div className="form-group">
@@ -526,8 +530,8 @@ export function NFSList({ profile, zone, zones, onZoneChange, onSelectNFS }: NFS
               </select>
             </div>
             <div className="form-group">
-              <label htmlFor="nfs-create-switch">接続スイッチ</label>
-              <select id="nfs-create-switch" value={createForm.switchId} onChange={(e) => setCreateForm({ ...createForm, switchId: e.target.value })}>
+              <label htmlFor="nfs-create-switch">接続スイッチ<span className="required-mark">*</span></label>
+              <select id="nfs-create-switch" value={createForm.switchId} onChange={(e) => setCreateForm({ ...createForm, switchId: e.target.value })} required>
                 <option value="">選択してください</option>
                 {switches.map((sw) => (
                   <option key={sw.id} value={sw.id}>{sw.name}</option>
@@ -535,21 +539,26 @@ export function NFSList({ profile, zone, zones, onZoneChange, onSelectNFS }: NFS
               </select>
             </div>
             <div className="form-group">
-              <label>IPアドレス</label>
+              <label>IPアドレス<span className="required-mark">*</span></label>
               <input
                 type="text"
                 value={createForm.ipAddress}
                 onChange={(e) => setCreateForm({ ...createForm, ipAddress: e.target.value })}
                 placeholder="例: 192.168.0.11"
+                pattern="^(\d{1,3}\.){3}\d{1,3}$"
+                required
               />
             </div>
             <div className="form-group">
-              <label>ネットワークマスク長</label>
+              <label>ネットワークマスク長<span className="required-mark">*</span></label>
               <input
                 type="number"
                 value={createForm.networkMaskLen}
                 onChange={(e) => setCreateForm({ ...createForm, networkMaskLen: e.target.value })}
                 placeholder="例: 24"
+                min={8}
+                max={29}
+                required
               />
             </div>
             <div className="form-group">
@@ -559,6 +568,7 @@ export function NFSList({ profile, zone, zones, onZoneChange, onSelectNFS }: NFS
                 value={createForm.defaultRoute}
                 onChange={(e) => setCreateForm({ ...createForm, defaultRoute: e.target.value })}
                 placeholder="任意(例: 192.168.0.1)"
+                pattern="^(\d{1,3}\.){3}\d{1,3}$"
               />
             </div>
             {createError && (
@@ -567,15 +577,16 @@ export function NFSList({ profile, zone, zones, onZoneChange, onSelectNFS }: NFS
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+              <button type="button" className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
               <button
+                type="submit"
                 className="btn btn-primary"
-                onClick={handleCreateSubmit}
-                disabled={creating || !createForm.name || !createForm.switchId || !createForm.ipAddress}
+                disabled={creating}
               >
                 {creating ? '作成中...' : '作成する'}
               </button>
             </div>
+            </form>
           </div>
         </div>
       )}

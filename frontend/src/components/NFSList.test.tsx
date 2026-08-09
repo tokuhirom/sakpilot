@@ -197,7 +197,7 @@ describe('NFSList', () => {
     expect(await screen.findByRole('option', { name: 'my-switch' })).toBeInTheDocument();
 
     await user.type(screen.getByPlaceholderText('my-nfs'), 'e2e-created-nfs');
-    await user.selectOptions(screen.getByLabelText('接続スイッチ'), 'sw-1');
+    await user.selectOptions(screen.getByLabelText('接続スイッチ', { exact: false }), 'sw-1');
     await user.type(screen.getByPlaceholderText('例: 192.168.0.11'), '192.168.0.11');
     await user.click(screen.getByRole('button', { name: '作成する' }));
 
@@ -212,5 +212,25 @@ describe('NFSList', () => {
     await waitFor(() => {
       expect(GetNFSList).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it('blocks NFS creation submit when 接続スイッチ is not selected', async () => {
+    vi.mocked(GetNFSList).mockResolvedValueOnce([]);
+    vi.mocked(GetSwitches).mockResolvedValueOnce([makeSwitch()]);
+    const user = userEvent.setup();
+
+    render(<NFSList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectNFS={() => {}} />);
+    await screen.findByText('NFSがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ NFS作成' }));
+    expect(await screen.findByRole('option', { name: 'my-switch' })).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('my-nfs'), 'e2e-created-nfs');
+    await user.type(screen.getByPlaceholderText('例: 192.168.0.11'), '192.168.0.11');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    const switchSelect = screen.getByLabelText('接続スイッチ', { exact: false }) as HTMLSelectElement;
+    expect(switchSelect.validity.valid).toBe(false);
+    expect(CreateNFS).not.toHaveBeenCalled();
   });
 });
