@@ -113,6 +113,23 @@ describe('ServerDetail', () => {
     expect(screen.getAllByRole('button', { name: '変更' })[0]).toBeDisabled();
   });
 
+  it('blocks plan submission via native min validation when CPU is below 1', async () => {
+    vi.mocked(GetServerDetail).mockResolvedValueOnce(makeServer({ status: 'down' }));
+    const user = userEvent.setup();
+
+    renderServerDetail();
+    await screen.findByText('サーバー詳細: my-server');
+
+    await user.click(screen.getAllByRole('button', { name: '変更' })[0]);
+    const [cpuInput] = screen.getAllByRole('spinbutton') as HTMLInputElement[];
+    await user.clear(cpuInput);
+    await user.type(cpuInput, '0');
+    await user.click(screen.getByRole('button', { name: '保存する' }));
+
+    expect(cpuInput.validity.valid).toBe(false);
+    expect(ChangeServerPlan).not.toHaveBeenCalled();
+  });
+
   it('inserts a CD-ROM', async () => {
     vi.mocked(GetServerDetail)
       .mockResolvedValueOnce(makeServer())
@@ -137,6 +154,26 @@ describe('ServerDetail', () => {
       expect(InsertServerCDROM).toHaveBeenCalledWith('default', 'is1a', '123456789012', '777777777777');
     });
     expect(await screen.findByText('777777777777')).toBeInTheDocument();
+  });
+
+  it('blocks CD-ROM insert submission via native required validation when nothing is selected', async () => {
+    vi.mocked(GetServerDetail).mockResolvedValueOnce(makeServer());
+    vi.mocked(GetCDROMs).mockResolvedValueOnce([makeCDROM()]);
+    const user = userEvent.setup();
+
+    renderServerDetail();
+    await screen.findByText('サーバー詳細: my-server');
+
+    await user.click(screen.getAllByRole('button', { name: '変更' })[1]);
+    await waitFor(() => {
+      expect(GetCDROMs).toHaveBeenCalledWith('default', 'is1a');
+    });
+
+    const select = screen.getAllByRole('combobox')[0] as HTMLSelectElement;
+    await user.click(screen.getByRole('button', { name: '挿入する' }));
+
+    expect(select.validity.valid).toBe(false);
+    expect(InsertServerCDROM).not.toHaveBeenCalled();
   });
 
   it('ejects the currently inserted CD-ROM', async () => {
