@@ -300,14 +300,14 @@
 
 **Tier 5: フォームUX見直し（横断的な品質改善、2026-08-09ユーザー指摘により追加）**
 
-23. Create/Update系フォームの入力ガイダンス・バリデーション見直し — 現状、`frontend/src/components/*.tsx`の作成・編集モーダル/フォーム（DNS/GSLB/ProxyLB/SimpleMonitor/Switch/Disk/Database/NFS/EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/AppRun専有・共用型/Server等、Tier1〜Tier3で実装した全リソース）は、**どの項目が必須か・どんな形式の値を期待しているかが画面から読み取れないものが多い**とユーザーから指摘あり。個別実装時にその場のスコープでしか見ておらず、フォーム全体を横断した使いやすさの観点でのレビューをしていなかったため。着手時は以下の観点で全フォームを棚卸しすること:
+23. ✅ Create/Update系フォームの入力ガイダンス・バリデーション見直し — 2026-08-09対応済み（Tier5 #23全項目完了）。現状、`frontend/src/components/*.tsx`の作成・編集モーダル/フォーム（DNS/GSLB/ProxyLB/SimpleMonitor/Switch/Disk/Database/NFS/EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/AppRun専有・共用型/Server等、Tier1〜Tier3で実装した全リソース）は、**どの項目が必須か・どんな形式の値を期待しているかが画面から読み取れないものが多い**とユーザーから指摘あり。個別実装時にその場のスコープでしか見ておらず、フォーム全体を横断した使いやすさの観点でのレビューをしていなかったため。着手時は以下の観点で全フォームを棚卸しすること:
     - 必須項目にHTML5の`required`属性を付与し、視覚的にも必須であることが分かるようにする（未入力のまま送信しようとした際にブラウザネイティブのバリデーションメッセージが出る状態にする）。具体的な実装ルール（`<form>`化・ラベル有無での視覚マーカーの付け方・HTML5化で不要になったJSバリデーションの削除等）は`docs/ui-implementation-patterns.md`の「必須項目のフォームバリデーション」節に確立済みのため、以降のリソース対応では必ずこれに従うこと
     - 数値項目は`type="number"`+`min`/`max`（例: ポート番号1-65535、監視間隔の下限値等、SDK/API側の制約に合わせる）を付与する
     - 形式が決まっている項目（IPアドレス、ネットワークマスク長、ドメイン名、タグの命名規則等）は`pattern`属性やplaceholderの入力例で期待値を明示する
     - 各フォームの入力欄に「何を入力すればよいか」が分かるplaceholderやヘルプテキストが無い箇所を洗い出し追加する（現状はラベルのみで単位や制約の説明が無い項目が多い）
     - 見直し対象はTier1〜Tier3で実装した機能に限らず、既存の全Create/Updateフォームが対象。範囲が広いため、着手時にリソース単位で区切って段階的にPRを分けるか、ユーザーと相談してスコープを決めること
     - フォームごとに前提（SDK側のバリデーション仕様、必須/任意の別）を確認した上で実装すること。SDK側で判明した制約や挙動の不明点は[[sakpilot-upstream-issues-doc]]の運用に従いdocs/upstream-issues.mdに記録する
-    - **進捗**: DNS/GSLB/ProxyLB/SimpleMonitor/Switch/Disk/Database/NFS/EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/Server対応済み。残り: AppRun専有・共用型のみ
+    - **進捗**: ✅ DNS/GSLB/ProxyLB/SimpleMonitor/Switch/Disk/Database/NFS/EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/Server/AppRun専有型/AppRun共用型、全リソース対応完了（2026-08-09）。これでTier5 #23は完了
 
 ### ✅ 完了（2026-08-09 追加セッション43、Tier5 #23 一部・ObjectStorage）
 - Archiveに続き、オブジェクトストレージ(`ObjectStorageList.tsx`のバケット作成モーダル・シークレットキー保存フォーム、`BucketSettingsModal.tsx`の暗号化有効化/レプリケーション有効化フォーム、`ObjectStoragePermissions.tsx`のパーミッション作成/編集モーダル)を`docs/ui-implementation-patterns.md`のルールに合わせて改修。計5フォームを`<form onSubmit>`+`<button type="submit">`に変換した。
