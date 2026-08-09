@@ -105,7 +105,8 @@ export function Monitoring({ profile }: MonitoringProps) {
     setShowCreate(false);
   };
 
-  const handleCreateSubmit = async () => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setCreating(true);
     setCreateError(null);
     try {
@@ -269,41 +270,46 @@ export function Monitoring({ profile }: MonitoringProps) {
             padding: '20px', minWidth: '320px', maxWidth: '420px',
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>{STORAGE_LABEL[subPage]}ストレージ作成</h3>
-            <div className="form-group">
-              <label htmlFor="ms-storage-create-name">名前</label>
-              <input
-                id="ms-storage-create-name"
-                type="text"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                autoFocus
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="ms-storage-create-description">説明</label>
-              <input
-                id="ms-storage-create-description"
-                type="text"
-                value={newDescription}
-                onChange={(e) => setNewDescription(e.target.value)}
-                placeholder="任意"
-              />
-            </div>
-            {createError && (
-              <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
-                エラー: {createError}
+            <form onSubmit={handleCreateSubmit}>
+              <div className="form-group">
+                <label htmlFor="ms-storage-create-name">名前<span className="required-mark">*</span></label>
+                <input
+                  id="ms-storage-create-name"
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  autoFocus
+                  required
+                  maxLength={64}
+                />
               </div>
-            )}
-            <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
-              <button
-                className="btn btn-primary"
-                onClick={handleCreateSubmit}
-                disabled={creating || !newName}
-              >
-                {creating ? '作成中...' : '作成する'}
-              </button>
-            </div>
+              <div className="form-group">
+                <label htmlFor="ms-storage-create-description">説明</label>
+                <input
+                  id="ms-storage-create-description"
+                  type="text"
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  placeholder="任意"
+                  maxLength={512}
+                />
+              </div>
+              {createError && (
+                <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                  エラー: {createError}
+                </div>
+              )}
+              <div className="confirm-actions">
+                <button type="button" className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={creating}
+                >
+                  {creating ? '作成中...' : '作成する'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
