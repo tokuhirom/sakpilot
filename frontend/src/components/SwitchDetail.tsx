@@ -3,6 +3,8 @@ import { GetSwitchDetail, UpdateSwitch } from '../../wailsjs/go/main/App';
 import { sakura } from '../../wailsjs/go/models';
 import { useGlobalReload } from '../hooks/useGlobalReload';
 
+const IPV4_PATTERN = '^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$';
+
 interface SwitchDetailProps {
   profile: string;
   zone: string;
@@ -56,7 +58,8 @@ export function SwitchDetail({ profile, zone, switchId }: SwitchDetailProps) {
     setBasicError(null);
   };
 
-  const handleBasicSave = async () => {
+  const handleBasicSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSavingBasic(true);
     setBasicError(null);
     try {
@@ -88,13 +91,14 @@ export function SwitchDetail({ profile, zone, switchId }: SwitchDetailProps) {
           )}
         </div>
         {editingBasic ? (
-          <div>
+          <form onSubmit={handleBasicSave}>
             <div className="form-group">
-              <label>名前</label>
+              <label>名前<span className="required-mark">*</span></label>
               <input
                 type="text"
                 value={nameInput}
                 onChange={(e) => setNameInput(e.target.value)}
+                required
                 autoFocus
               />
             </div>
@@ -105,6 +109,7 @@ export function SwitchDetail({ profile, zone, switchId }: SwitchDetailProps) {
                 value={descriptionInput}
                 onChange={(e) => setDescriptionInput(e.target.value)}
                 placeholder="任意"
+                maxLength={512}
               />
             </div>
             <div className="form-group">
@@ -113,7 +118,9 @@ export function SwitchDetail({ profile, zone, switchId }: SwitchDetailProps) {
                 type="number"
                 value={networkMaskLenInput}
                 onChange={(e) => setNetworkMaskLenInput(e.target.value)}
-                placeholder="任意(ルータ接続する場合のみ、例: 28)"
+                placeholder="任意(ルータ接続する場合のみ、26-28)"
+                min={26}
+                max={28}
               />
             </div>
             <div className="form-group">
@@ -123,6 +130,7 @@ export function SwitchDetail({ profile, zone, switchId }: SwitchDetailProps) {
                 value={defaultRouteInput}
                 onChange={(e) => setDefaultRouteInput(e.target.value)}
                 placeholder="任意(例: 192.168.0.1)"
+                pattern={IPV4_PATTERN}
               />
             </div>
             {basicError && (
@@ -131,12 +139,12 @@ export function SwitchDetail({ profile, zone, switchId }: SwitchDetailProps) {
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleBasicEditCancel} disabled={savingBasic}>キャンセル</button>
-              <button className="btn btn-primary" onClick={handleBasicSave} disabled={savingBasic || !nameInput}>
+              <button type="button" className="btn btn-secondary" onClick={handleBasicEditCancel} disabled={savingBasic}>キャンセル</button>
+              <button type="submit" className="btn btn-primary" disabled={savingBasic}>
                 {savingBasic ? '保存中...' : '保存する'}
               </button>
             </div>
-          </div>
+          </form>
         ) : (
           <table style={{ borderCollapse: 'collapse' }}>
             <tbody>
