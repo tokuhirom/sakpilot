@@ -201,9 +201,8 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
     }
   }, [activeUserName, activePassword, loadImages]);
 
-  const handleSavePassword = async (userName: string) => {
-    if (!password) return;
-
+  const handleSavePassword = async (e: React.FormEvent, userName: string) => {
+    e.preventDefault();
     setSavingPassword(true);
     try {
       await SaveContainerRegistrySecret(registryId, userName, password);
@@ -258,7 +257,8 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
     setBasicError(null);
   };
 
-  const handleBasicSave = async () => {
+  const handleBasicSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSavingBasic(true);
     setBasicError(null);
     try {
@@ -286,7 +286,8 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
     setShowAddUser(false);
   };
 
-  const handleAddUserSubmit = async () => {
+  const handleAddUserSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setAddingUser(true);
     setAddUserError(null);
     try {
@@ -447,14 +448,15 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
           )}
         </div>
         {editingBasic ? (
-          <div>
+          <form onSubmit={handleBasicSave}>
             <div className="form-group">
-              <label>名前</label>
+              <label>名前<span className="required-mark">*</span></label>
               <input
                 type="text"
                 value={nameInput}
                 onChange={(e) => setNameInput(e.target.value)}
                 autoFocus
+                required
               />
             </div>
             <div className="form-group">
@@ -464,6 +466,7 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
                 value={descriptionInput}
                 onChange={(e) => setDescriptionInput(e.target.value)}
                 placeholder="任意"
+                maxLength={512}
               />
             </div>
             <div className="form-group">
@@ -491,12 +494,12 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleBasicEditCancel} disabled={savingBasic}>キャンセル</button>
-              <button className="btn btn-primary" onClick={handleBasicSave} disabled={savingBasic || !nameInput}>
+              <button type="button" className="btn btn-secondary" onClick={handleBasicEditCancel} disabled={savingBasic}>キャンセル</button>
+              <button type="submit" className="btn btn-primary" disabled={savingBasic}>
                 {savingBasic ? '保存中...' : '保存する'}
               </button>
             </div>
-          </div>
+          </form>
         ) : (
           <table style={{ borderCollapse: 'collapse' }}>
             <tbody>
@@ -592,12 +595,16 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
                     {user.permission === 'all' && (
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         {selectedUser === user.userName ? (
-                          <>
+                          <form
+                            onSubmit={(e) => handleSavePassword(e, user.userName)}
+                            style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: 1 }}
+                          >
                             <input
                               type="password"
                               value={password}
                               onChange={(e) => setPassword(e.target.value)}
-                              placeholder="パスワード"
+                              placeholder="パスワード *"
+                              required
                               style={{
                                 flex: 1,
                                 padding: '0.25rem 0.5rem',
@@ -609,14 +616,15 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
                               }}
                             />
                             <button
+                              type="submit"
                               className="btn btn-primary"
-                              onClick={() => handleSavePassword(user.userName)}
-                              disabled={savingPassword || !password}
+                              disabled={savingPassword}
                               style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
                             >
                               保存
                             </button>
                             <button
+                              type="button"
                               className="btn btn-secondary"
                               onClick={() => {
                                 setSelectedUser(null);
@@ -626,7 +634,7 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
                             >
                               取消
                             </button>
-                          </>
+                          </form>
                         ) : (
                           <>
                             {user.hasSavedSecret ? (
@@ -656,7 +664,10 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
                   </td>
                   <td style={{ textAlign: 'left' }}>
                     {editingUser === user.userName ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <form
+                        onSubmit={(e) => { e.preventDefault(); handleEditUserSave(); }}
+                        style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}
+                      >
                         <input
                           type="password"
                           value={editUserPassword}
@@ -669,14 +680,15 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
                         )}
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button
+                            type="submit"
                             className="btn btn-primary"
-                            onClick={handleEditUserSave}
                             disabled={savingUser}
                             style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
                           >
                             {savingUser ? '保存中...' : '保存'}
                           </button>
                           <button
+                            type="button"
                             className="btn btn-secondary"
                             onClick={handleEditUserCancel}
                             disabled={savingUser}
@@ -685,7 +697,7 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
                             取消
                           </button>
                         </div>
-                      </div>
+                      </form>
                     ) : (
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button
@@ -743,21 +755,24 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
             padding: '20px', minWidth: '320px', maxWidth: '420px',
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>ユーザー追加</h3>
+            <form onSubmit={handleAddUserSubmit}>
             <div className="form-group">
-              <label>ユーザー名</label>
+              <label>ユーザー名<span className="required-mark">*</span></label>
               <input
                 type="text"
                 value={newUserName}
                 onChange={(e) => setNewUserName(e.target.value)}
                 autoFocus
+                required
               />
             </div>
             <div className="form-group">
-              <label>パスワード</label>
+              <label>パスワード<span className="required-mark">*</span></label>
               <input
                 type="password"
                 value={newUserPassword}
                 onChange={(e) => setNewUserPassword(e.target.value)}
+                required
               />
             </div>
             <div className="form-group">
@@ -777,15 +792,16 @@ export function ContainerRegistryDetail({ profile, registryId }: ContainerRegist
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleAddUserCancel}>キャンセル</button>
+              <button type="button" className="btn btn-secondary" onClick={handleAddUserCancel}>キャンセル</button>
               <button
+                type="submit"
                 className="btn btn-primary"
-                onClick={handleAddUserSubmit}
-                disabled={addingUser || !newUserName || !newUserPassword}
+                disabled={addingUser}
               >
                 {addingUser ? '追加中...' : '追加する'}
               </button>
             </div>
+            </form>
           </div>
         </div>
       )}

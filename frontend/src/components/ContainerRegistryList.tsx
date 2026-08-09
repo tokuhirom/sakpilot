@@ -95,7 +95,8 @@ export function ContainerRegistryList({ profile, onSelectRegistry }: ContainerRe
     setShowCreate(false);
   };
 
-  const handleCreateSubmit = async () => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setCreating(true);
     setCreateError(null);
     try {
@@ -199,14 +200,16 @@ export function ContainerRegistryList({ profile, onSelectRegistry }: ContainerRe
             padding: '20px', minWidth: '320px', maxWidth: '420px',
           }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>コンテナレジストリ作成</h3>
+            <form onSubmit={handleCreateSubmit}>
             <div className="form-group">
-              <label>名前</label>
+              <label>名前<span className="required-mark">*</span></label>
               <input
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="my-registry"
                 autoFocus
+                required
               />
             </div>
             <div className="form-group">
@@ -216,6 +219,7 @@ export function ContainerRegistryList({ profile, onSelectRegistry }: ContainerRe
                 value={newDescription}
                 onChange={(e) => setNewDescription(e.target.value)}
                 placeholder="任意"
+                maxLength={512}
               />
             </div>
             <div className="form-group">
@@ -246,15 +250,16 @@ export function ContainerRegistryList({ profile, onSelectRegistry }: ContainerRe
               </div>
             )}
             <div className="confirm-actions">
-              <button className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+              <button type="button" className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
               <button
+                type="submit"
                 className="btn btn-primary"
-                onClick={handleCreateSubmit}
-                disabled={creating || !newName}
+                disabled={creating}
               >
                 {creating ? '作成中...' : '作成する'}
               </button>
             </div>
+            </form>
           </div>
         </div>
       )}

@@ -114,7 +114,7 @@ describe('ContainerRegistryDetail', () => {
     render(<ContainerRegistryDetail profile="default" registryId="123456789012" />);
 
     await user.click(await screen.findByRole('button', { name: 'パスワード設定' }));
-    await user.type(screen.getByPlaceholderText('パスワード'), 'new-password');
+    await user.type(screen.getByPlaceholderText('パスワード *'), 'new-password');
     await user.click(screen.getByRole('button', { name: '保存' }));
 
     await waitFor(() => {
@@ -138,10 +138,10 @@ describe('ContainerRegistryDetail', () => {
     render(<ContainerRegistryDetail profile="default" registryId="123456789012" />);
 
     await user.click(await screen.findByRole('button', { name: 'パスワード設定' }));
-    await user.type(screen.getByPlaceholderText('パスワード'), 'abc');
+    await user.type(screen.getByPlaceholderText('パスワード *'), 'abc');
     await user.click(screen.getByRole('button', { name: '取消' }));
 
-    expect(screen.queryByPlaceholderText('パスワード')).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('パスワード *')).not.toBeInTheDocument();
     expect(SaveContainerRegistrySecret).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'パスワード設定' })).toBeInTheDocument();
   });
