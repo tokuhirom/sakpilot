@@ -53,6 +53,7 @@ test('ディスクマニュアル用スクリーンショット', async ({ page 
   await page.getByRole('link', { name: 'ディスク' }).click();
   await diskCard(page, 'e2e-unconnected-disk').click();
   await expect(page).toHaveURL(/#\/e2e\/disks\//);
+  await expect(page.getByRole('heading', { name: /^ディスク詳細: / })).toBeVisible();
   await expect(page.getByText('(未接続)')).toBeVisible();
   await page.getByRole('button', { name: '変更' }).click();
   const connectionCard = page.locator('.card', { hasText: '接続先サーバー' });
@@ -65,6 +66,7 @@ test('ディスクマニュアル用スクリーンショット', async ({ page 
   await page.getByRole('link', { name: 'ディスク' }).click();
   await diskCard(page, 'e2e-connected-disk').click();
   await expect(page).toHaveURL(/#\/e2e\/disks\//);
+  await expect(page.getByRole('heading', { name: /^ディスク詳細: / })).toBeVisible();
   await expect(page.getByText('e2e-web-1')).toBeVisible();
   await page.getByRole('button', { name: '変更' }).click();
   await expect(page.getByRole('button', { name: '接続を解除する' })).toBeVisible();
