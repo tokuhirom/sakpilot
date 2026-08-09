@@ -190,7 +190,10 @@ describe('AppRunDedicatedList', () => {
     render(<AppRunDedicatedList profile="default" />);
     await user.click(await screen.findByText('+ クラスタ作成'));
 
-    expect(screen.getByRole('button', { name: '作成する' })).toBeDisabled();
+    const nameInput = screen.getByPlaceholderText('my-cluster') as HTMLInputElement;
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    expect(nameInput.validity.valid).toBe(false);
     expect(CreateAppRunCluster).not.toHaveBeenCalled();
   });
 
@@ -333,10 +336,14 @@ describe('AppRunDedicatedList', () => {
     await user.click(await screen.findByText('+ LB作成'));
     await user.type(screen.getByPlaceholderText('my-lb'), 'new-lb');
 
-    await user.clear(screen.getByPlaceholderText('shared またはスイッチID'));
-    await user.type(screen.getByPlaceholderText('shared またはスイッチID'), 'switch-123');
-    await user.type(screen.getByPlaceholderText('VIP'), '203.0.113.1');
-    await user.type(screen.getByPlaceholderText('仮想ルータID'), '1');
+    await user.clear(screen.getByPlaceholderText('shared またはスイッチID *'));
+    await user.type(screen.getByPlaceholderText('shared またはスイッチID *'), 'switch-123');
+    await user.type(screen.getByPlaceholderText('IPプール開始 *'), '192.168.1.10');
+    await user.type(screen.getByPlaceholderText('IPプール終了 *'), '192.168.1.20');
+    await user.type(screen.getByPlaceholderText('ネットマスク長 *'), '24');
+    await user.type(screen.getByPlaceholderText('デフォルトゲートウェイ *'), '192.168.1.1');
+    await user.type(screen.getByPlaceholderText('VIP *'), '203.0.113.1');
+    await user.type(screen.getByPlaceholderText('仮想ルータID *'), '1');
 
     await user.click(screen.getByRole('button', { name: '作成する' }));
 
@@ -344,6 +351,9 @@ describe('AppRunDedicatedList', () => {
       expect(CreateAppRunLoadBalancer).toHaveBeenCalledWith('default', 'cluster-1', 'asg-1', expect.objectContaining({
         interfaces: [expect.objectContaining({
           upstream: 'switch-123',
+          ipPool: [{ start: '192.168.1.10', end: '192.168.1.20' }],
+          netmaskLen: 24,
+          defaultGateway: '192.168.1.1',
           vip: '203.0.113.1',
           virtualRouterID: 1,
         })],
@@ -434,7 +444,10 @@ describe('AppRunDedicatedList', () => {
 
     expect(await screen.findByText('証明書を更新')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('my-cert')).toHaveValue('my-cert');
-    expect(screen.getByRole('button', { name: '更新する' })).toBeDisabled();
+    const certInput = screen.getByPlaceholderText('-----BEGIN CERTIFICATE-----', { exact: true }) as HTMLTextAreaElement;
+    await user.click(screen.getByRole('button', { name: '更新する' }));
+    expect(certInput.validity.valid).toBe(false);
+    expect(UpdateAppRunCertificate).not.toHaveBeenCalled();
 
     await user.type(screen.getByPlaceholderText('-----BEGIN CERTIFICATE-----', { exact: true }), 'renewed-cert-pem');
     await user.type(screen.getByPlaceholderText('-----BEGIN PRIVATE KEY-----'), 'renewed-key-pem');
@@ -723,7 +736,10 @@ describe('AppRunDedicatedList', () => {
     await user.click(await screen.findByText('my-app'));
     await user.click(await screen.findByText('+ デプロイ'));
 
-    expect(screen.getByRole('button', { name: 'デプロイする' })).toBeDisabled();
+    const imageInput = screen.getByPlaceholderText('docker.io/library/nginx:latest') as HTMLInputElement;
+    await user.click(screen.getByRole('button', { name: 'デプロイする' }));
+
+    expect(imageInput.validity.valid).toBe(false);
     expect(CreateAppRunApplicationVersion).not.toHaveBeenCalled();
   });
 
@@ -812,7 +828,10 @@ describe('AppRunDedicatedList', () => {
     await user.click(await screen.findByText('my-cluster'));
     await user.click(await screen.findByText('+ アプリ作成'));
 
-    expect(screen.getByRole('button', { name: '作成する' })).toBeDisabled();
+    const nameInput = screen.getByPlaceholderText('my-app') as HTMLInputElement;
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    expect(nameInput.validity.valid).toBe(false);
     expect(CreateAppRunApplication).not.toHaveBeenCalled();
   });
 
@@ -882,13 +901,13 @@ describe('AppRunDedicatedList', () => {
     await user.click(await screen.findByText('+ ASG作成'));
     await user.type(screen.getByPlaceholderText('my-asg'), 'new-asg');
 
-    await user.clear(screen.getByPlaceholderText('shared またはスイッチID'));
-    await user.type(screen.getByPlaceholderText('shared またはスイッチID'), 'switch-123');
+    await user.clear(screen.getByPlaceholderText('shared またはスイッチID *'));
+    await user.type(screen.getByPlaceholderText('shared またはスイッチID *'), 'switch-123');
 
-    await user.type(screen.getByPlaceholderText('IPプール開始'), '192.168.1.10');
-    await user.type(screen.getByPlaceholderText('IPプール終了'), '192.168.1.20');
-    await user.type(screen.getByPlaceholderText('ネットマスク長'), '24');
-    await user.type(screen.getByPlaceholderText('デフォルトゲートウェイ'), '192.168.1.1');
+    await user.type(screen.getByPlaceholderText('IPプール開始 *'), '192.168.1.10');
+    await user.type(screen.getByPlaceholderText('IPプール終了 *'), '192.168.1.20');
+    await user.type(screen.getByPlaceholderText('ネットマスク長 *'), '24');
+    await user.type(screen.getByPlaceholderText('デフォルトゲートウェイ *'), '192.168.1.1');
 
     await user.click(screen.getByRole('button', { name: '作成する' }));
 

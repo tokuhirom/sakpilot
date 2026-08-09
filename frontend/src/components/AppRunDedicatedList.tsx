@@ -110,6 +110,13 @@ const WORKER_SERVICE_CLASS_PATHS = [
 
 const APPRUN_ZONES = ['is1a', 'is1b', 'tk1a', 'tk1b', 'tk1v'];
 
+// クラスタ/アプリ/ASG/LB名の共通パターン(OpenAPI仕様: apprun-dedicated openapi.json)
+const RESOURCE_NAME_PATTERN = '^[a-zA-Z0-9_-]+$';
+// 証明書名のみドットも許可
+const CERTIFICATE_NAME_PATTERN = '^[a-zA-Z0-9_.-]+$';
+const SERVICE_PRINCIPAL_ID_PATTERN = '^[0-9]{12}$';
+const IPV4_PATTERN = '^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$';
+
 type CreateASGInterfaceFormRow = {
   upstream: string;
   connectsToLB: boolean;
@@ -197,7 +204,7 @@ function emptyDeployForm(): DeployForm {
     fixedScale: '1',
     minScale: '1',
     maxScale: '3',
-    scaleInThreshold: '20',
+    scaleInThreshold: '30',
     scaleOutThreshold: '80',
     cmd: '',
     exposedPorts: [{ targetPort: '8080', loadBalancerPort: '', useLetsEncrypt: false, host: '', healthCheckPath: '', healthCheckIntervalSeconds: '', healthCheckTimeoutSeconds: '' }],
@@ -517,63 +524,32 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
     });
   };
 
-  const handleDeploySubmit = async () => {
+  const handleDeploySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!deployForm || view.type !== 'app') return;
 
     const cpuVCPU = parseFloat(deployForm.cpu);
     const memory = parseInt(deployForm.memory, 10);
-    if (!deployForm.image.trim()) {
-      setDeployError('コンテナイメージを入力してください');
-      return;
-    }
-    if (isNaN(cpuVCPU) || isNaN(memory)) {
-      setDeployError('CPU・メモリを正しく入力してください');
-      return;
-    }
     // APIはCPUをミリvCPU単位(1000 = 1vCPU)の整数で受け取る
     const cpu = Math.round(cpuVCPU * 1000);
-    if (deployForm.exposedPorts.some((p) => !p.targetPort)) {
-      setDeployError('公開ポートのターゲットポートを入力してください');
-      return;
-    }
-    if (deployForm.envVars.some((e) => !e.key)) {
-      setDeployError('環境変数のキーを入力してください');
-      return;
-    }
 
-    const exposedPorts: apprun.CreateExposedPortParams[] = [];
-    for (const p of deployForm.exposedPorts) {
+    const exposedPorts: apprun.CreateExposedPortParams[] = deployForm.exposedPorts.map((p) => {
       const targetPort = parseInt(p.targetPort, 10);
-      if (isNaN(targetPort)) {
-        setDeployError('ターゲットポートは数値で入力してください');
-        return;
-      }
-      let loadBalancerPort: number | undefined;
-      if (p.loadBalancerPort) {
-        loadBalancerPort = parseInt(p.loadBalancerPort, 10);
-        if (isNaN(loadBalancerPort)) {
-          setDeployError('LBポートは数値で入力してください');
-          return;
-        }
-      }
+      const loadBalancerPort = p.loadBalancerPort ? parseInt(p.loadBalancerPort, 10) : undefined;
       let healthCheck: apprun.CreateHealthCheckParams | undefined;
       if (p.healthCheckPath) {
         const intervalSeconds = parseInt(p.healthCheckIntervalSeconds || '10', 10);
         const timeoutSeconds = parseInt(p.healthCheckTimeoutSeconds || '5', 10);
-        if (isNaN(intervalSeconds) || isNaN(timeoutSeconds)) {
-          setDeployError('ヘルスチェックの間隔・タイムアウトは数値で入力してください');
-          return;
-        }
         healthCheck = new apprun.CreateHealthCheckParams({ path: p.healthCheckPath, intervalSeconds, timeoutSeconds });
       }
-      exposedPorts.push(new apprun.CreateExposedPortParams({
+      return new apprun.CreateExposedPortParams({
         targetPort,
         loadBalancerPort,
         useLetsEncrypt: p.useLetsEncrypt,
         host: p.host ? p.host.split(',').map((h) => h.trim()).filter(Boolean) : [],
         healthCheck,
-      }));
-    }
+      });
+    });
 
     const envVars: apprun.CreateEnvVarParams[] = deployForm.envVars.map((e) => new apprun.CreateEnvVarParams({
       key: e.key,
@@ -591,25 +567,12 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
       envVars,
     };
     if (deployForm.scalingMode === 'manual') {
-      const fixedScale = parseInt(deployForm.fixedScale, 10);
-      if (isNaN(fixedScale)) {
-        setDeployError('固定スケールを正しく入力してください');
-        return;
-      }
-      params.fixedScale = fixedScale;
+      params.fixedScale = parseInt(deployForm.fixedScale, 10);
     } else {
-      const minScale = parseInt(deployForm.minScale, 10);
-      const maxScale = parseInt(deployForm.maxScale, 10);
-      const scaleInThreshold = parseInt(deployForm.scaleInThreshold, 10);
-      const scaleOutThreshold = parseInt(deployForm.scaleOutThreshold, 10);
-      if ([minScale, maxScale, scaleInThreshold, scaleOutThreshold].some(isNaN)) {
-        setDeployError('スケーリング設定を正しく入力してください');
-        return;
-      }
-      params.minScale = minScale;
-      params.maxScale = maxScale;
-      params.scaleInThreshold = scaleInThreshold;
-      params.scaleOutThreshold = scaleOutThreshold;
+      params.minScale = parseInt(deployForm.minScale, 10);
+      params.maxScale = parseInt(deployForm.maxScale, 10);
+      params.scaleInThreshold = parseInt(deployForm.scaleInThreshold, 10);
+      params.scaleOutThreshold = parseInt(deployForm.scaleOutThreshold, 10);
     }
 
     setDeploying(true);
@@ -635,12 +598,9 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
     setCreateAppError(null);
   };
 
-  const handleCreateAppSubmit = async () => {
+  const handleCreateAppSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (createAppName === null || view.type !== 'cluster') return;
-    if (!createAppName.trim()) {
-      setCreateAppError('アプリ名を入力してください');
-      return;
-    }
 
     setCreatingApp(true);
     setCreateAppError(null);
@@ -687,20 +647,9 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
     setCreateClusterForm({ ...createClusterForm, ports } as CreateClusterForm);
   };
 
-  const handleCreateClusterSubmit = async () => {
+  const handleCreateClusterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!createClusterForm) return;
-    if (!createClusterForm.name.trim()) {
-      setCreateClusterError('クラスタ名を入力してください');
-      return;
-    }
-    if (!createClusterForm.servicePrincipalID.trim()) {
-      setCreateClusterError('サービスプリンシパルIDを入力してください');
-      return;
-    }
-    if (createClusterForm.ports.length === 0 || createClusterForm.ports.some((p) => !p.port.trim())) {
-      setCreateClusterError('待ち受けポートを1つ以上指定してください');
-      return;
-    }
 
     setCreatingCluster(true);
     setCreateClusterError(null);
@@ -768,24 +717,14 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
     setCreateASGForm({ ...createASGForm, interfaces });
   };
 
-  const handleCreateASGSubmit = async () => {
+  const handleCreateASGSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!createASGForm || view.type !== 'cluster') return;
-    if (!createASGForm.name.trim()) {
-      setCreateASGError('ASG名を入力してください');
-      return;
-    }
-    if (createASGForm.nameServers.length === 0 || createASGForm.nameServers.some((ns) => !ns.trim())) {
-      setCreateASGError('ネームサーバーを1つ以上入力してください');
-      return;
-    }
     const minNodes = Number(createASGForm.minNodes);
     const maxNodes = Number(createASGForm.maxNodes);
-    if (!minNodes || !maxNodes || minNodes > maxNodes) {
-      setCreateASGError('最小ノード数は1以上、かつ最大ノード数以下で指定してください');
-      return;
-    }
-    if (createASGForm.interfaces.length === 0 || createASGForm.interfaces.some((iface) => !iface.upstream.trim())) {
-      setCreateASGError('インターフェースの接続先(upstream)を入力してください');
+    // min/maxの大小関係はHTML5のmin/max属性だけでは表現できないクロスフィールドの制約なので引き続きJSでチェックする
+    if (minNodes > maxNodes) {
+      setCreateASGError('最小ノード数は最大ノード数以下で指定してください');
       return;
     }
 
@@ -865,20 +804,9 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
     setCreateLBForm({ ...createLBForm, interfaces });
   };
 
-  const handleCreateLBSubmit = async () => {
+  const handleCreateLBSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!createLBForm || view.type !== 'asg') return;
-    if (!createLBForm.name.trim()) {
-      setCreateLBError('LB名を入力してください');
-      return;
-    }
-    if (createLBForm.nameServers.length === 0 || createLBForm.nameServers.some((ns) => !ns.trim())) {
-      setCreateLBError('ネームサーバーを1つ以上入力してください');
-      return;
-    }
-    if (createLBForm.interfaces.length === 0 || createLBForm.interfaces.some((iface) => !iface.upstream.trim())) {
-      setCreateLBError('インターフェースの接続先(upstream)を入力してください');
-      return;
-    }
 
     setCreatingLB(true);
     setCreateLBError(null);
@@ -924,16 +852,9 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
     setCertificateError(null);
   };
 
-  const handleCertificateSubmit = async () => {
+  const handleCertificateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!certificateForm || view.type !== 'cluster') return;
-    if (!certificateForm.name.trim()) {
-      setCertificateError('証明書名を入力してください');
-      return;
-    }
-    if (!certificateForm.certificatePEM.trim() || !certificateForm.privateKeyPEM.trim()) {
-      setCertificateError('証明書と秘密鍵のPEMを入力してください');
-      return;
-    }
 
     setSavingCertificate(true);
     setCertificateError(null);
@@ -1092,36 +1013,45 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
           padding: '20px', minWidth: '420px', maxWidth: '560px', maxHeight: '85vh', overflowY: 'auto',
         }}>
           <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>クラスタを作成</h3>
+          <form onSubmit={handleCreateClusterSubmit}>
           <div className="form-group">
-            <label>クラスタ名</label>
+            <label>クラスタ名<span className="required-mark">*</span></label>
             <input
               type="text"
               value={createClusterForm.name}
               onChange={(e) => setCreateClusterForm({ ...createClusterForm, name: e.target.value })}
               placeholder="my-cluster"
+              pattern={RESOURCE_NAME_PATTERN}
+              title="半角英数字、アンダースコア、ハイフンのみ使用できます"
+              maxLength={20}
+              required
               autoFocus
             />
           </div>
           <div className="form-group">
-            <label>サービスプリンシパルID</label>
+            <label>サービスプリンシパルID<span className="required-mark">*</span></label>
             <input
               type="text"
               value={createClusterForm.servicePrincipalID}
               onChange={(e) => setCreateClusterForm({ ...createClusterForm, servicePrincipalID: e.target.value })}
               placeholder="123456789012"
+              pattern={SERVICE_PRINCIPAL_ID_PATTERN}
+              title="12桁の数字を入力してください"
+              maxLength={12}
+              required
             />
           </div>
           <div className="form-group">
             <label>Let's Encryptメールアドレス（任意）</label>
             <input
-              type="text"
+              type="email"
               value={createClusterForm.letsEncryptEmail}
               onChange={(e) => setCreateClusterForm({ ...createClusterForm, letsEncryptEmail: e.target.value })}
               placeholder="admin@example.com"
             />
           </div>
           <div className="form-group">
-            <label>待ち受けポート</label>
+            <label>待ち受けポート<span className="required-mark">*</span></label>
             {createClusterForm.ports.map((p, i) => (
               <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
                 <input
@@ -1129,6 +1059,9 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                   value={p.port}
                   onChange={(e) => handleClusterPortChange(i, 'port', e.target.value)}
                   placeholder="443"
+                  min={1}
+                  max={65535}
+                  required
                   style={{ width: '100px' }}
                 />
                 <select
@@ -1140,6 +1073,7 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                   <option value="tcp">tcp</option>
                 </select>
                 <button
+                  type="button"
                   className="btn btn-danger btn-small"
                   onClick={() => handleRemoveClusterPort(i)}
                   disabled={createClusterForm.ports.length <= 1}
@@ -1148,7 +1082,14 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                 </button>
               </div>
             ))}
-            <button className="btn btn-secondary btn-small" onClick={handleAddClusterPort}>+ ポート追加</button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-small"
+              onClick={handleAddClusterPort}
+              disabled={createClusterForm.ports.length >= 5}
+            >
+              + ポート追加
+            </button>
           </div>
           {createClusterError && (
             <div style={{ marginTop: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
@@ -1156,15 +1097,16 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
             </div>
           )}
           <div className="confirm-actions" style={{ marginTop: '1.5rem' }}>
-            <button className="btn btn-secondary" onClick={handleCreateClusterCancel}>キャンセル</button>
+            <button type="button" className="btn btn-secondary" onClick={handleCreateClusterCancel}>キャンセル</button>
             <button
+              type="submit"
               className="btn btn-primary"
-              onClick={handleCreateClusterSubmit}
-              disabled={creatingCluster || !createClusterForm.name.trim() || !createClusterForm.servicePrincipalID.trim()}
+              disabled={creatingCluster}
             >
               {creatingCluster ? '作成中...' : '作成する'}
             </button>
           </div>
+          </form>
         </div>
       </div>
     );
@@ -1183,13 +1125,18 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
           padding: '20px', minWidth: '480px', maxWidth: '640px', maxHeight: '85vh', overflowY: 'auto',
         }}>
           <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>Auto Scaling Groupを作成</h3>
+          <form onSubmit={handleCreateASGSubmit}>
           <div className="form-group">
-            <label>ASG名</label>
+            <label>ASG名<span className="required-mark">*</span></label>
             <input
               type="text"
               value={createASGForm.name}
               onChange={(e) => setCreateASGForm({ ...createASGForm, name: e.target.value })}
               placeholder="my-asg"
+              pattern={RESOURCE_NAME_PATTERN}
+              title="半角英数字、アンダースコア、ハイフンのみ使用できます"
+              maxLength={20}
+              required
               autoFocus
             />
           </div>
@@ -1215,23 +1162,25 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
           </div>
           <div style={{ display: 'flex', gap: '1rem' }}>
             <div className="form-group" style={{ flex: 1 }}>
-              <label>最小ノード数</label>
+              <label>最小ノード数<span className="required-mark">*</span></label>
               <input
                 type="number"
                 value={createASGForm.minNodes}
                 onChange={(e) => setCreateASGForm({ ...createASGForm, minNodes: e.target.value })}
                 min={1}
                 max={10}
+                required
               />
             </div>
             <div className="form-group" style={{ flex: 1 }}>
-              <label>最大ノード数</label>
+              <label>最大ノード数<span className="required-mark">*</span></label>
               <input
                 type="number"
                 value={createASGForm.maxNodes}
                 onChange={(e) => setCreateASGForm({ ...createASGForm, maxNodes: e.target.value })}
                 min={1}
                 max={10}
+                required
               />
             </div>
           </div>
@@ -1243,9 +1192,13 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                   type="text"
                   value={ns}
                   onChange={(e) => handleASGNameServerChange(i, e.target.value)}
-                  placeholder="133.242.0.3"
+                  placeholder="133.242.0.3 *"
+                  pattern={IPV4_PATTERN}
+                  title="IPv4アドレスの形式で入力してください"
+                  required
                 />
                 <button
+                  type="button"
                   className="btn btn-danger btn-small"
                   onClick={() => handleRemoveASGNameServer(i)}
                   disabled={createASGForm.nameServers.length <= 1}
@@ -1255,6 +1208,7 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
               </div>
             ))}
             <button
+              type="button"
               className="btn btn-secondary btn-small"
               onClick={handleAddASGNameServer}
               disabled={createASGForm.nameServers.length >= 3}
@@ -1264,11 +1218,14 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
           </div>
           <div className="form-group">
             <label>ネットワークインターフェース</label>
-            {createASGForm.interfaces.map((iface, i) => (
+            {createASGForm.interfaces.map((iface, i) => {
+              const isShared = iface.upstream.trim() === 'shared';
+              return (
               <div key={i} style={{ border: '1px solid #333', borderRadius: '6px', padding: '0.75rem', marginBottom: '0.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.85rem', color: '#999' }}>eth{i}</span>
                   <button
+                    type="button"
                     className="btn btn-danger btn-small"
                     onClick={() => handleRemoveASGInterface(i)}
                     disabled={createASGForm.interfaces.length <= 1}
@@ -1281,7 +1238,8 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                     type="text"
                     value={iface.upstream}
                     onChange={(e) => handleASGInterfaceChange(i, 'upstream', e.target.value)}
-                    placeholder="shared またはスイッチID"
+                    placeholder="shared またはスイッチID *"
+                    required
                     style={{ flex: 1 }}
                   />
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
@@ -1293,34 +1251,46 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                     LBに接続
                   </label>
                 </div>
-                {iface.upstream.trim() !== 'shared' && (
+                {!isShared && (
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
                     <input
                       type="text"
                       value={iface.ipPoolStart}
                       onChange={(e) => handleASGInterfaceChange(i, 'ipPoolStart', e.target.value)}
-                      placeholder="IPプール開始"
+                      placeholder="IPプール開始 *"
+                      pattern={IPV4_PATTERN}
+                      title="IPv4アドレスの形式で入力してください"
+                      required
                       style={{ width: '130px' }}
                     />
                     <input
                       type="text"
                       value={iface.ipPoolEnd}
                       onChange={(e) => handleASGInterfaceChange(i, 'ipPoolEnd', e.target.value)}
-                      placeholder="IPプール終了"
+                      placeholder="IPプール終了 *"
+                      pattern={IPV4_PATTERN}
+                      title="IPv4アドレスの形式で入力してください"
+                      required
                       style={{ width: '130px' }}
                     />
                     <input
                       type="number"
                       value={iface.netmaskLen}
                       onChange={(e) => handleASGInterfaceChange(i, 'netmaskLen', e.target.value)}
-                      placeholder="ネットマスク長"
+                      placeholder="ネットマスク長 *"
+                      min={8}
+                      max={29}
+                      required
                       style={{ width: '110px' }}
                     />
                     <input
                       type="text"
                       value={iface.defaultGateway}
                       onChange={(e) => handleASGInterfaceChange(i, 'defaultGateway', e.target.value)}
-                      placeholder="デフォルトゲートウェイ"
+                      placeholder="デフォルトゲートウェイ *"
+                      pattern={IPV4_PATTERN}
+                      title="IPv4アドレスの形式で入力してください"
+                      required
                       style={{ width: '150px' }}
                     />
                     <input
@@ -1333,8 +1303,10 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
             <button
+              type="button"
               className="btn btn-secondary btn-small"
               onClick={handleAddASGInterface}
               disabled={createASGForm.interfaces.length >= 5}
@@ -1348,15 +1320,16 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
             </div>
           )}
           <div className="confirm-actions" style={{ marginTop: '1.5rem' }}>
-            <button className="btn btn-secondary" onClick={handleCreateASGCancel}>キャンセル</button>
+            <button type="button" className="btn btn-secondary" onClick={handleCreateASGCancel}>キャンセル</button>
             <button
+              type="submit"
               className="btn btn-primary"
-              onClick={handleCreateASGSubmit}
-              disabled={creatingASG || !createASGForm.name.trim()}
+              disabled={creatingASG}
             >
               {creatingASG ? '作成中...' : '作成する'}
             </button>
           </div>
+          </form>
         </div>
       </div>
     );
@@ -1377,33 +1350,40 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
           <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>
             {certificateForm.editingId ? '証明書を更新' : '証明書を作成'}
           </h3>
+          <form onSubmit={handleCertificateSubmit}>
           <div className="form-group">
-            <label>証明書名</label>
+            <label>証明書名<span className="required-mark">*</span></label>
             <input
               type="text"
               value={certificateForm.name}
               onChange={(e) => setCertificateForm({ ...certificateForm, name: e.target.value })}
               placeholder="my-cert"
+              pattern={CERTIFICATE_NAME_PATTERN}
+              title="半角英数字、アンダースコア、ハイフン、ドットのみ使用できます"
+              maxLength={20}
+              required
               autoFocus
             />
           </div>
           <div className="form-group">
-            <label>証明書(PEM)</label>
+            <label>証明書(PEM)<span className="required-mark">*</span></label>
             <textarea
               value={certificateForm.certificatePEM}
               onChange={(e) => setCertificateForm({ ...certificateForm, certificatePEM: e.target.value })}
               placeholder="-----BEGIN CERTIFICATE-----"
               rows={5}
+              required
               style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.8rem' }}
             />
           </div>
           <div className="form-group">
-            <label>秘密鍵(PEM)</label>
+            <label>秘密鍵(PEM)<span className="required-mark">*</span></label>
             <textarea
               value={certificateForm.privateKeyPEM}
               onChange={(e) => setCertificateForm({ ...certificateForm, privateKeyPEM: e.target.value })}
               placeholder="-----BEGIN PRIVATE KEY-----"
               rows={5}
+              required
               style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.8rem' }}
             />
           </div>
@@ -1428,15 +1408,16 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
             </div>
           )}
           <div className="confirm-actions" style={{ marginTop: '1.5rem' }}>
-            <button className="btn btn-secondary" onClick={handleCertificateCancel}>キャンセル</button>
+            <button type="button" className="btn btn-secondary" onClick={handleCertificateCancel}>キャンセル</button>
             <button
+              type="submit"
               className="btn btn-primary"
-              onClick={handleCertificateSubmit}
-              disabled={savingCertificate || !certificateForm.name.trim() || !certificateForm.certificatePEM.trim() || !certificateForm.privateKeyPEM.trim()}
+              disabled={savingCertificate}
             >
               {savingCertificate ? '保存中...' : certificateForm.editingId ? '更新する' : '作成する'}
             </button>
           </div>
+          </form>
         </div>
       </div>
     );
@@ -1455,13 +1436,18 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
           padding: '20px', minWidth: '480px', maxWidth: '640px', maxHeight: '85vh', overflowY: 'auto',
         }}>
           <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>ロードバランサーを作成</h3>
+          <form onSubmit={handleCreateLBSubmit}>
           <div className="form-group">
-            <label>LB名</label>
+            <label>LB名<span className="required-mark">*</span></label>
             <input
               type="text"
               value={createLBForm.name}
               onChange={(e) => setCreateLBForm({ ...createLBForm, name: e.target.value })}
               placeholder="my-lb"
+              pattern={RESOURCE_NAME_PATTERN}
+              title="半角英数字、アンダースコア、ハイフンのみ使用できます"
+              maxLength={20}
+              required
               autoFocus
             />
           </div>
@@ -1482,9 +1468,13 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                   type="text"
                   value={ns}
                   onChange={(e) => handleLBNameServerChange(i, e.target.value)}
-                  placeholder="133.242.0.3"
+                  placeholder="133.242.0.3 *"
+                  pattern={IPV4_PATTERN}
+                  title="IPv4アドレスの形式で入力してください"
+                  required
                 />
                 <button
+                  type="button"
                   className="btn btn-danger btn-small"
                   onClick={() => handleRemoveLBNameServer(i)}
                   disabled={createLBForm.nameServers.length <= 1}
@@ -1494,6 +1484,7 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
               </div>
             ))}
             <button
+              type="button"
               className="btn btn-secondary btn-small"
               onClick={handleAddLBNameServer}
               disabled={createLBForm.nameServers.length >= 3}
@@ -1503,11 +1494,14 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
           </div>
           <div className="form-group">
             <label>ネットワークインターフェース</label>
-            {createLBForm.interfaces.map((iface, i) => (
+            {createLBForm.interfaces.map((iface, i) => {
+              const isShared = iface.upstream.trim() === 'shared';
+              return (
               <div key={i} style={{ border: '1px solid #333', borderRadius: '6px', padding: '0.75rem', marginBottom: '0.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.85rem', color: '#999' }}>eth{i}</span>
                   <button
+                    type="button"
                     className="btn btn-danger btn-small"
                     onClick={() => handleRemoveLBInterface(i)}
                     disabled={createLBForm.interfaces.length <= 1}
@@ -1519,51 +1513,70 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                   type="text"
                   value={iface.upstream}
                   onChange={(e) => handleLBInterfaceChange(i, 'upstream', e.target.value)}
-                  placeholder="shared またはスイッチID"
+                  placeholder="shared またはスイッチID *"
+                  required
                   style={{ marginTop: '0.5rem', width: '100%' }}
                 />
-                {iface.upstream.trim() !== 'shared' && (
+                {!isShared && (
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
                     <input
                       type="text"
                       value={iface.ipPoolStart}
                       onChange={(e) => handleLBInterfaceChange(i, 'ipPoolStart', e.target.value)}
-                      placeholder="IPプール開始"
+                      placeholder="IPプール開始 *"
+                      pattern={IPV4_PATTERN}
+                      title="IPv4アドレスの形式で入力してください"
+                      required
                       style={{ width: '130px' }}
                     />
                     <input
                       type="text"
                       value={iface.ipPoolEnd}
                       onChange={(e) => handleLBInterfaceChange(i, 'ipPoolEnd', e.target.value)}
-                      placeholder="IPプール終了"
+                      placeholder="IPプール終了 *"
+                      pattern={IPV4_PATTERN}
+                      title="IPv4アドレスの形式で入力してください"
+                      required
                       style={{ width: '130px' }}
                     />
                     <input
                       type="number"
                       value={iface.netmaskLen}
                       onChange={(e) => handleLBInterfaceChange(i, 'netmaskLen', e.target.value)}
-                      placeholder="ネットマスク長"
+                      placeholder="ネットマスク長 *"
+                      min={8}
+                      max={29}
+                      required
                       style={{ width: '110px' }}
                     />
                     <input
                       type="text"
                       value={iface.defaultGateway}
                       onChange={(e) => handleLBInterfaceChange(i, 'defaultGateway', e.target.value)}
-                      placeholder="デフォルトゲートウェイ"
+                      placeholder="デフォルトゲートウェイ *"
+                      pattern={IPV4_PATTERN}
+                      title="IPv4アドレスの形式で入力してください"
+                      required
                       style={{ width: '150px' }}
                     />
                     <input
                       type="text"
                       value={iface.vip}
                       onChange={(e) => handleLBInterfaceChange(i, 'vip', e.target.value)}
-                      placeholder="VIP"
+                      placeholder="VIP *"
+                      pattern={IPV4_PATTERN}
+                      title="IPv4アドレスの形式で入力してください"
+                      required
                       style={{ width: '130px' }}
                     />
                     <input
                       type="number"
                       value={iface.virtualRouterID}
                       onChange={(e) => handleLBInterfaceChange(i, 'virtualRouterID', e.target.value)}
-                      placeholder="仮想ルータID"
+                      placeholder="仮想ルータID *"
+                      min={1}
+                      max={255}
+                      required
                       style={{ width: '110px' }}
                     />
                     <input
@@ -1576,8 +1589,10 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
             <button
+              type="button"
               className="btn btn-secondary btn-small"
               onClick={handleAddLBInterface}
               disabled={createLBForm.interfaces.length >= 5}
@@ -1591,15 +1606,16 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
             </div>
           )}
           <div className="confirm-actions" style={{ marginTop: '1.5rem' }}>
-            <button className="btn btn-secondary" onClick={handleCreateLBCancel}>キャンセル</button>
+            <button type="button" className="btn btn-secondary" onClick={handleCreateLBCancel}>キャンセル</button>
             <button
+              type="submit"
               className="btn btn-primary"
-              onClick={handleCreateLBSubmit}
-              disabled={creatingLB || !createLBForm.name.trim()}
+              disabled={creatingLB}
             >
               {creatingLB ? '作成中...' : '作成する'}
             </button>
           </div>
+          </form>
         </div>
       </div>
     );
@@ -1618,13 +1634,18 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
           padding: '20px', minWidth: '360px',
         }}>
           <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>アプリケーションを作成</h3>
+          <form onSubmit={handleCreateAppSubmit}>
           <div className="form-group">
-            <label>アプリ名</label>
+            <label>アプリ名<span className="required-mark">*</span></label>
             <input
               type="text"
               value={createAppName}
               onChange={(e) => setCreateAppName(e.target.value)}
               placeholder="my-app"
+              pattern={RESOURCE_NAME_PATTERN}
+              title="半角英数字、アンダースコア、ハイフンのみ使用できます"
+              maxLength={20}
+              required
               autoFocus
             />
           </div>
@@ -1634,15 +1655,16 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
             </div>
           )}
           <div className="confirm-actions" style={{ marginTop: '1.5rem' }}>
-            <button className="btn btn-secondary" onClick={handleCreateAppCancel}>キャンセル</button>
+            <button type="button" className="btn btn-secondary" onClick={handleCreateAppCancel}>キャンセル</button>
             <button
+              type="submit"
               className="btn btn-primary"
-              onClick={handleCreateAppSubmit}
-              disabled={creatingApp || !createAppName.trim()}
+              disabled={creatingApp}
             >
               {creatingApp ? '作成中...' : '作成する'}
             </button>
           </div>
+          </form>
         </div>
       </div>
     );
@@ -1661,14 +1683,17 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
           padding: '20px', minWidth: '480px', maxWidth: '640px', maxHeight: '85vh', overflowY: 'auto',
         }}>
           <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>新しいバージョンをデプロイ</h3>
+          <form onSubmit={handleDeploySubmit}>
 
           <div className="form-group">
-            <label>コンテナイメージ</label>
+            <label>コンテナイメージ<span className="required-mark">*</span></label>
             <input
               type="text"
               value={deployForm.image}
               onChange={(e) => setDeployForm({ ...deployForm, image: e.target.value })}
               placeholder="docker.io/library/nginx:latest"
+              maxLength={512}
+              required
               autoFocus
             />
           </div>
@@ -1684,19 +1709,27 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
             <div className="form-group">
-              <label>CPU (vCPU)</label>
+              <label>CPU (vCPU)<span className="required-mark">*</span></label>
               <input
-                type="text"
+                type="number"
                 value={deployForm.cpu}
                 onChange={(e) => setDeployForm({ ...deployForm, cpu: e.target.value })}
+                min={0.1}
+                max={64}
+                step={0.1}
+                required
               />
             </div>
             <div className="form-group">
-              <label>メモリ (MB)</label>
+              <label>メモリ (MB)<span className="required-mark">*</span></label>
               <input
-                type="text"
+                type="number"
                 value={deployForm.memory}
                 onChange={(e) => setDeployForm({ ...deployForm, memory: e.target.value })}
+                min={128}
+                max={131072}
+                step={1}
+                required
               />
             </div>
           </div>
@@ -1714,45 +1747,65 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
 
           {deployForm.scalingMode === 'manual' ? (
             <div className="form-group">
-              <label>固定スケール（インスタンス数）</label>
+              <label>固定スケール（インスタンス数）<span className="required-mark">*</span></label>
               <input
-                type="text"
+                type="number"
                 value={deployForm.fixedScale}
                 onChange={(e) => setDeployForm({ ...deployForm, fixedScale: e.target.value })}
+                min={1}
+                max={50}
+                step={1}
+                required
               />
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
               <div className="form-group">
-                <label>最小スケール</label>
+                <label>最小スケール<span className="required-mark">*</span></label>
                 <input
-                  type="text"
+                  type="number"
                   value={deployForm.minScale}
                   onChange={(e) => setDeployForm({ ...deployForm, minScale: e.target.value })}
+                  min={1}
+                  max={50}
+                  step={1}
+                  required
                 />
               </div>
               <div className="form-group">
-                <label>最大スケール</label>
+                <label>最大スケール<span className="required-mark">*</span></label>
                 <input
-                  type="text"
+                  type="number"
                   value={deployForm.maxScale}
                   onChange={(e) => setDeployForm({ ...deployForm, maxScale: e.target.value })}
+                  min={1}
+                  max={50}
+                  step={1}
+                  required
                 />
               </div>
               <div className="form-group">
-                <label>スケールイン閾値 (%)</label>
+                <label>スケールイン閾値 (%)<span className="required-mark">*</span></label>
                 <input
-                  type="text"
+                  type="number"
                   value={deployForm.scaleInThreshold}
                   onChange={(e) => setDeployForm({ ...deployForm, scaleInThreshold: e.target.value })}
+                  min={30}
+                  max={70}
+                  step={1}
+                  required
                 />
               </div>
               <div className="form-group">
-                <label>スケールアウト閾値 (%)</label>
+                <label>スケールアウト閾値 (%)<span className="required-mark">*</span></label>
                 <input
-                  type="text"
+                  type="number"
                   value={deployForm.scaleOutThreshold}
                   onChange={(e) => setDeployForm({ ...deployForm, scaleOutThreshold: e.target.value })}
+                  min={50}
+                  max={99}
+                  step={1}
+                  required
                 />
               </div>
             </div>
@@ -1761,7 +1814,14 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
           <div style={{ marginTop: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <label style={{ margin: 0 }}>公開ポート</label>
-              <button className="btn btn-secondary btn-small" onClick={handleExposedPortAdd}>+ ポート追加</button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-small"
+                onClick={handleExposedPortAdd}
+                disabled={deployForm.exposedPorts.length >= 5}
+              >
+                + ポート追加
+              </button>
             </div>
             {deployForm.exposedPorts.length === 0 ? (
               <div style={{ color: '#888', fontSize: '0.85rem', marginTop: '0.5rem' }}>公開ポートなし</div>
@@ -1770,16 +1830,21 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                 <div key={index} style={{ border: '1px solid #333', borderRadius: '6px', padding: '0.75rem', marginTop: '0.5rem' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
                     <input
-                      type="text"
+                      type="number"
                       value={p.targetPort}
                       onChange={(e) => handleExposedPortChange(index, 'targetPort', e.target.value)}
-                      placeholder="ターゲットポート"
+                      placeholder="ターゲットポート *"
+                      min={1}
+                      max={65535}
+                      required
                     />
                     <input
-                      type="text"
+                      type="number"
                       value={p.loadBalancerPort}
                       onChange={(e) => handleExposedPortChange(index, 'loadBalancerPort', e.target.value)}
                       placeholder="LBポート（任意）"
+                      min={1}
+                      max={65535}
                     />
                   </div>
                   <input
@@ -1803,22 +1868,26 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                       value={p.healthCheckPath}
                       onChange={(e) => handleExposedPortChange(index, 'healthCheckPath', e.target.value)}
                       placeholder="ヘルスチェックパス（任意）"
+                      maxLength={200}
                     />
                     <input
-                      type="text"
+                      type="number"
                       value={p.healthCheckIntervalSeconds}
                       onChange={(e) => handleExposedPortChange(index, 'healthCheckIntervalSeconds', e.target.value)}
                       placeholder="間隔(秒)"
+                      min={3}
+                      max={60}
                     />
                     <input
-                      type="text"
+                      type="number"
                       value={p.healthCheckTimeoutSeconds}
                       onChange={(e) => handleExposedPortChange(index, 'healthCheckTimeoutSeconds', e.target.value)}
                       placeholder="タイムアウト(秒)"
+                      max={60}
                     />
                   </div>
                   <div style={{ textAlign: 'right', marginTop: '0.5rem' }}>
-                    <button className="btn btn-danger btn-small" onClick={() => handleExposedPortRemove(index)}>削除</button>
+                    <button type="button" className="btn btn-danger btn-small" onClick={() => handleExposedPortRemove(index)}>削除</button>
                   </div>
                 </div>
               ))
@@ -1828,7 +1897,14 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
           <div style={{ marginTop: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <label style={{ margin: 0 }}>環境変数</label>
-              <button className="btn btn-secondary btn-small" onClick={handleEnvVarAdd}>+ 環境変数追加</button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-small"
+                onClick={handleEnvVarAdd}
+                disabled={deployForm.envVars.length >= 50}
+              >
+                + 環境変数追加
+              </button>
             </div>
             {deployForm.envVars.length === 0 ? (
               <div style={{ color: '#888', fontSize: '0.85rem', marginTop: '0.5rem' }}>環境変数なし</div>
@@ -1839,7 +1915,9 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                     type="text"
                     value={e.key}
                     onChange={(ev) => handleEnvVarChange(index, 'key', ev.target.value)}
-                    placeholder="KEY"
+                    placeholder="KEY *"
+                    maxLength={255}
+                    required
                     style={{ flex: 1 }}
                   />
                   <input
@@ -1847,6 +1925,7 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                     value={e.value}
                     onChange={(ev) => handleEnvVarChange(index, 'value', ev.target.value)}
                     placeholder="値"
+                    maxLength={4096}
                     style={{ flex: 1 }}
                   />
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', whiteSpace: 'nowrap' }}>
@@ -1857,7 +1936,7 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
                     />
                     secret
                   </label>
-                  <button className="btn btn-danger btn-small" onClick={() => handleEnvVarRemove(index)}>削除</button>
+                  <button type="button" className="btn btn-danger btn-small" onClick={() => handleEnvVarRemove(index)}>削除</button>
                 </div>
               ))
             )}
@@ -1869,15 +1948,16 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
             </div>
           )}
           <div className="confirm-actions" style={{ marginTop: '1.5rem' }}>
-            <button className="btn btn-secondary" onClick={handleDeployCancel}>キャンセル</button>
+            <button type="button" className="btn btn-secondary" onClick={handleDeployCancel}>キャンセル</button>
             <button
+              type="submit"
               className="btn btn-primary"
-              onClick={handleDeploySubmit}
-              disabled={deploying || !deployForm.image.trim()}
+              disabled={deploying}
             >
               {deploying ? 'デプロイ中...' : 'デプロイする'}
             </button>
           </div>
+          </form>
         </div>
       </div>
     );
