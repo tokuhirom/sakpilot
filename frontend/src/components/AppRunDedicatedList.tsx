@@ -37,7 +37,6 @@ type View =
   | { type: 'clusters' }
   | { type: 'cluster'; clusterId: string; clusterName: string }
   | { type: 'asg'; clusterId: string; clusterName: string; asgId: string; asgName: string }
-  | { type: 'lb'; clusterId: string; clusterName: string; asgId: string; asgName: string; lbId: string; lbName: string }
   | { type: 'app'; clusterId: string; clusterName: string; appId: string; appName: string; activeVersion: number }
   | { type: 'version'; clusterId: string; clusterName: string; appId: string; appName: string; activeVersion: number; version: number };
 
@@ -221,7 +220,6 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
   const [certificates, setCertificates] = useState<apprun.CertificateInfo[]>([]);
   const [lbs, setLbs] = useState<apprun.LBInfo[]>([]);
   const [workerNodes, setWorkerNodes] = useState<apprun.WorkerNodeInfo[]>([]);
-  const [lbNodes, setLbNodes] = useState<apprun.LBNodeInfo[]>([]);
   const [lbNodesMap, setLbNodesMap] = useState<Record<string, apprun.LBNodeInfo[]>>({});
   const [versionDetail, setVersionDetail] = useState<apprun.AppVersionDetailInfo | null>(null);
   const [loading, setLoading] = useState(false);
@@ -326,19 +324,6 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
       setLbNodesMap(nodesMap);
     } catch (err) {
       console.error('[AppRunList] loadASGDetails error:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [profile]);
-
-  const loadLBNodes = useCallback(async (clusterId: string, asgId: string, lbId: string) => {
-    if (!profile) return;
-    setLoading(true);
-    try {
-      const list = await GetAppRunLBNodes(profile, clusterId, asgId, lbId);
-      setLbNodes(list || []);
-    } catch (err) {
-      console.error('[AppRunList] loadLBNodes error:', err);
     } finally {
       setLoading(false);
     }
@@ -902,12 +887,10 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
       loadAppVersions(view.appId);
     } else if (view.type === 'asg') {
       loadASGDetails(view.clusterId, view.asgId);
-    } else if (view.type === 'lb') {
-      loadLBNodes(view.clusterId, view.asgId, view.lbId);
     } else if (view.type === 'version') {
       loadVersionDetail(view.appId, view.version);
     }
-  }, [view, loadClusters, loadClusterDetails, loadAppVersions, loadASGDetails, loadLBNodes, loadVersionDetail]);
+  }, [view, loadClusters, loadClusterDetails, loadAppVersions, loadASGDetails, loadVersionDetail]);
 
   useGlobalReload(handleGlobalReload);
 
@@ -923,7 +906,7 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
       onClick: view.type !== 'clusters' ? () => setView({ type: 'clusters' }) : undefined,
     });
 
-    if (view.type === 'cluster' || view.type === 'asg' || view.type === 'lb' || view.type === 'app' || view.type === 'version') {
+    if (view.type === 'cluster' || view.type === 'asg' || view.type === 'app' || view.type === 'version') {
       const clusterName = view.clusterName;
       const clusterId = view.clusterId;
       items.push({
@@ -932,21 +915,11 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
       });
     }
 
-    if (view.type === 'asg' || view.type === 'lb') {
+    if (view.type === 'asg') {
       items.push({
         label: view.asgName,
-        onClick: view.type !== 'asg' ? () => setView({
-          type: 'asg',
-          clusterId: view.clusterId,
-          clusterName: view.clusterName,
-          asgId: view.asgId,
-          asgName: view.asgName
-        }) : undefined,
+        onClick: undefined,
       });
-    }
-
-    if (view.type === 'lb') {
-      items.push({ label: view.lbName });
     }
 
     if (view.type === 'app' || view.type === 'version') {
@@ -2409,55 +2382,6 @@ export function AppRunDedicatedList({ profile }: AppRunDedicatedListProps) {
         )}
         {renderCreateLBModal()}
         {renderConfirmDialog()}
-      </>
-    );
-  }
-
-  // LB詳細（LBノード一覧）
-  if (view.type === 'lb') {
-    return (
-      <>
-        <div className="header">
-          <h2>AppRun専有型</h2>
-        </div>
-        {renderBreadcrumb()}
-
-        <h3 style={{ marginTop: '1rem', color: '#00adb5' }}>ロードバランサーノード</h3>
-        {lbNodes.length === 0 ? (
-          <div className="empty-state">LBノードがありません</div>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>状態</th>
-                <th>IPアドレス</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lbNodes.map((node) => {
-                const isHealthy = ['running', 'healthy'].includes(node.status.toLowerCase());
-                return (
-                  <tr key={node.id}>
-                    <td>{node.id.substring(0, 8)}...</td>
-                    <td>
-                      <span className={`status ${isHealthy ? 'up' : 'down'}`}>
-                        {node.status}
-                      </span>
-                    </td>
-                    <td>
-                      {node.interfaces?.map((iface, idx) => (
-                        <div key={idx}>
-                          eth{iface.index}: {iface.addresses?.join(', ') || '-'}
-                        </div>
-                      ))}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
       </>
     );
   }

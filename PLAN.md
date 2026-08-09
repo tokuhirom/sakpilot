@@ -164,7 +164,7 @@
 - SDK比較で残る不足: なし（Read/Write一式が揃った。AccessLevelは`readonly`/`none`のみが有効値でSDK上deprecated扱いのため`readwrite`は選択不可）
 
 ### AppRun（専有型 / 共用型）
-- テスト: `AppRunSharedList.test.tsx` あり（ユーザー未設定時の案内・一覧表示・エラー表示・詳細遷移とコンポーネント/トラフィック/バージョン履歴表示・戻る操作をカバー）。`AppRunDedicatedList.test.tsx` も整備済み（cluster→app→version遷移とアクティブバージョン設定・ASGのLB/ワーカーノード表示・非アクティブ化/アクティブ化の成功・失敗フロー・Cluster/Application/ASG/LoadBalancerの削除確認〜成功・失敗フローをカバー。`lb` view単体はUI上到達経路が無く未カバー）
+- テスト: `AppRunSharedList.test.tsx` あり（ユーザー未設定時の案内・一覧表示・エラー表示・詳細遷移とコンポーネント/トラフィック/バージョン履歴表示・戻る操作をカバー）。`AppRunDedicatedList.test.tsx` も整備済み（cluster→app→version遷移とアクティブバージョン設定・ASGのLB/ワーカーノード表示・非アクティブ化/アクティブ化の成功・失敗フロー・Cluster/Application/ASG/LoadBalancerの削除確認〜成功・失敗フローをカバー）
 - バックエンド: `internal/apprun/`（専有型）・`internal/apprunshared/`（共用型）に分離実装。List/Read/`SetActiveVersion`/`ClearActiveVersion`/**CreateApplicationVersion**に加え、専有型はCluster/Application/ASG/LoadBalancerの**Delete**を実装
 - ✅ **対応済み（2026-08-08 追加セッション6）**: AppRun専有型の削除機能一式を実装。`internal/apprun/service.go`に`DeleteCluster`/`DeleteApplication`/`DeleteAutoScalingGroup`/`DeleteLoadBalancer`を追加し、`app.go`に対応するRPCを公開。`AppRunDedicatedList.tsx`のクラスタ一覧・アプリ一覧・ASG一覧・LB一覧の各行に削除ボタンと確認ダイアログを追加
 - ✅ **対応済み（2026-08-08 追加セッション11、Tier1 #6）**: AppRun専有型のVersion Create（デプロイ）を実装。`internal/apprun/service.go`にSDKの`version.CreateParams`を薄くラップした`CreateAppVersionParams`（CPU/Memory/ScalingMode+FixedScale or MinScale・MaxScale・閾値/Image/Cmd/RegistryUsername・Password/ExposedPorts(TargetPort/LoadBalancerPort/UseLetsEncrypt/Host/HealthCheck)/EnvVars(Key/Value/Secret)）と`CreateApplicationVersion`を追加、`app.go`に`CreateAppRunApplicationVersion`のRPCを公開。`AppRunDedicatedList.tsx`のバージョン一覧に「+ デプロイ」ボタンとフルデプロイフォーム（イメージ/コマンド/CPU・メモリ/スケーリングモード切替/公開ポート・ヘルスチェックの追加編集削除/環境変数の追加編集削除）を実装。`internal/apprun/service_test.go`に`sakumock/apprundedicated`のテストサーバーを使った`TestService_CreateApplicationVersion`を追加（実際のAPIリクエスト/レスポンスを検証）
@@ -179,7 +179,7 @@
 - SDK比較で残る不足:
   - 専有型: なし（Read/Write一式が揃った。**これでTier2 #14は全項目完了**）
   - 共用型: なし（Read/Write一式が揃った）
-- **TODO**: `lb` view（ロードバランサー単体詳細）への遷移導線が無い点は意図的な未実装か実装漏れか要確認
+- ✅ **対応済み（2026-08-09、TODO調査）**: `lb` view（ロードバランサー単体詳細への遷移）は、ASG詳細画面（`view.type === 'asg'`）が各LBの名前・プラン・ノード一覧（ID/状態/IP）をLB単位でインライン表示済みであり、`lb` viewは完全に重複した内容を表示するだけの到達不能コードだったと判明。ASG詳細への統合時に削除し忘れたデッドコードと判断し、`AppRunDedicatedList.tsx`から`View`型の`lb`バリアント・`loadLBNodes`・`lbNodes`state・対応するrender/breadcrumb/globalReload分岐を削除した（削除確認用の`DeleteTarget`の`kind: 'lb'`は別物でLB削除機能として現役のため維持）
 
 ### Bill（請求）
 - テスト: `BillList.test.tsx` 追加済み（一覧表示・年/月絞り込み・詳細表示・CSVダウンロード成功/失敗/キャンセル、2026-08-09）
