@@ -197,11 +197,11 @@ describe('DatabaseList', () => {
     expect(GetSwitches).toHaveBeenCalledWith('default', 'is1a');
 
     await user.type(screen.getByPlaceholderText('my-database'), 'new-db');
-    await user.selectOptions(screen.getByLabelText('接続先スイッチ'), 'sw-1');
+    await user.selectOptions(screen.getByLabelText('接続先スイッチ', { exact: false }), 'sw-1');
     await user.type(screen.getByPlaceholderText('192.168.0.11'), '192.168.0.11');
     await user.type(screen.getByPlaceholderText('192.168.0.1'), '192.168.0.1');
-    await user.type(screen.getByLabelText('管理ユーザー名'), 'dbadmin');
-    await user.type(screen.getByLabelText('管理ユーザーパスワード'), 'TestPassword01');
+    await user.type(screen.getByLabelText('管理ユーザー名', { exact: false }), 'dbadmin');
+    await user.type(screen.getByLabelText('管理ユーザーパスワード', { exact: false }), 'TestPassword01');
 
     await user.click(screen.getByRole('button', { name: '作成する' }));
 
@@ -218,5 +218,31 @@ describe('DatabaseList', () => {
     await waitFor(() => {
       expect(GetDatabases).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it('blocks submission via native required validation when no switch is selected', async () => {
+    vi.mocked(GetDatabases).mockResolvedValueOnce([]);
+    vi.mocked(GetSwitches).mockResolvedValueOnce([
+      new sakura.SwitchInfo({ id: 'sw-1', name: 'my-switch' }),
+    ]);
+    const user = userEvent.setup();
+
+    render(<DatabaseList profile="default" zone="is1a" zones={zones} onZoneChange={() => {}} onSelectDatabase={() => {}} />);
+    await screen.findByText('データベースがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ データベース作成' }));
+    expect(await screen.findByText('データベース作成')).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('my-database'), 'new-db');
+    await user.type(screen.getByPlaceholderText('192.168.0.11'), '192.168.0.11');
+    await user.type(screen.getByPlaceholderText('192.168.0.1'), '192.168.0.1');
+    await user.type(screen.getByLabelText('管理ユーザー名', { exact: false }), 'dbadmin');
+    await user.type(screen.getByLabelText('管理ユーザーパスワード', { exact: false }), 'TestPassword01');
+
+    const switchSelect = screen.getByLabelText('接続先スイッチ', { exact: false }) as HTMLSelectElement;
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    expect(switchSelect.validity.valid).toBe(false);
+    expect(CreateDatabase).not.toHaveBeenCalled();
   });
 });

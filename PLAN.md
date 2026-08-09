@@ -307,9 +307,15 @@
     - 各フォームの入力欄に「何を入力すればよいか」が分かるplaceholderやヘルプテキストが無い箇所を洗い出し追加する（現状はラベルのみで単位や制約の説明が無い項目が多い）
     - 見直し対象はTier1〜Tier3で実装した機能に限らず、既存の全Create/Updateフォームが対象。範囲が広いため、着手時にリソース単位で区切って段階的にPRを分けるか、ユーザーと相談してスコープを決めること
     - フォームごとに前提（SDK側のバリデーション仕様、必須/任意の別）を確認した上で実装すること。SDK側で判明した制約や挙動の不明点は[[sakpilot-upstream-issues-doc]]の運用に従いdocs/upstream-issues.mdに記録する
-    - **進捗**: DNS/GSLB/ProxyLB/SimpleMonitor/Switch/Disk対応済み。残り: Database/NFS/EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/AppRun専有・共用型/Server等
+    - **進捗**: DNS/GSLB/ProxyLB/SimpleMonitor/Switch/Disk/Database対応済み。残り: NFS/EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/AppRun専有・共用型/Server等
 
-### ✅ 完了（2026-08-09 追加セッション36、Tier5 #23 一部・Disk）
+### ✅ 完了（2026-08-09 追加セッション37、Tier5 #23 一部・Database）
+- Diskに続き、データベース(`DatabaseList.tsx`の作成モーダル、`DatabaseDetail.tsx`の基本情報インライン編集・稼働設定編集モーダル・DBパラメータ追加フォーム)を`docs/ui-implementation-patterns.md`のルールに合わせて改修。4フォームとも`<form onSubmit>`+`<button type="submit">`に変換した。
+- 制約値は`internal/sakura/database.go`(SDK呼び出しのみでstructタグ上の範囲情報なし)では判別できなかったため、`terraform-provider-sakura`の`docs/resources/database.md`で確認: `name`必須、`description`長さ上限512、`username`(管理ユーザー名)必須・長さ`3-20`、`network_interface`配下の`ip_address`/`gateway`/`vswitch_id`はいずれも必須(従来`デフォルトルート`は未入力でも送信できる作りだったが、ドキュメント上gatewayは必須のため`required`化)、`netmask`(ネットワークマスク長)は範囲`8-29`必須、`port`(ポート番号)は範囲`1024-65535`(既存フォームは常にRDBMS種別ごとのデフォルトポートを埋めて送信する設計のため`required`とした)。
+- DBパラメータ追加フォーム(項目選択+値入力)も同ルールに合わせて`<form onSubmit>`化し、両フィールドに`required`を付与(値入力欄はラベル無しのためplaceholder末尾に`*`)。
+- 作成モーダルの送信ボタンに残っていた`disabled={... || !createForm.name || !createForm.switchId || !createForm.ipAddress || !createForm.defaultUser || !createForm.userPassword}`というrequiredと重複するJSバリデーション、DBパラメータ追加ボタンの`!newParamName`チェックを削除(rule 4)。
+- `DatabaseList.test.tsx`に接続先スイッチ未選択時の送信ブロックを`select.validity.valid`で検証するテストを追加。既存テストは`required-mark`付与でラベルのアクセシブルネームが変化したため`getByLabelText`呼び出しに`{ exact: false }`を付与、DBパラメータのplaceholder変更(`値`→`値 *`)に伴い該当テストも更新。
+- `tsc --noEmit`/`npm run test`(266件全パス)/`npm run build`+`npx playwright test e2e/database.spec.ts`(7件全パス)/`golangci-lint run`(0 issues、Go側の変更なし)を確認してから作成。
 - DNS/GSLB/ProxyLB/SimpleMonitor/Switchに続き、ディスク(`DiskList.tsx`の作成モーダル、`DiskDetail.tsx`の基本情報インライン編集・接続先サーバー変更)を`docs/ui-implementation-patterns.md`のルールに合わせて改修。3フォームとも`<form onSubmit>`+`<button type="submit">`に変換した。
 - 制約値は`internal/sakura/disk.go`(SDK呼び出しのみでstructタグ上の範囲情報なし)では判別できなかったため、`terraform-provider-sakura`の`docs/resources/disk.md`で確認: `name`必須、`description`は長さ上限512。サイズは`helper/query`にNFSのような`FindDiskPlanID`が無く自由入力(`SizeMB`をそのまま渡す)のため、既知の最小プランサイズである20GBのみ`min`として設定し、根拠のない上限は付けなかった。
 - 接続先サーバー変更フォームは「接続する」「接続を解除する」の2アクションが同一カード内に共存するため、`<select required>`を含む`<form onSubmit={handleConnect}>`でラップしつつ、`接続を解除する`ボタンのみ`type="button"`のまま独立した`onClick`ハンドラを維持する設計とした(解除には選択必須のバリデーションが不要なため)。
