@@ -307,7 +307,7 @@
     - 各フォームの入力欄に「何を入力すればよいか」が分かるplaceholderやヘルプテキストが無い箇所を洗い出し追加する（現状はラベルのみで単位や制約の説明が無い項目が多い）
     - 見直し対象はTier1〜Tier3で実装した機能に限らず、既存の全Create/Updateフォームが対象。範囲が広いため、着手時にリソース単位で区切って段階的にPRを分けるか、ユーザーと相談してスコープを決めること
     - フォームごとに前提（SDK側のバリデーション仕様、必須/任意の別）を確認した上で実装すること。SDK側で判明した制約や挙動の不明点は[[sakpilot-upstream-issues-doc]]の運用に従いdocs/upstream-issues.mdに記録する
-    - **進捗**: DNS/GSLB/ProxyLB/SimpleMonitor/Switch/Disk/Database/NFS/EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage対応済み。残り: Monitoring Suite/AppRun専有・共用型/Server等
+    - **進捗**: DNS/GSLB/ProxyLB/SimpleMonitor/Switch/Disk/Database/NFS/EnhancedDB/ContainerRegistry/KMS/Archive/ObjectStorage/Monitoring Suite/Server対応済み。残り: AppRun専有・共用型のみ
 
 ### ✅ 完了（2026-08-09 追加セッション43、Tier5 #23 一部・ObjectStorage）
 - Archiveに続き、オブジェクトストレージ(`ObjectStorageList.tsx`のバケット作成モーダル・シークレットキー保存フォーム、`BucketSettingsModal.tsx`の暗号化有効化/レプリケーション有効化フォーム、`ObjectStoragePermissions.tsx`のパーミッション作成/編集モーダル)を`docs/ui-implementation-patterns.md`のルールに合わせて改修。計5フォームを`<form onSubmit>`+`<button type="submit">`に変換した。
