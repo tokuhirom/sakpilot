@@ -22,8 +22,9 @@
 | データベース | [database.md](database.md) |
 | エンハンスドDB | [enhanceddb.md](enhanceddb.md) |
 | NFS | [nfs.md](nfs.md) |
+| コンテナレジストリ | [containerregistry.md](containerregistry.md) |
 
-上記以外のリソース(コンテナレジストリ・KMS・AppRun専有型/共用型 等)は未整備です。撮影スクリプト・configはリソース非依存の共通基盤として作成済みのため、これを流用して順次追加予定です。
+上記以外のリソース(KMS・AppRun専有型/共用型 等)は未整備です。撮影スクリプト・configはリソース非依存の共通基盤として作成済みのため、これを流用して順次追加予定です。
 
 ### 今回未対応のリソース
 
