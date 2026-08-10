@@ -89,6 +89,15 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - SakPilotでの回避: `internal/eventbus/service.go`の`ListTriggers`/`ListSchedules`/`ListProcessConfigurations`で、レスポンスの各アイテムを`item.Settings.IsTriggerSettings()`等のSettings型判定でクライアント側フィルタしてから返すようにした。
 - 報告時の提案: `injectFilterMiddleware`が生成するミドルウェアが実際に`saclient`のミドルウェアチェーンに乗っているか(`WithMiddleware`オプションの適用順序、複数回の`DupWith`呼び出しでの上書き等)を調査してほしい。可能であれば`client_test.go`に「`RawQuery`が期待通り設定されているか」を検証するテストケースを追加すると再発を防げる。
 
+### 9. `sacloud-sdk-go/api/apigw` の `Service.ConnectTimeout`/`WriteTimeout`/`ReadTimeout` のGodocが「秒数」だが、実際の単位はミリ秒
+
+- パッケージ: `github.com/sacloud/sacloud-sdk-go/api/apigw`
+- ファイル: `apis/v1/oas_schemas_gen.go`(`ServiceDetailRequest`/`ServiceDetail`/`ServiceDetailResponse`の`ConnectTimeout`/`WriteTimeout`/`ReadTimeout`フィールド、コメントはそれぞれ「接続タイムアウト秒数」「書き込みタイムアウト秒数」「読み込みタイムアウト秒数」)
+- 内容: `sakumock/apigw`の`applyServiceDefaults`(`store_memory.go`)は未指定時のデフォルト値として`ConnectTimeout`/`WriteTimeout`/`ReadTimeout`にいずれも`60000`を設定している。仮に単位が秒であれば60000秒(≒16.6時間)というタイムアウト値は非現実的であり、Kong等の一般的なAPIゲートウェイの慣習(ミリ秒単位、デフォルト60000ms=60秒)から見てもミリ秒単位と考えるのが自然。実際にsakumockに`ConnectTimeout: 5`(秒のつもりで指定)を送信してもバリデーションエラーにならず素通りする(=5ミリ秒として保存される)ため、Godocの「秒数」を信じて実装すると気づかないまま極端に短いタイムアウトを設定してしまう。
+- 実害: SakPilotの初期実装では`internal/apigw/service.go`のフィールド名・フロントエンドのフォームラベルをGodoc通り「秒」として実装してしまい、E2Eマニュアル用スクリーンショット撮影時にサービス詳細画面の表示値(デフォルト適用後の`60000s`)を見て初めて単位の誤りに気づいた。`docs/manual/apigw.md`用のスクリーンショットで実際の表示を確認する工程が無ければ本番相当のデータでも気づきにくいバグだった。
+- 対応: SakPilot側はUIラベルを「(ミリ秒)」に修正し、フォームのデフォルト値もミリ秒基準(5000/60000/60000)に変更して回避した。SDK・sakumock側の修正は行っていない。
+- 提案: Godocのコメントを「ミリ秒」に修正するか、可能であればOpenAPI定義(`openapi/openapi.json`)のフィールド説明・`example`値を実態に合わせてほしい。
+
 ## その他メモ(バグではないが気づいた点)
 
 - `fake.InitDataStore()` / `fake.SwitchFactoryFuncToFake()` はいずれも `sync.Once` でプロセス内1回しか実行されない。同一プロセス内で複数のGoテストが同じデータストアを共有することになるため、テスト間で状態がリークする(SakPilotの `internal/sakura/disk_test.go` ではID/存在ベースの検証に倒すことで対応した)。ドキュメントに明記しておいてもらえると、初見でハマる人が減りそう。

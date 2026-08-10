@@ -30,6 +30,7 @@
 | IAM | [iam.md](iam.md) |
 | ワークフロー | [workflows.md](workflows.md) |
 | イベントバス | [eventbus.md](eventbus.md) |
+| APIゲートウェイ | [apigw.md](apigw.md) |
 | AppRun専有型 | [apprun-dedicated.md](apprun-dedicated.md) |
 | AppRun共用型 | [apprun-shared.md](apprun-shared.md) |
 
