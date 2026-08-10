@@ -48,6 +48,8 @@ import { EnhancedDBDetail } from './components/EnhancedDBDetail';
 import { KMSList } from './components/KMSList';
 import { KMSDetail } from './components/KMSDetail';
 import { ProxyLBList } from './components/ProxyLBList';
+import { SecretManagerList } from './components/SecretManagerList';
+import { SecretManagerDetail } from './components/SecretManagerDetail';
 
 // ナビゲーション項目の定義
 const zoneResources = [
@@ -70,6 +72,7 @@ const globalResources = [
   { path: 'object-storage', label: 'オブジェクトストレージ' },
   { path: 'enhanced-db', label: 'エンハンスドDB' },
   { path: 'kms', label: 'KMS' },
+  { path: 'secretmanager', label: 'シークレットマネージャー' },
   { path: 'apprun-shared', label: 'AppRun共用型' },
   { path: 'apprun-dedicated', label: 'AppRun専有型' },
 ];
@@ -204,6 +207,8 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
               <Route path="enhanced-db/:id" element={<EnhancedDBBreadcrumb profile={profile} />} />
               <Route path="kms" element={<span className="breadcrumb-item active">KMS</span>} />
               <Route path="kms/:id" element={<KMSBreadcrumb profile={profile} />} />
+              <Route path="secretmanager" element={<span className="breadcrumb-item active">シークレットマネージャー</span>} />
+              <Route path="secretmanager/:id" element={<SecretManagerBreadcrumb profile={profile} />} />
               <Route path="apprun-dedicated" element={<span className="breadcrumb-item active">AppRun 専有型</span>} />
               <Route path="apprun-shared" element={<span className="breadcrumb-item active">AppRun 共用型</span>} />
               <Route path="bills" element={<span className="breadcrumb-item active">請求</span>} />
@@ -307,6 +312,10 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
           <Route path="kms" element={<KMSListWrapper profile={profile} />} />
           <Route path="kms/:id" element={
             <KMSDetailWrapper profile={profile} />
+          } />
+          <Route path="secretmanager" element={<SecretManagerListWrapper profile={profile} />} />
+          <Route path="secretmanager/:id" element={
+            <SecretManagerDetailWrapper profile={profile} />
           } />
           <Route path="apprun-dedicated" element={<AppRunDedicatedList profile={profile} />} />
           <Route path="apprun-shared" element={<AppRunSharedList profile={profile} />} />
@@ -549,6 +558,22 @@ function KMSDetailWrapper({ profile }: { profile: string }) {
   return <KMSDetail profile={profile} keyId={id} />;
 }
 
+function SecretManagerListWrapper({ profile }: { profile: string }) {
+  const navigate = useNavigate();
+  return (
+    <SecretManagerList
+      profile={profile}
+      onSelectVault={(id) => navigate(`/${profile}/secretmanager/${id}`)}
+    />
+  );
+}
+
+function SecretManagerDetailWrapper({ profile }: { profile: string }) {
+  const { id } = useParams<{ id: string }>();
+  if (!id) return null;
+  return <SecretManagerDetail profile={profile} vaultId={id} />;
+}
+
 // Breadcrumb components
 function DatabaseBreadcrumb({ profile }: { profile: string }) {
   const navigate = useNavigate();
@@ -673,6 +698,19 @@ function KMSBreadcrumb({ profile }: { profile: string }) {
     <>
       <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/${profile}/kms`)}>
         KMS
+      </span>
+      <span className="breadcrumb-separator">/</span>
+      <span className="breadcrumb-item active">詳細</span>
+    </>
+  );
+}
+
+function SecretManagerBreadcrumb({ profile }: { profile: string }) {
+  const navigate = useNavigate();
+  return (
+    <>
+      <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/${profile}/secretmanager`)}>
+        シークレットマネージャー
       </span>
       <span className="breadcrumb-separator">/</span>
       <span className="breadcrumb-item active">詳細</span>

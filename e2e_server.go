@@ -41,11 +41,14 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	sdkkms "github.com/sacloud/sacloud-sdk-go/api/kms"
 	kmsv1 "github.com/sacloud/sacloud-sdk-go/api/kms/apis/v1"
+	sdksecretmanager "github.com/sacloud/sacloud-sdk-go/api/secretmanager"
+	secretmanagerv1 "github.com/sacloud/sacloud-sdk-go/api/secretmanager/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 	mockapprunshared "github.com/sacloud/sakumock/apprun"
 	mockapprundedicated "github.com/sacloud/sakumock/apprundedicated"
 	mockkms "github.com/sacloud/sakumock/kms"
 	mockobjectstorage "github.com/sacloud/sakumock/objectstorage"
+	mocksecretmanager "github.com/sacloud/sakumock/secretmanager"
 	"github.com/zalando/go-keyring"
 )
 
@@ -113,8 +116,17 @@ func runE2EServer(addr, dist string) error {
 	if err := os.Setenv("SAKURA_ENDPOINTS_KMS", kmsSrv.TestURL()); err != nil {
 		return err
 	}
-	if err := seedKMSKeys(); err != nil {
+	kmsKeyIDs, err := seedKMSKeys()
+	if err != nil {
 		return fmt.Errorf("failed to seed KMS keys: %w", err)
+	}
+
+	secretManagerSrv := mocksecretmanager.NewTestServer(mocksecretmanager.Config{})
+	if err := os.Setenv("SAKURA_ENDPOINTS_SECRETMANAGER", secretManagerSrv.TestURL()); err != nil {
+		return err
+	}
+	if err := seedSecretManagerVaults(kmsKeyIDs[0]); err != nil {
+		return fmt.Errorf("failed to seed secret manager vaults: %w", err)
 	}
 
 	// ObjectStorageのS3互換データプレーン(オブジェクト一覧・ダウンロード)はsakumock側で
@@ -789,7 +801,42 @@ func seedEnhancedDBs() error {
 }
 
 // seedKMSKeys はsakumockのKMSサーバーにE2Eシナリオ用のキーを投入する。
-func seedKMSKeys() error {
+func seedKMSKeys() ([]string, error) {
+	var sc saclient.Client
+	env := append(os.Environ(),
+		"SAKURA_ACCESS_TOKEN="+e2eAccessToken,
+		"SAKURA_ACCESS_TOKEN_SECRET="+e2eSecretToken,
+	)
+	if err := sc.SetEnviron(env); err != nil {
+		return nil, err
+	}
+	client, err := sdkkms.NewClient(&sc)
+	if err != nil {
+		return nil, err
+	}
+	keyOp := sdkkms.NewKeyOp(client)
+
+	var ids []string
+	for _, name := range []string{"e2e-key-1", "e2e-doomed-key", "e2e-editable-key"} {
+		created, err := keyOp.Create(context.Background(), kmsv1.CreateKey{
+			Name:      name,
+			KeyOrigin: kmsv1.KeyOriginEnumGenerated,
+			Tags:      []string{"env:e2e"},
+		})
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, created.ID)
+	}
+	return ids, nil
+}
+
+// seedSecretManagerVaults はsakumockのSecret Managerサーバーに
+// E2Eシナリオ用のVaultとSecretを投入する。KmsKeyIDにはseedKMSKeysが
+// 作成したKMSキーの1つを流用する(secretmanager自体はKmsKeyIDの実在性を
+// 検証しないが、フロントのVault作成フォームがGetKMSKeysの結果と同じ値を
+// 使う想定と揃えておく)。
+func seedSecretManagerVaults(kmsKeyID string) error {
 	var sc saclient.Client
 	env := append(os.Environ(),
 		"SAKURA_ACCESS_TOKEN="+e2eAccessToken,
@@ -798,17 +845,34 @@ func seedKMSKeys() error {
 	if err := sc.SetEnviron(env); err != nil {
 		return err
 	}
-	client, err := sdkkms.NewClient(&sc)
+	client, err := sdksecretmanager.NewClient(&sc)
 	if err != nil {
 		return err
 	}
-	keyOp := sdkkms.NewKeyOp(client)
+	vaultOp := sdksecretmanager.NewVaultOp(client)
 
-	for _, name := range []string{"e2e-key-1", "e2e-doomed-key", "e2e-editable-key"} {
-		if _, err := keyOp.Create(context.Background(), kmsv1.CreateKey{
-			Name:      name,
-			KeyOrigin: kmsv1.KeyOriginEnumGenerated,
-			Tags:      []string{"env:e2e"},
+	vault, err := vaultOp.Create(context.Background(), secretmanagerv1.CreateVault{
+		Name:        "e2e-vault-1",
+		Description: secretmanagerv1.NewOptString("E2E: シークレット表示/追加シナリオ用"),
+		KmsKeyID:    kmsKeyID,
+		Tags:        []string{"env:e2e"},
+	})
+	if err != nil {
+		return err
+	}
+	secretOp := sdksecretmanager.NewSecretOp(client, vault.ID)
+	if _, err := secretOp.Create(context.Background(), secretmanagerv1.CreateSecret{
+		Name:  "e2e-secret",
+		Value: "e2e-secret-value",
+	}); err != nil {
+		return err
+	}
+
+	for _, name := range []string{"e2e-doomed-vault", "e2e-editable-vault"} {
+		if _, err := vaultOp.Create(context.Background(), secretmanagerv1.CreateVault{
+			Name:     name,
+			KmsKeyID: kmsKeyID,
+			Tags:     []string{"env:e2e"},
 		}); err != nil {
 			return err
 		}
