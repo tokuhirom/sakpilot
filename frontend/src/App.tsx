@@ -50,6 +50,8 @@ import { KMSDetail } from './components/KMSDetail';
 import { ProxyLBList } from './components/ProxyLBList';
 import { SecretManagerList } from './components/SecretManagerList';
 import { SecretManagerDetail } from './components/SecretManagerDetail';
+import { SimpleMQList } from './components/SimpleMQList';
+import { SimpleMQDetail } from './components/SimpleMQDetail';
 import { IAMList } from './components/IAMList';
 import { IAMServicePrincipalDetail } from './components/IAMServicePrincipalDetail';
 
@@ -75,6 +77,7 @@ const globalResources = [
   { path: 'enhanced-db', label: 'エンハンスドDB' },
   { path: 'kms', label: 'KMS' },
   { path: 'secretmanager', label: 'シークレットマネージャー' },
+  { path: 'simplemq', label: 'SimpleMQ' },
   { path: 'iam', label: 'IAM' },
   { path: 'apprun-shared', label: 'AppRun共用型' },
   { path: 'apprun-dedicated', label: 'AppRun専有型' },
@@ -212,6 +215,8 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
               <Route path="kms/:id" element={<KMSBreadcrumb profile={profile} />} />
               <Route path="secretmanager" element={<span className="breadcrumb-item active">シークレットマネージャー</span>} />
               <Route path="secretmanager/:id" element={<SecretManagerBreadcrumb profile={profile} />} />
+              <Route path="simplemq" element={<span className="breadcrumb-item active">SimpleMQ</span>} />
+              <Route path="simplemq/:id" element={<SimpleMQBreadcrumb profile={profile} />} />
               <Route path="iam" element={<span className="breadcrumb-item active">IAM</span>} />
               <Route path="iam/serviceprincipals/:id" element={<IAMServicePrincipalBreadcrumb profile={profile} />} />
               <Route path="apprun-dedicated" element={<span className="breadcrumb-item active">AppRun 専有型</span>} />
@@ -321,6 +326,10 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
           <Route path="secretmanager" element={<SecretManagerListWrapper profile={profile} />} />
           <Route path="secretmanager/:id" element={
             <SecretManagerDetailWrapper profile={profile} />
+          } />
+          <Route path="simplemq" element={<SimpleMQListWrapper profile={profile} />} />
+          <Route path="simplemq/:id" element={
+            <SimpleMQDetailWrapper profile={profile} />
           } />
           <Route path="iam" element={<IAMListWrapper profile={profile} />} />
           <Route path="iam/serviceprincipals/:id" element={
@@ -599,6 +608,22 @@ function SecretManagerDetailWrapper({ profile }: { profile: string }) {
   return <SecretManagerDetail profile={profile} vaultId={id} />;
 }
 
+function SimpleMQListWrapper({ profile }: { profile: string }) {
+  const navigate = useNavigate();
+  return (
+    <SimpleMQList
+      profile={profile}
+      onSelectQueue={(id) => navigate(`/${profile}/simplemq/${id}`)}
+    />
+  );
+}
+
+function SimpleMQDetailWrapper({ profile }: { profile: string }) {
+  const { id } = useParams<{ id: string }>();
+  if (!id) return null;
+  return <SimpleMQDetail profile={profile} queueId={id} />;
+}
+
 // Breadcrumb components
 function DatabaseBreadcrumb({ profile }: { profile: string }) {
   const navigate = useNavigate();
@@ -749,6 +774,19 @@ function SecretManagerBreadcrumb({ profile }: { profile: string }) {
     <>
       <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/${profile}/secretmanager`)}>
         シークレットマネージャー
+      </span>
+      <span className="breadcrumb-separator">/</span>
+      <span className="breadcrumb-item active">詳細</span>
+    </>
+  );
+}
+
+function SimpleMQBreadcrumb({ profile }: { profile: string }) {
+  const navigate = useNavigate();
+  return (
+    <>
+      <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/${profile}/simplemq`)}>
+        SimpleMQ
       </span>
       <span className="breadcrumb-separator">/</span>
       <span className="breadcrumb-item active">詳細</span>

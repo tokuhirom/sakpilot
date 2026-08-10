@@ -11,6 +11,7 @@ import (
 	"sakpilot/internal/kms"
 	"sakpilot/internal/sakura"
 	"sakpilot/internal/secretmanager"
+	"sakpilot/internal/simplemq"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -2313,4 +2314,101 @@ func (a *App) GetProxyLBMonitorConnection(profileName, proxyLBId string, start, 
 	}
 	service := sakura.NewProxyLBService(client)
 	return service.MonitorConnection(a.ctx, proxyLBId, start, end)
+}
+
+// SimpleMQ
+func (a *App) GetSimpleMQQueues(profileName string) ([]simplemq.QueueInfo, error) {
+	service, err := simplemq.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListQueues(a.ctx)
+}
+
+func (a *App) GetSimpleMQQueue(profileName, queueId string) (*simplemq.QueueInfo, error) {
+	service, err := simplemq.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetQueue(a.ctx, queueId)
+}
+
+func (a *App) CreateSimpleMQQueue(profileName, name, description string, tags []string) (*simplemq.QueueInfo, error) {
+	service, err := simplemq.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateQueue(a.ctx, name, description, tags)
+}
+
+func (a *App) ConfigSimpleMQQueue(profileName, queueId, description string, visibilityTimeoutSeconds, expireSeconds int, tags []string) (*simplemq.QueueInfo, error) {
+	service, err := simplemq.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ConfigQueue(a.ctx, queueId, description, visibilityTimeoutSeconds, expireSeconds, tags)
+}
+
+func (a *App) DeleteSimpleMQQueue(profileName, queueId string) error {
+	service, err := simplemq.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteQueue(a.ctx, queueId)
+}
+
+func (a *App) GetSimpleMQMessageCount(profileName, queueId string) (int, error) {
+	service, err := simplemq.NewService(profileName)
+	if err != nil {
+		return 0, err
+	}
+	return service.CountMessages(a.ctx, queueId)
+}
+
+func (a *App) RotateSimpleMQQueueAPIKey(profileName, queueId string) (string, error) {
+	service, err := simplemq.NewService(profileName)
+	if err != nil {
+		return "", err
+	}
+	return service.RotateAPIKey(a.ctx, queueId)
+}
+
+func (a *App) ClearSimpleMQMessages(profileName, queueId string) error {
+	service, err := simplemq.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.ClearMessages(a.ctx, queueId)
+}
+
+func (a *App) SendSimpleMQMessage(profileName, queueName, apiKey, content string) (*simplemq.MessageInfo, error) {
+	service, err := simplemq.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.SendMessage(a.ctx, queueName, apiKey, content)
+}
+
+func (a *App) ReceiveSimpleMQMessages(profileName, queueName, apiKey string) ([]simplemq.MessageInfo, error) {
+	service, err := simplemq.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ReceiveMessages(a.ctx, queueName, apiKey)
+}
+
+func (a *App) ExtendSimpleMQMessageTimeout(profileName, queueName, apiKey, messageId string) (*simplemq.MessageInfo, error) {
+	service, err := simplemq.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ExtendMessageTimeout(a.ctx, queueName, apiKey, messageId)
+}
+
+func (a *App) DeleteSimpleMQMessage(profileName, queueName, apiKey, messageId string) error {
+	service, err := simplemq.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteMessage(a.ctx, queueName, apiKey, messageId)
 }
