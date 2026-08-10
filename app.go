@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"sakpilot/internal/apigw"
 	"sakpilot/internal/apprun"
 	"sakpilot/internal/apprunshared"
 	"sakpilot/internal/eventbus"
@@ -2985,4 +2986,294 @@ func (a *App) DeleteEventBusProcessConfiguration(profileName, id string) error {
 		return err
 	}
 	return service.DeleteProcessConfiguration(a.ctx, id)
+}
+
+// Apigw
+
+func (a *App) GetApigwGroups(profileName string) ([]apigw.GroupInfo, error) {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListGroups(a.ctx)
+}
+
+func (a *App) GetApigwGroup(profileName, id string) (*apigw.GroupInfo, error) {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetGroup(a.ctx, id)
+}
+
+func (a *App) CreateApigwGroup(profileName, name string, tags []string) (*apigw.GroupInfo, error) {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateGroup(a.ctx, name, tags)
+}
+
+func (a *App) UpdateApigwGroup(profileName, id, name string, tags []string) error {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.UpdateGroup(a.ctx, id, name, tags)
+}
+
+func (a *App) DeleteApigwGroup(profileName, id string) error {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteGroup(a.ctx, id)
+}
+
+func (a *App) GetApigwCertificates(profileName string) ([]apigw.CertificateInfo, error) {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListCertificates(a.ctx)
+}
+
+func (a *App) CreateApigwCertificate(profileName, name, rsaCert, rsaKey, ecdsaCert, ecdsaKey string) (*apigw.CertificateInfo, error) {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateCertificate(a.ctx, name, rsaCert, rsaKey, ecdsaCert, ecdsaKey)
+}
+
+func (a *App) UpdateApigwCertificate(profileName, id, name, rsaCert, rsaKey, ecdsaCert, ecdsaKey string) error {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.UpdateCertificate(a.ctx, id, name, rsaCert, rsaKey, ecdsaCert, ecdsaKey)
+}
+
+func (a *App) DeleteApigwCertificate(profileName, id string) error {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteCertificate(a.ctx, id)
+}
+
+func (a *App) GetApigwDomains(profileName string) ([]apigw.DomainInfo, error) {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListDomains(a.ctx)
+}
+
+func (a *App) CreateApigwDomain(profileName, domainName, certificateId string) (*apigw.DomainInfo, error) {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateDomain(a.ctx, domainName, certificateId)
+}
+
+func (a *App) UpdateApigwDomain(profileName, id, certificateId string) error {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.UpdateDomain(a.ctx, id, certificateId)
+}
+
+func (a *App) DeleteApigwDomain(profileName, id string) error {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteDomain(a.ctx, id)
+}
+
+func (a *App) GetApigwPlans(profileName string) ([]apigw.PlanInfo, error) {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListPlans(a.ctx)
+}
+
+func (a *App) GetApigwSubscriptions(profileName string) ([]apigw.SubscriptionInfo, error) {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListSubscriptions(a.ctx)
+}
+
+func (a *App) GetApigwSubscription(profileName, id string) (*apigw.SubscriptionInfo, error) {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetSubscription(a.ctx, id)
+}
+
+func (a *App) CreateApigwSubscription(profileName, planId, name string) (*apigw.SubscriptionInfo, error) {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateSubscription(a.ctx, planId, name)
+}
+
+func (a *App) UpdateApigwSubscription(profileName, id, name string) error {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.UpdateSubscription(a.ctx, id, name)
+}
+
+func (a *App) DeleteApigwSubscription(profileName, id string) error {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteSubscription(a.ctx, id)
+}
+
+func (a *App) GetApigwServices(profileName string) ([]apigw.ServiceInfo, error) {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListServices(a.ctx)
+}
+
+func (a *App) GetApigwService(profileName, id string) (*apigw.ServiceInfo, error) {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetService(a.ctx, id)
+}
+
+func (a *App) CreateApigwService(profileName, name, protocol, host, path string, port, retries, connectTimeout, writeTimeout, readTimeout int, subscriptionId string) (*apigw.ServiceInfo, error) {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateService(a.ctx, name, protocol, host, path, port, retries, connectTimeout, writeTimeout, readTimeout, subscriptionId)
+}
+
+func (a *App) UpdateApigwService(profileName, id, name, protocol, host, path string, port, retries, connectTimeout, writeTimeout, readTimeout int) error {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.UpdateService(a.ctx, id, name, protocol, host, path, port, retries, connectTimeout, writeTimeout, readTimeout)
+}
+
+func (a *App) DeleteApigwService(profileName, id string) error {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteService(a.ctx, id)
+}
+
+func (a *App) GetApigwRoutes(profileName, serviceId string) ([]apigw.RouteInfo, error) {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListRoutes(a.ctx, serviceId)
+}
+
+func (a *App) GetApigwRoute(profileName, serviceId, id string) (*apigw.RouteInfo, error) {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetRoute(a.ctx, serviceId, id)
+}
+
+func (a *App) CreateApigwRoute(profileName, serviceId, name, protocols, path string, hosts, methods []string, httpsRedirectStatusCode, regexPriority int, stripPath, preserveHost bool, tags []string) (*apigw.RouteInfo, error) {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateRoute(a.ctx, serviceId, name, protocols, path, hosts, methods, httpsRedirectStatusCode, regexPriority, stripPath, preserveHost, tags)
+}
+
+func (a *App) UpdateApigwRoute(profileName, serviceId, id, name, protocols, path string, hosts, methods []string, httpsRedirectStatusCode, regexPriority int, stripPath, preserveHost bool, tags []string) error {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.UpdateRoute(a.ctx, serviceId, id, name, protocols, path, hosts, methods, httpsRedirectStatusCode, regexPriority, stripPath, preserveHost, tags)
+}
+
+func (a *App) DeleteApigwRoute(profileName, serviceId, id string) error {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteRoute(a.ctx, serviceId, id)
+}
+
+func (a *App) GetApigwUsers(profileName string) ([]apigw.UserInfo, error) {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListUsers(a.ctx)
+}
+
+func (a *App) GetApigwUser(profileName, id string) (*apigw.UserInfo, error) {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetUser(a.ctx, id)
+}
+
+func (a *App) CreateApigwUser(profileName, name, customId string, tags []string) (*apigw.UserInfo, error) {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateUser(a.ctx, name, customId, tags)
+}
+
+func (a *App) UpdateApigwUser(profileName, id, name, customId string, tags []string) error {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.UpdateUser(a.ctx, id, name, customId, tags)
+}
+
+func (a *App) DeleteApigwUser(profileName, id string) error {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteUser(a.ctx, id)
+}
+
+func (a *App) GetApigwUserGroups(profileName, userId string) ([]apigw.UserGroupAssignmentInfo, error) {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListUserGroups(a.ctx, userId)
+}
+
+func (a *App) SetApigwUserGroup(profileName, userId, groupId string, isAssigned bool) error {
+	service, err := apigw.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.SetUserGroup(a.ctx, userId, groupId, isAssigned)
 }

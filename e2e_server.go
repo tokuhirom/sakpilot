@@ -17,10 +17,16 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
+	"encoding/pem"
 	"flag"
 	"fmt"
 	"log"
+	"math/big"
 	"net/http"
 	"os"
 	"os/signal"
@@ -31,11 +37,14 @@ import (
 	"syscall"
 	"time"
 
+	sdkapigw "github.com/sacloud/sacloud-sdk-go/api/apigw"
+	apigwv1 "github.com/sacloud/sacloud-sdk-go/api/apigw/apis/v1"
 	sdkapprunshared "github.com/sacloud/sacloud-sdk-go/api/apprun"
 	sdkapprundedicated "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated"
 	dedicatedv1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/version"
 	sharedv1 "github.com/sacloud/sacloud-sdk-go/api/apprun/apis/v1"
+	"github.com/google/uuid"
 	sdkeventbus "github.com/sacloud/sacloud-sdk-go/api/eventbus"
 	eventbusv1 "github.com/sacloud/sacloud-sdk-go/api/eventbus/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
@@ -58,6 +67,7 @@ import (
 	sdkworkflows "github.com/sacloud/sacloud-sdk-go/api/workflows"
 	workflowsv1 "github.com/sacloud/sacloud-sdk-go/api/workflows/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
+	mockapigw "github.com/sacloud/sakumock/apigw"
 	mockapprunshared "github.com/sacloud/sakumock/apprun"
 	mockapprundedicated "github.com/sacloud/sakumock/apprundedicated"
 	mockeventbus "github.com/sacloud/sakumock/eventbus"
@@ -189,6 +199,14 @@ func runE2EServer(addr, dist string) error {
 	}
 	if err := seedEventBus(); err != nil {
 		return fmt.Errorf("failed to seed EventBus resources: %w", err)
+	}
+
+	apigwSrv := mockapigw.NewTestServer(mockapigw.Config{})
+	if err := os.Setenv("SAKURA_ENDPOINTS_APIGW", apigwSrv.TestURL()); err != nil {
+		return err
+	}
+	if err := seedApigw(); err != nil {
+		return fmt.Errorf("failed to seed Apigw resources: %w", err)
 	}
 
 	// ObjectStorageのS3互換データプレーン(オブジェクト一覧・ダウンロード)はsakumock側で
@@ -1276,6 +1294,224 @@ func seedEventBus() error {
 		return err
 	}
 	if err := newSchedule("e2e-eventbus-schedule-editable"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// generateE2ECertPEM はE2E用の自己署名証明書と秘密鍵のPEMを生成する。
+// sakumockはCertificate作成時にtls.X509KeyPairで実際に検証するため、PEMの形式だけでなく
+// 有効な証明書/秘密鍵ペアである必要がある。
+func generateE2ECertPEM() (certPEM, keyPEM string, err error) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return "", "", err
+	}
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "e2e.example.com"},
+		NotBefore:    time.Unix(0, 0),
+		NotAfter:     time.Unix(0, 0).AddDate(100, 0, 0),
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	if err != nil {
+		return "", "", err
+	}
+	cert := string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
+	priv := string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}))
+	return cert, priv, nil
+}
+
+// seedApigw はsakumockのApigwサーバーにE2Eシナリオ用の証明書・ドメイン・グループ・ユーザー・
+// サブスクリプション・サービス・ルートを投入する。ServiceはCreate時に未使用のSubscriptionへの
+// 紐づけが必須(sakumockの制約、1 Subscription : 1 Service)のため、表示/削除/編集シナリオ用の
+// Serviceごとに専用のSubscriptionを用意する。
+func seedApigw() error {
+	var sc saclient.Client
+	env := append(os.Environ(),
+		"SAKURA_ACCESS_TOKEN="+e2eAccessToken,
+		"SAKURA_ACCESS_TOKEN_SECRET="+e2eSecretToken,
+	)
+	if err := sc.SetEnviron(env); err != nil {
+		return err
+	}
+	client, err := sdkapigw.NewClient(&sc)
+	if err != nil {
+		return err
+	}
+	ctx := context.Background()
+
+	certPEM, keyPEM, err := generateE2ECertPEM()
+	if err != nil {
+		return err
+	}
+
+	certificateOp := sdkapigw.NewCertificateOp(client)
+	newCertificate := func(name string) (*apigwv1.Certificate, error) {
+		return certificateOp.Create(ctx, &apigwv1.Certificate{
+			Name: apigwv1.NewOptName(apigwv1.Name(name)),
+			Rsa: apigwv1.NewOptCertificateDetails(apigwv1.CertificateDetails{
+				Cert: apigwv1.NewOptString(certPEM),
+				Key:  apigwv1.NewOptString(keyPEM),
+			}),
+		})
+	}
+	cert1, err := newCertificate("e2e-apigw-cert-1")
+	if err != nil {
+		return err
+	}
+	if _, err := newCertificate("e2e-apigw-cert-doomed"); err != nil {
+		return err
+	}
+	if _, err := newCertificate("e2e-apigw-cert-editable"); err != nil {
+		return err
+	}
+
+	domainOp := sdkapigw.NewDomainOp(client)
+	newDomain := func(domainName string, certificateID apigwv1.OptUUID) error {
+		_, err := domainOp.Create(ctx, &apigwv1.Domain{DomainName: domainName, CertificateId: certificateID})
+		return err
+	}
+	if err := newDomain("e2e-apigw-domain-1.example.com", apigwv1.NewOptUUID(cert1.ID.Value)); err != nil {
+		return err
+	}
+	if err := newDomain("e2e-apigw-domain-doomed.example.com", apigwv1.OptUUID{}); err != nil {
+		return err
+	}
+	if err := newDomain("e2e-apigw-domain-editable.example.com", apigwv1.OptUUID{}); err != nil {
+		return err
+	}
+
+	groupOp := sdkapigw.NewGroupOp(client)
+	newGroup := func(name string) (*apigwv1.Group, error) {
+		return groupOp.Create(ctx, &apigwv1.Group{Name: apigwv1.NewOptName(apigwv1.Name(name)), Tags: []string{"env:e2e"}})
+	}
+	group1, err := newGroup("e2e-apigw-group-1")
+	if err != nil {
+		return err
+	}
+	if _, err := newGroup("e2e-apigw-group-doomed"); err != nil {
+		return err
+	}
+	if _, err := newGroup("e2e-apigw-group-editable"); err != nil {
+		return err
+	}
+
+	userOp := sdkapigw.NewUserOp(client)
+	newUser := func(name string) (*apigwv1.UserDetail, error) {
+		return userOp.Create(ctx, &apigwv1.UserDetail{Name: apigwv1.Name(name), Tags: []string{"env:e2e"}})
+	}
+	user1, err := newUser("e2e-apigw-user-1")
+	if err != nil {
+		return err
+	}
+	if _, err := newUser("e2e-apigw-user-doomed"); err != nil {
+		return err
+	}
+	if _, err := newUser("e2e-apigw-user-editable"); err != nil {
+		return err
+	}
+	if err := sdkapigw.NewUserExtraOp(client, user1.ID.Value).UpdateGroup(ctx, group1.ID.Value.String(), true); err != nil {
+		return err
+	}
+
+	subscriptionOp := sdkapigw.NewSubscriptionOp(client)
+	plans, err := subscriptionOp.ListPlans(ctx)
+	if err != nil {
+		return err
+	}
+	if len(plans) == 0 {
+		return fmt.Errorf("no apigw plans available")
+	}
+	planID := plans[0].ID.Value
+
+	newSubscription := func(name string) (*apigwv1.SubscriptionDetailResponse, error) {
+		if err := subscriptionOp.Create(ctx, planID, name); err != nil {
+			return nil, err
+		}
+		subs, err := subscriptionOp.List(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, s := range subs {
+			if s.Name.Value == apigwv1.Name(name) {
+				return subscriptionOp.Read(ctx, s.ID.Value)
+			}
+		}
+		return nil, fmt.Errorf("subscription %s not found after create", name)
+	}
+
+	// サブスクリプションタブの表示/編集/削除シナリオ用(サービスには紐づけない)
+	if _, err := newSubscription("e2e-apigw-subscription-1"); err != nil {
+		return err
+	}
+	if _, err := newSubscription("e2e-apigw-subscription-doomed"); err != nil {
+		return err
+	}
+	// サービス作成シナリオ用(未使用のまま残す)
+	if _, err := newSubscription("e2e-apigw-subscription-for-create"); err != nil {
+		return err
+	}
+
+	// サービスタブの表示/編集/削除シナリオ用。それぞれ専用のSubscriptionに紐づける
+	svcSub1, err := newSubscription("e2e-apigw-svc-subscription-1")
+	if err != nil {
+		return err
+	}
+	svcSubDoomed, err := newSubscription("e2e-apigw-svc-subscription-doomed")
+	if err != nil {
+		return err
+	}
+	svcSubEditable, err := newSubscription("e2e-apigw-svc-subscription-editable")
+	if err != nil {
+		return err
+	}
+
+	serviceOp := sdkapigw.NewServiceOp(client)
+	newService := func(name string, subscriptionID uuid.UUID) (*apigwv1.ServiceDetailRequest, error) {
+		return serviceOp.Create(ctx, &apigwv1.ServiceDetailRequest{
+			Name:     apigwv1.Name(name),
+			Protocol: apigwv1.ServiceDetailRequestProtocolHTTPS,
+			Host:     "backend.e2e.example.com",
+			Path:     apigwv1.NewOptString("/"),
+			Port:     apigwv1.NewOptInt(443),
+			Tags:     []string{"env:e2e"},
+			Subscription: apigwv1.ServiceSubscriptionRequest{
+				ID: subscriptionID,
+			},
+		})
+	}
+	service1, err := newService("e2e_apigw_service_1", svcSub1.ID.Value)
+	if err != nil {
+		return err
+	}
+	if _, err := newService("e2e_apigw_service_doomed", svcSubDoomed.ID.Value); err != nil {
+		return err
+	}
+	if _, err := newService("e2e_apigw_service_editable", svcSubEditable.ID.Value); err != nil {
+		return err
+	}
+
+	routeOp := sdkapigw.NewRouteOp(client, service1.ID.Value)
+	newRoute := func(name, path string) error {
+		_, err := routeOp.Create(ctx, &apigwv1.RouteDetail{
+			Name:      apigwv1.NewOptName(apigwv1.Name(name)),
+			Path:      apigwv1.NewOptString(path),
+			Protocols: apigwv1.NewOptRouteDetailProtocols(apigwv1.RouteDetailProtocolsHTTPHTTPS),
+			Methods:   []apigwv1.HTTPMethod{apigwv1.HTTPMethodGET},
+			StripPath: apigwv1.NewOptBool(true),
+			Tags:      []string{"env:e2e"},
+		})
+		return err
+	}
+	if err := newRoute("e2e-apigw-route-1", "/e2e-1"); err != nil {
+		return err
+	}
+	if err := newRoute("e2e-apigw-route-doomed", "/e2e-doomed"); err != nil {
+		return err
+	}
+	if err := newRoute("e2e-apigw-route-editable", "/e2e-editable"); err != nil {
 		return err
 	}
 

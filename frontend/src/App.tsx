@@ -58,6 +58,8 @@ import { IAMServicePrincipalDetail } from './components/IAMServicePrincipalDetai
 import { WorkflowsList } from './components/WorkflowsList';
 import { WorkflowDetail } from './components/WorkflowDetail';
 import { EventBusList } from './components/EventBusList';
+import { ApigwList } from './components/ApigwList';
+import { ApigwServiceDetail } from './components/ApigwServiceDetail';
 
 // ナビゲーション項目の定義
 const zoneResources = [
@@ -86,6 +88,7 @@ const globalResources = [
   { path: 'iam', label: 'IAM' },
   { path: 'workflows', label: 'ワークフロー' },
   { path: 'eventbus', label: 'イベントバス' },
+  { path: 'apigw', label: 'APIゲートウェイ' },
   { path: 'apprun-shared', label: 'AppRun共用型' },
   { path: 'apprun-dedicated', label: 'AppRun専有型' },
 ];
@@ -230,6 +233,8 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
               <Route path="workflows" element={<span className="breadcrumb-item active">ワークフロー</span>} />
               <Route path="workflows/:id" element={<WorkflowBreadcrumb profile={profile} />} />
               <Route path="eventbus" element={<span className="breadcrumb-item active">イベントバス</span>} />
+              <Route path="apigw" element={<span className="breadcrumb-item active">APIゲートウェイ</span>} />
+              <Route path="apigw/services/:id" element={<ApigwServiceBreadcrumb profile={profile} />} />
               <Route path="apprun-dedicated" element={<span className="breadcrumb-item active">AppRun 専有型</span>} />
               <Route path="apprun-shared" element={<span className="breadcrumb-item active">AppRun 共用型</span>} />
               <Route path="bills" element={<span className="breadcrumb-item active">請求</span>} />
@@ -352,6 +357,10 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
             <WorkflowDetailWrapper profile={profile} />
           } />
           <Route path="eventbus" element={<EventBusList profile={profile} />} />
+          <Route path="apigw" element={<ApigwListWrapper profile={profile} />} />
+          <Route path="apigw/services/:id" element={
+            <ApigwServiceDetailWrapper profile={profile} />
+          } />
           <Route path="apprun-dedicated" element={<AppRunDedicatedList profile={profile} />} />
           <Route path="apprun-shared" element={<AppRunSharedList profile={profile} />} />
           <Route path="bills" element={
@@ -625,6 +634,22 @@ function WorkflowDetailWrapper({ profile }: { profile: string }) {
   return <WorkflowDetail profile={profile} workflowId={id} />;
 }
 
+function ApigwListWrapper({ profile }: { profile: string }) {
+  const navigate = useNavigate();
+  return (
+    <ApigwList
+      profile={profile}
+      onSelectService={(id) => navigate(`/${profile}/apigw/services/${id}`)}
+    />
+  );
+}
+
+function ApigwServiceDetailWrapper({ profile }: { profile: string }) {
+  const { id } = useParams<{ id: string }>();
+  if (!id) return null;
+  return <ApigwServiceDetail profile={profile} serviceId={id} />;
+}
+
 function SecretManagerListWrapper({ profile }: { profile: string }) {
   const navigate = useNavigate();
   return (
@@ -797,6 +822,19 @@ function WorkflowBreadcrumb({ profile }: { profile: string }) {
       </span>
       <span className="breadcrumb-separator">/</span>
       <span className="breadcrumb-item active">詳細</span>
+    </>
+  );
+}
+
+function ApigwServiceBreadcrumb({ profile }: { profile: string }) {
+  const navigate = useNavigate();
+  return (
+    <>
+      <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/${profile}/apigw`)}>
+        APIゲートウェイ
+      </span>
+      <span className="breadcrumb-separator">/</span>
+      <span className="breadcrumb-item active">サービス詳細</span>
     </>
   );
 }
