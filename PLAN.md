@@ -166,8 +166,8 @@ CLAUDE.mdに既に記載があるサービスだが未着手。`sacloud-sdk-go/a
 
 - `apigw`: groups/certificates/domains/routes/services/subscriptions/users
 - `eventbus`: triggers/schedules/process_configurations/filter
-- `workflows`: workflow/execution/revision/subscription
-- `nosql`: instances/databases/backups/plan
+- `workflows`: workflow/execution/revision/subscription — ✅ **対応済み（2026-08-10）**: sakumockが全operationに対応済みと判明したため優先着手。`internal/workflows/service.go`にogen生成OpenAPIクライアント(simplemq/simple-notificationと同パターン)でWorkflow(List/Create/Read/Update/Delete)・Revision(List/Create/UpdateAlias/DeleteAlias)・Execution(List/Create/Read/Cancel/Delete/ListHistory)・Subscription(ListPlans/Read/Create/Delete)を実装。Runbook(YAML DSL)はテキストエリアでの生編集のみとし専用GUIエディタは作らない方針とした(実行ステップ定義がGCP Workflows類似の複雑なDSLのため)。サブスクリプション未契約時、sakumockが仕様上non-nullableな`MonthAppliedPlan`にnullを返しSDKのデコードに失敗する不具合を発見、Service層でフォールバック実装(`docs/upstream-issues.md`参照)。UI設計はKMSList/KMSDetailの「一覧+詳細ページ」パターンを踏襲(`WorkflowsList.tsx`でサブスクリプション状況表示+ワークフローCRUD、`WorkflowDetail.tsx`でリビジョン/実行のタブ切り替え)。Goテスト・Vitest・E2E(`frontend/e2e/workflows.spec.ts`)・マニュアル(`docs/manual/workflows.md`)まで対応し、既存E2E含め全件パス確認済み
+- `nosql`: instances/databases/backups/plan — sakumock未対応(2026-08-10時点調査)のためE2E不可、着手見送り。詳細は`docs/upstream-issues.md`ではなく本ファイル調査時点のメモ(sakumock@v0.7.2に`nosql`パッケージなし)を参照
 
 ---
 

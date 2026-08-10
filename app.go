@@ -13,6 +13,7 @@ import (
 	"sakpilot/internal/secretmanager"
 	"sakpilot/internal/simplemq"
 	"sakpilot/internal/simplenotification"
+	"sakpilot/internal/workflows"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -2693,4 +2694,157 @@ func (a *App) DeleteSimpleNotificationRouting(profileName, id string) error {
 		return err
 	}
 	return service.DeleteRouting(a.ctx, id)
+}
+
+// Workflows
+func (a *App) GetWorkflowsPlans(profileName string) ([]workflows.PlanInfo, error) {
+	service, err := workflows.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListPlans(a.ctx)
+}
+
+func (a *App) GetWorkflowsSubscription(profileName string) (*workflows.SubscriptionInfo, error) {
+	service, err := workflows.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetSubscription(a.ctx)
+}
+
+func (a *App) CreateWorkflowsSubscription(profileName string, planId int) error {
+	service, err := workflows.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.CreateSubscription(a.ctx, planId)
+}
+
+func (a *App) DeleteWorkflowsSubscription(profileName string) error {
+	service, err := workflows.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteSubscription(a.ctx)
+}
+
+func (a *App) GetWorkflows(profileName string) ([]workflows.WorkflowInfo, error) {
+	service, err := workflows.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListWorkflows(a.ctx)
+}
+
+func (a *App) GetWorkflow(profileName, id string) (*workflows.WorkflowInfo, error) {
+	service, err := workflows.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetWorkflow(a.ctx, id)
+}
+
+func (a *App) CreateWorkflow(profileName, name, description, runbook string, publish, logging bool, concurrencyMode string, tags []string) (*workflows.WorkflowInfo, error) {
+	service, err := workflows.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateWorkflow(a.ctx, name, description, runbook, publish, logging, concurrencyMode, tags)
+}
+
+func (a *App) UpdateWorkflow(profileName, id, name, description string, publish, logging bool, concurrencyMode string, tags []string) (*workflows.WorkflowInfo, error) {
+	service, err := workflows.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateWorkflow(a.ctx, id, name, description, publish, logging, concurrencyMode, tags)
+}
+
+func (a *App) DeleteWorkflow(profileName, id string) error {
+	service, err := workflows.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteWorkflow(a.ctx, id)
+}
+
+func (a *App) GetWorkflowRevisions(profileName, workflowId string) ([]workflows.RevisionInfo, error) {
+	service, err := workflows.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListRevisions(a.ctx, workflowId)
+}
+
+func (a *App) CreateWorkflowRevision(profileName, workflowId, runbook, revisionAlias string) (*workflows.RevisionInfo, error) {
+	service, err := workflows.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateRevision(a.ctx, workflowId, runbook, revisionAlias)
+}
+
+func (a *App) UpdateWorkflowRevisionAlias(profileName, workflowId string, revisionNumber int, revisionAlias string) (*workflows.RevisionInfo, error) {
+	service, err := workflows.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateRevisionAlias(a.ctx, workflowId, revisionNumber, revisionAlias)
+}
+
+func (a *App) DeleteWorkflowRevisionAlias(profileName, workflowId string, revisionNumber int) error {
+	service, err := workflows.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteRevisionAlias(a.ctx, workflowId, revisionNumber)
+}
+
+func (a *App) GetWorkflowExecutions(profileName, workflowId string) ([]workflows.ExecutionInfo, error) {
+	service, err := workflows.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListExecutions(a.ctx, workflowId)
+}
+
+func (a *App) GetWorkflowExecution(profileName, workflowId, executionId string) (*workflows.ExecutionInfo, error) {
+	service, err := workflows.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetExecution(a.ctx, workflowId, executionId)
+}
+
+func (a *App) CreateWorkflowExecution(profileName, workflowId string, revisionNumber int, revisionAlias, args, name string) (*workflows.ExecutionInfo, error) {
+	service, err := workflows.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateExecution(a.ctx, workflowId, revisionNumber, revisionAlias, args, name)
+}
+
+func (a *App) CancelWorkflowExecution(profileName, workflowId, executionId string) (*workflows.ExecutionInfo, error) {
+	service, err := workflows.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CancelExecution(a.ctx, workflowId, executionId)
+}
+
+func (a *App) DeleteWorkflowExecution(profileName, workflowId, executionId string) error {
+	service, err := workflows.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteExecution(a.ctx, workflowId, executionId)
+}
+
+func (a *App) GetWorkflowExecutionHistory(profileName, workflowId, executionId string) ([]workflows.ExecutionHistoryInfo, error) {
+	service, err := workflows.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListExecutionHistory(a.ctx, workflowId, executionId)
 }

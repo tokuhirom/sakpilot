@@ -31,9 +31,18 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - SakPilotでの回避: E2Eシード(`e2e_server.go` の `seedDatabases`)で `Conf`/`CommonSetting` を明示的に設定するよう修正した。SakPilot本体のコード(`internal/sakura/database.go`)側はSDKが返す `Conf` の有無を全てnilチェックしているため、実運用データに対しては影響を受けない。
 - 報告時の提案: `GetParameter` 内で `v.Conf` がnilの場合はMariaDB用のメタ情報にフォールバックする(あるいは明確なエラーを返す)ようにしてほしい。
 
+### 3. `sakumock/workflows` の `GET /subscriptions` が未契約時に非nullable仕様の `MonthAppliedPlan` へ `null` を返し、SDKのデコードが失敗する
+
+- パッケージ: `github.com/sacloud/sakumock/workflows`
+- ファイル: `handler.go`(`handleGetSubscription`、795行目付近)
+- 内容: OpenAPI仕様(`sacloud-sdk-go/api/workflows/openapi/openapi.json`)上、`GET /subscriptions` レスポンスの `MonthAppliedPlan` は(`CurrentPlan`と異なり)`nullable: true` が付いていないオブジェクト型。にもかかわらず `handleGetSubscription` は未契約(`sub == nil`)の場合に `CurrentPlan`/`MonthAppliedPlan` 双方へ素の `nil` を設定してJSONエンコードするため、`"MonthAppliedPlan": null` が返る。SDKが生成する `OptGetSubscriptionOKMonthAppliedPlan`(`OptNil`ではなく`Opt`)はnullのデコードに対応しておらず、`SubscriptionAPI.Read` が `decode field "MonthAppliedPlan": ... unexpected byte 110 'n'` のようなエラーで必ず失敗する。
+- 影響: サブスクリプション未契約状態で `GetSubscription`(`Read`)を呼ぶと100%エラーになり、「契約済みかどうかを確認する」というAPIの基本的なユースケースがsakumock上では検証できない。契約後は `MonthAppliedPlan` が実体を持つため問題なくデコードできる。
+- SakPilotでの回避: `internal/workflows/service.go` の `GetSubscription` で、エラーメッセージに `"MonthAppliedPlan"` が含まれる場合は未契約(`Subscribed: false`)とみなすフォールバックを実装した。`CurrentPlan`/`MonthAppliedPlan` は常にセットで存在/不在が一致する設計のため、このデコード失敗は実質的に「未契約」の代替シグナルとして安全に使える。
+- 報告時の提案: `handleGetSubscription` で未契約時は `MonthAppliedPlan` キー自体を省略する(値を送らない)、またはOpenAPI仕様側で `MonthAppliedPlan` に `nullable: true` を追加してSDKを再生成するかのいずれかで解消できる。
+
 ## 改善要望(upstream向け)
 
-### 3. AppRun専有型 `version.CreateParams.CPU` / SDK内の `Version.CPU` の単位がコード上どこにもドキュメント化されていない
+### 4. AppRun専有型 `version.CreateParams.CPU` / SDK内の `Version.CPU` の単位がコード上どこにもドキュメント化されていない
 
 - パッケージ: `github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/version`
 - 該当: `version.go` の `CreateParams.CPU int64` / `Version.CPU int64`(`json:"cpu"`)
@@ -41,7 +50,7 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - 実害: SakPilot側でこの単位を誤解しており、デプロイフォームの「CPU (vCPU)」欄のデフォルト値 `0.1` をそのまま送信すると `json: cannot unmarshal number 0.1 into ... int64` で必ず失敗するバグになっていた(SakPilot側で修正済み: ミリvCPUに変換してから送るよう修正)。単位がコード上明記されていれば防げたクラスの不具合。
 - 提案: `CPU int64` フィールドに `// CPU ミリvCPU単位のCPU割り当て(例: 1000 = 1 vCPU)` のようなdocコメントを追加してほしい。可能なら `Memory` 等の他の数値フィールドも単位を明記してほしい。
 
-### 4. `sakumock/objectstorage` のS3データプレーンが、control planeで発行したアクセスキーを検証しないため、キー発行込みの結合テストができない
+### 5. `sakumock/objectstorage` のS3データプレーンが、control planeで発行したアクセスキーを検証しないため、キー発行込みの結合テストができない
 
 - パッケージ: `github.com/sacloud/sakumock/objectstorage`
 - 参照: [README「Data plane (S3)」](https://github.com/sacloud/sakumock/tree/main/objectstorage#data-plane-s3)
@@ -50,7 +59,7 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - 実害: SakPilotの実際のUIフロー(アクセスキーを作成 → そのキーでバケット一覧/オブジェクト一覧を取得)をEnd-to-Endに検証できない。versitygwを追加してもキーの紐付けが再現できないため意味がなく、SakPilotではバケット作成リクエスト自体が(control plane経由のため)成功することのみ確認し、一覧反映やオブジェクト操作はE2E対象外にした(`frontend/e2e/objectstorage.spec.ts` 参照)。これはsakumockの不具合ではなく、現状の設計を把握した上でのSakPilot側の判断。
 - 提案(バグ報告ではなく機能要望): data planeがcontrol planeで発行したアクセスキー/シークレットも(固定ルート資格情報に加えて)受け付けるようにしてもらえると、`versitygw` を用意しさえすればキー発行〜オブジェクト操作までを実際のアプリと同じ資格情報で一気通貫にテストできるようになる。
 
-### 5. `sakumock/apprun` のバージョン `CreatedAt` が秒単位に丸められており、短時間に複数回更新すると「最新バージョン」の判定順が不定になる
+### 6. `sakumock/apprun` のバージョン `CreatedAt` が秒単位に丸められており、短時間に複数回更新すると「最新バージョン」の判定順が不定になる
 
 - パッケージ: `github.com/sacloud/sakumock/apprun`
 - ファイル: `store_memory.go` の `createVersionLocked`(`time.Now().UTC().Truncate(time.Second)`)、`ListVersions`(`sort.Slice` で `CreatedAt` の降順ソート、デフォルト`SortOrder=desc`)
@@ -58,7 +67,7 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - 実害: AppRun共用型のVersion Delete API(`handleDeleteVersion`)は「`ListVersions`の先頭要素と同じIDは削除不可(最新版のため)」というチェックを行っているため、この不定性がそのままAPIレスポンスの不定性になる。SakPilot側でVersion Delete機能のテストを書く際、「作成直後のバージョンではない、かつ削除不可能な最新版でもない、中間バージョン」を用意しようとしても`CreatedAt`だけでは判別できず、最終的に「削除を試みて失敗したら次の候補を試す」というフォールバック実装(`internal/apprunshared/service_test.go`の`TestService_DeleteVersion`)で回避する必要があった。内部的には`MemoryStore`が`versionSeq`という単調増加のシーケンス番号を持っており(`Version.Name`のサフィックスに埋め込まれている)、実際の生成順序自体は失われていないため、ソートに使えばこの問題自体は容易に解消できるはずである。
 - 提案: `ListVersions`のソートキーに`CreatedAt`だけでなく`versionSeq`(または相当する単調増加ID)をタイブレーカーとして使う、あるいは`Version.CreatedAt`をより高精度(ナノ秒単位)で記録するようにしてほしい。
 
-### 6. `sakumock/simplenotification` が通知履歴・ソース一覧・ルーティング並び替え・ステータス取得のAPIに未対応
+### 7. `sakumock/simplenotification` が通知履歴・ソース一覧・ルーティング並び替え・ステータス取得のAPIに未対応
 
 - パッケージ: `github.com/sacloud/sakumock/simplenotification`
 - ファイル: `route.go`(`routeTable`)
