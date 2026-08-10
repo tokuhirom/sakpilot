@@ -60,6 +60,8 @@ import { WorkflowDetail } from './components/WorkflowDetail';
 import { EventBusList } from './components/EventBusList';
 import { ApigwList } from './components/ApigwList';
 import { ApigwServiceDetail } from './components/ApigwServiceDetail';
+import { ServiceEndpointGatewayList } from './components/ServiceEndpointGatewayList';
+import { ServiceEndpointGatewayDetail } from './components/ServiceEndpointGatewayDetail';
 
 // ナビゲーション項目の定義
 const zoneResources = [
@@ -70,6 +72,7 @@ const zoneResources = [
   { path: 'databases', label: 'データベース' },
   { path: 'nfs', label: 'NFS' },
   { path: 'packetfilters', label: 'パケットフィルター' },
+  { path: 'service-endpoint-gateway', label: 'サービスエンドポイントゲートウェイ' },
 ];
 
 const globalResources = [
@@ -207,6 +210,8 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
               <Route path="nfs/:id" element={<NFSBreadcrumb profile={profile} />} />
               <Route path="packetfilters" element={<span className="breadcrumb-item active">パケットフィルター</span>} />
               <Route path="packetfilters/:id" element={<PacketFilterBreadcrumb profile={profile} />} />
+              <Route path="service-endpoint-gateway" element={<span className="breadcrumb-item active">サービスエンドポイントゲートウェイ</span>} />
+              <Route path="service-endpoint-gateway/:id" element={<ServiceEndpointGatewayBreadcrumb profile={profile} />} />
               <Route path="dns" element={<span className="breadcrumb-item active">DNS</span>} />
               <Route path="dns/:id" element={<DNSBreadcrumb profile={profile} />} />
               <Route path="gslb" element={<span className="breadcrumb-item active">GSLB</span>} />
@@ -302,6 +307,12 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
           } />
           <Route path="packetfilters/:id" element={
             <PacketFilterDetailWrapper profile={profile} zone={selectedZone} />
+          } />
+          <Route path="service-endpoint-gateway" element={
+            <ServiceEndpointGatewayListWrapper profile={profile} zone={selectedZone} zones={zones} onZoneChange={setSelectedZone} />
+          } />
+          <Route path="service-endpoint-gateway/:id" element={
+            <ServiceEndpointGatewayDetailWrapper profile={profile} zone={selectedZone} />
           } />
           <Route path="dns" element={
             <DNSListWrapper profile={profile} />
@@ -465,6 +476,25 @@ function NFSDetailWrapper({ profile, zone }: { profile: string; zone: string }) 
   const { id } = useParams<{ id: string }>();
   if (!id) return null;
   return <NFSDetail profile={profile} zone={zone} nfsId={id} />;
+}
+
+function ServiceEndpointGatewayListWrapper({ profile, zone, zones, onZoneChange }: { profile: string; zone: string; zones: sakura.ZoneInfo[]; onZoneChange: (zone: string) => void }) {
+  const navigate = useNavigate();
+  return (
+    <ServiceEndpointGatewayList
+      profile={profile}
+      zone={zone}
+      zones={zones}
+      onZoneChange={onZoneChange}
+      onSelect={(id) => navigate(`/${profile}/service-endpoint-gateway/${id}`)}
+    />
+  );
+}
+
+function ServiceEndpointGatewayDetailWrapper({ profile, zone }: { profile: string; zone: string }) {
+  const { id } = useParams<{ id: string }>();
+  if (!id) return null;
+  return <ServiceEndpointGatewayDetail profile={profile} zone={zone} id={id} />;
 }
 
 function SwitchListWrapper({ profile, zone, zones, onZoneChange }: { profile: string; zone: string; zones: sakura.ZoneInfo[]; onZoneChange: (zone: string) => void }) {
@@ -715,6 +745,19 @@ function NFSBreadcrumb({ profile }: { profile: string }) {
     <>
       <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/${profile}/nfs`)}>
         NFS
+      </span>
+      <span className="breadcrumb-separator">/</span>
+      <span className="breadcrumb-item active">詳細</span>
+    </>
+  );
+}
+
+function ServiceEndpointGatewayBreadcrumb({ profile }: { profile: string }) {
+  const navigate = useNavigate();
+  return (
+    <>
+      <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/${profile}/service-endpoint-gateway`)}>
+        サービスエンドポイントゲートウェイ
       </span>
       <span className="breadcrumb-separator">/</span>
       <span className="breadcrumb-item active">詳細</span>
