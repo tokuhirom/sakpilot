@@ -80,6 +80,15 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - 実害: SakPilotの簡易通知機能(`internal/simplenotification/`)はDestination/Group/RoutingのCRUD + テストメッセージ送信のみをE2E対象にできた。通知履歴の閲覧、ルーティング作成時のソースID選択UI(現状は数値ID直接入力)、ルーティングの並び替えはUI自体を実装してもE2E検証ができないため、今回のスコープでは見送った(`docs/manual/simplenotification.md`の「未対応の機能」参照)。
 - 提案: 上記4エンドポイントの対応を追加してほしい。特に`ListSources`が使えるようになれば、ルーティング作成フォームでソースIDをID直接入力ではなく選択式にでき、UXが大きく改善する。
 
+### 8. `sacloud-sdk-go/api/eventbus` の `Provider.Class` クエリ注入ミドルウェアが実際のリクエストに反映されず、`Trigger`/`Schedule`/`ProcessConfiguration`のList APIが常に全件を返す
+
+- パッケージ: `github.com/sacloud/sacloud-sdk-go/api/eventbus`
+- ファイル: `filter.go`(`injectFilterMiddleware`/`injectFilterToRequest`)、`triggers.go`/`schedules.go`/`process_configurations.go`(各`List`メソッド)
+- 内容: Trigger/Schedule/ProcessConfigurationは同一の`GET /commonserviceitem`エンドポイントを共有しており、種別ごとの絞り込みは`injectFilterMiddleware`が生成する`saclient.Middleware`が`req.URL.RawQuery`に`{"Filter":{"Provider.Class":"eventbustrigger"}}`のようなJSONクエリを注入する仕組みで実現される設計になっている(sakumock側は`providerClassFilter`でこの形式を正しくパースでき、直接HTTPリクエストを組み立てて検証した限りではフィルタは機能する)。しかし実際にSDKの`TriggerOp.List`/`ScheduleOp.List`/`ProcessConfigurationOp.List`経由で呼び出すと、ミドルウェアが呼ばれていないのか`RawQuery`が最終的なリクエストに反映されず、常に空文字列のまま送信される(プロキシを挟んでリクエストを観測して確認)。結果として`GET /commonserviceitem`は種別を問わず全件を返し、SDK単体では`ScheduleAPI.List`を呼んでもTrigger/ProcessConfigurationを含む全アイテムが返ってくる。
+- 影響: 複数種別のリソースを1つのeventbusサーバーに作成した状態でいずれかの`List`を呼ぶと、意図しない他種別のアイテムが混入する。`sacloud-sdk-go/api/eventbus`のテスト(`client_test.go`の`TestNewClient_WithCustomEndpoint`)はリクエストが1件飛んだことしか検証しておらず、`RawQuery`の中身は未検証のためこのバグはCIをすり抜けている。
+- SakPilotでの回避: `internal/eventbus/service.go`の`ListTriggers`/`ListSchedules`/`ListProcessConfigurations`で、レスポンスの各アイテムを`item.Settings.IsTriggerSettings()`等のSettings型判定でクライアント側フィルタしてから返すようにした。
+- 報告時の提案: `injectFilterMiddleware`が生成するミドルウェアが実際に`saclient`のミドルウェアチェーンに乗っているか(`WithMiddleware`オプションの適用順序、複数回の`DupWith`呼び出しでの上書き等)を調査してほしい。可能であれば`client_test.go`に「`RawQuery`が期待通り設定されているか」を検証するテストケースを追加すると再発を防げる。
+
 ## その他メモ(バグではないが気づいた点)
 
 - `fake.InitDataStore()` / `fake.SwitchFactoryFuncToFake()` はいずれも `sync.Once` でプロセス内1回しか実行されない。同一プロセス内で複数のGoテストが同じデータストアを共有することになるため、テスト間で状態がリークする(SakPilotの `internal/sakura/disk_test.go` ではID/存在ベースの検証に倒すことで対応した)。ドキュメントに明記しておいてもらえると、初見でハマる人が減りそう。

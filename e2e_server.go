@@ -36,6 +36,8 @@ import (
 	dedicatedv1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/version"
 	sharedv1 "github.com/sacloud/sacloud-sdk-go/api/apprun/apis/v1"
+	sdkeventbus "github.com/sacloud/sacloud-sdk-go/api/eventbus"
+	eventbusv1 "github.com/sacloud/sacloud-sdk-go/api/eventbus/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/fake"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
@@ -58,6 +60,7 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 	mockapprunshared "github.com/sacloud/sakumock/apprun"
 	mockapprundedicated "github.com/sacloud/sakumock/apprundedicated"
+	mockeventbus "github.com/sacloud/sakumock/eventbus"
 	mockiam "github.com/sacloud/sakumock/iam"
 	mockkms "github.com/sacloud/sakumock/kms"
 	mockobjectstorage "github.com/sacloud/sakumock/objectstorage"
@@ -178,6 +181,14 @@ func runE2EServer(addr, dist string) error {
 	}
 	if err := seedWorkflows(); err != nil {
 		return fmt.Errorf("failed to seed Workflows resources: %w", err)
+	}
+
+	eventBusSrv := mockeventbus.NewTestServer(mockeventbus.Config{})
+	if err := os.Setenv("SAKURA_ENDPOINTS_EVENTBUS", eventBusSrv.TestURL()); err != nil {
+		return err
+	}
+	if err := seedEventBus(); err != nil {
+		return fmt.Errorf("failed to seed EventBus resources: %w", err)
 	}
 
 	// ObjectStorageのS3互換データプレーン(オブジェクト一覧・ダウンロード)はsakumock側で
@@ -1162,6 +1173,109 @@ steps:
 		Set:   true,
 		Value: workflowsv1.CreateExecutionReq{Name: workflowsv1.NewOptString("e2e-execution-1")},
 	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// seedEventBus はsakumockのEventBusサーバーにE2Eシナリオ用の実行設定・トリガー・
+// スケジュールを投入する。トリガー/スケジュールはいずれも表示用の実行設定を参照する。
+func seedEventBus() error {
+	var sc saclient.Client
+	env := append(os.Environ(),
+		"SAKURA_ACCESS_TOKEN="+e2eAccessToken,
+		"SAKURA_ACCESS_TOKEN_SECRET="+e2eSecretToken,
+	)
+	if err := sc.SetEnviron(env); err != nil {
+		return err
+	}
+	client, err := sdkeventbus.NewClient(&sc)
+	if err != nil {
+		return err
+	}
+	ctx := context.Background()
+
+	processConfigurationOp := sdkeventbus.NewProcessConfigurationOp(client)
+	newProcessConfiguration := func(name string) (string, error) {
+		created, err := processConfigurationOp.Create(ctx, eventbusv1.CreateCommonServiceItemRequest{
+			CommonServiceItem: eventbusv1.CreateCommonServiceItemRequestCommonServiceItem{
+				Name:        name,
+				Description: eventbusv1.NewOptNilString("E2E: EventBus表示確認シナリオ用"),
+				Settings: eventbusv1.NewProcessConfigurationSettingsSettings(eventbusv1.ProcessConfigurationSettings{
+					Destination: eventbusv1.ProcessConfigurationSettingsDestinationSimplemq,
+					Parameters:  `{"queue_name":"e2e-queue","content":"hello"}`,
+				}),
+				Tags: []string{"env:e2e"},
+			},
+		})
+		if err != nil {
+			return "", err
+		}
+		return created.ID, nil
+	}
+
+	pcID, err := newProcessConfiguration("e2e-eventbus-pc-1")
+	if err != nil {
+		return err
+	}
+	if _, err := newProcessConfiguration("e2e-eventbus-pc-doomed"); err != nil {
+		return err
+	}
+	if _, err := newProcessConfiguration("e2e-eventbus-pc-editable"); err != nil {
+		return err
+	}
+
+	triggerOp := sdkeventbus.NewTriggerOp(client)
+	newTrigger := func(name string) error {
+		_, err := triggerOp.Create(ctx, eventbusv1.CreateCommonServiceItemRequest{
+			CommonServiceItem: eventbusv1.CreateCommonServiceItemRequestCommonServiceItem{
+				Name:        name,
+				Description: eventbusv1.NewOptNilString("E2E: EventBus表示確認シナリオ用"),
+				Settings: eventbusv1.NewTriggerSettingsSettings(eventbusv1.TriggerSettings{
+					Source:                 "sakuracloud",
+					Types:                  eventbusv1.NewOptNilStringArray([]string{"server.power.on"}),
+					ProcessConfigurationID: pcID,
+				}),
+				Tags: []string{"env:e2e"},
+			},
+		})
+		return err
+	}
+	if err := newTrigger("e2e-eventbus-trigger-1"); err != nil {
+		return err
+	}
+	if err := newTrigger("e2e-eventbus-trigger-doomed"); err != nil {
+		return err
+	}
+	if err := newTrigger("e2e-eventbus-trigger-editable"); err != nil {
+		return err
+	}
+
+	scheduleOp := sdkeventbus.NewScheduleOp(client)
+	newSchedule := func(name string) error {
+		_, err := scheduleOp.Create(ctx, eventbusv1.CreateCommonServiceItemRequest{
+			CommonServiceItem: eventbusv1.CreateCommonServiceItemRequestCommonServiceItem{
+				Name:        name,
+				Description: eventbusv1.NewOptNilString("E2E: EventBus表示確認シナリオ用"),
+				Settings: eventbusv1.NewScheduleSettingsSettings(eventbusv1.ScheduleSettings{
+					ProcessConfigurationID: pcID,
+					RecurringStep:          eventbusv1.NewOptInt(10),
+					RecurringUnit:          eventbusv1.NewOptScheduleSettingsRecurringUnit(eventbusv1.ScheduleSettingsRecurringUnitMin),
+					StartsAt:               eventbusv1.NewInt64ScheduleSettingsStartsAt(1893456000000),
+				}),
+				Tags: []string{"env:e2e"},
+			},
+		})
+		return err
+	}
+	if err := newSchedule("e2e-eventbus-schedule-1"); err != nil {
+		return err
+	}
+	if err := newSchedule("e2e-eventbus-schedule-doomed"); err != nil {
+		return err
+	}
+	if err := newSchedule("e2e-eventbus-schedule-editable"); err != nil {
 		return err
 	}
 

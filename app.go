@@ -7,6 +7,7 @@ import (
 
 	"sakpilot/internal/apprun"
 	"sakpilot/internal/apprunshared"
+	"sakpilot/internal/eventbus"
 	"sakpilot/internal/iam"
 	"sakpilot/internal/kms"
 	"sakpilot/internal/sakura"
@@ -2847,4 +2848,141 @@ func (a *App) GetWorkflowExecutionHistory(profileName, workflowId, executionId s
 		return nil, err
 	}
 	return service.ListExecutionHistory(a.ctx, workflowId, executionId)
+}
+
+// EventBus
+func (a *App) GetEventBusTriggers(profileName string) ([]eventbus.TriggerInfo, error) {
+	service, err := eventbus.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListTriggers(a.ctx)
+}
+
+func (a *App) GetEventBusTrigger(profileName, id string) (*eventbus.TriggerInfo, error) {
+	service, err := eventbus.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetTrigger(a.ctx, id)
+}
+
+func (a *App) CreateEventBusTrigger(profileName, name, description, source string, types []string, conditions []eventbus.TriggerConditionInfo, processConfigurationId string, tags []string) (*eventbus.TriggerInfo, error) {
+	service, err := eventbus.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateTrigger(a.ctx, name, description, source, types, conditions, processConfigurationId, tags)
+}
+
+func (a *App) UpdateEventBusTrigger(profileName, id, name, description, source string, types []string, conditions []eventbus.TriggerConditionInfo, processConfigurationId string, tags []string) (*eventbus.TriggerInfo, error) {
+	service, err := eventbus.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateTrigger(a.ctx, id, name, description, source, types, conditions, processConfigurationId, tags)
+}
+
+func (a *App) DeleteEventBusTrigger(profileName, id string) error {
+	service, err := eventbus.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteTrigger(a.ctx, id)
+}
+
+func (a *App) GetEventBusSchedules(profileName string) ([]eventbus.ScheduleInfo, error) {
+	service, err := eventbus.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListSchedules(a.ctx)
+}
+
+func (a *App) GetEventBusSchedule(profileName, id string) (*eventbus.ScheduleInfo, error) {
+	service, err := eventbus.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetSchedule(a.ctx, id)
+}
+
+func (a *App) CreateEventBusSchedule(profileName, name, description, processConfigurationId string, recurringStep int, recurringUnit, crontab string, startsAtMillis int64, tags []string) (*eventbus.ScheduleInfo, error) {
+	service, err := eventbus.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateSchedule(a.ctx, name, description, processConfigurationId, recurringStep, recurringUnit, crontab, startsAtMillis, tags)
+}
+
+func (a *App) UpdateEventBusSchedule(profileName, id, name, description, processConfigurationId string, recurringStep int, recurringUnit, crontab string, startsAtMillis int64, tags []string) (*eventbus.ScheduleInfo, error) {
+	service, err := eventbus.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateSchedule(a.ctx, id, name, description, processConfigurationId, recurringStep, recurringUnit, crontab, startsAtMillis, tags)
+}
+
+func (a *App) DeleteEventBusSchedule(profileName, id string) error {
+	service, err := eventbus.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteSchedule(a.ctx, id)
+}
+
+func (a *App) GetEventBusProcessConfigurations(profileName string) ([]eventbus.ProcessConfigurationInfo, error) {
+	service, err := eventbus.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListProcessConfigurations(a.ctx)
+}
+
+func (a *App) GetEventBusProcessConfiguration(profileName, id string) (*eventbus.ProcessConfigurationInfo, error) {
+	service, err := eventbus.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetProcessConfiguration(a.ctx, id)
+}
+
+func (a *App) CreateEventBusProcessConfiguration(profileName, name, description, destination, parameters string, tags []string) (*eventbus.ProcessConfigurationInfo, error) {
+	service, err := eventbus.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateProcessConfiguration(a.ctx, name, description, destination, parameters, tags)
+}
+
+func (a *App) UpdateEventBusProcessConfiguration(profileName, id, name, description, destination, parameters string, tags []string) (*eventbus.ProcessConfigurationInfo, error) {
+	service, err := eventbus.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateProcessConfiguration(a.ctx, id, name, description, destination, parameters, tags)
+}
+
+func (a *App) UpdateEventBusProcessConfigurationSacloudAPISecret(profileName, id, accessToken, accessTokenSecret string) error {
+	service, err := eventbus.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.UpdateProcessConfigurationSacloudAPISecret(a.ctx, id, accessToken, accessTokenSecret)
+}
+
+func (a *App) UpdateEventBusProcessConfigurationSimpleMQSecret(profileName, id, apiKey string) error {
+	service, err := eventbus.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.UpdateProcessConfigurationSimpleMQSecret(a.ctx, id, apiKey)
+}
+
+func (a *App) DeleteEventBusProcessConfiguration(profileName, id string) error {
+	service, err := eventbus.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteProcessConfiguration(a.ctx, id)
 }
