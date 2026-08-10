@@ -53,6 +53,8 @@ import (
 	simplenotificationv1 "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
 	sdksimplemq "github.com/sacloud/sacloud-sdk-go/api/simplemq"
 	simplemqqueue "github.com/sacloud/sacloud-sdk-go/api/simplemq/apis/v1/queue"
+	sdkworkflows "github.com/sacloud/sacloud-sdk-go/api/workflows"
+	workflowsv1 "github.com/sacloud/sacloud-sdk-go/api/workflows/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 	mockapprunshared "github.com/sacloud/sakumock/apprun"
 	mockapprundedicated "github.com/sacloud/sakumock/apprundedicated"
@@ -62,6 +64,7 @@ import (
 	mocksecretmanager "github.com/sacloud/sakumock/secretmanager"
 	mocksimplemq "github.com/sacloud/sakumock/simplemq"
 	mocksimplenotification "github.com/sacloud/sakumock/simplenotification"
+	mockworkflows "github.com/sacloud/sakumock/workflows"
 	"github.com/zalando/go-keyring"
 )
 
@@ -167,6 +170,14 @@ func runE2EServer(addr, dist string) error {
 	}
 	if err := seedSimpleNotification(); err != nil {
 		return fmt.Errorf("failed to seed Simple Notification resources: %w", err)
+	}
+
+	workflowsSrv := mockworkflows.NewTestServer(mockworkflows.Config{})
+	if err := os.Setenv("SAKURA_ENDPOINTS_WORKFLOWS", workflowsSrv.TestURL()); err != nil {
+		return err
+	}
+	if err := seedWorkflows(); err != nil {
+		return fmt.Errorf("failed to seed Workflows resources: %w", err)
 	}
 
 	// ObjectStorageのS3互換データプレーン(オブジェクト一覧・ダウンロード)はsakumock側で
@@ -1066,6 +1077,94 @@ func seedSimpleNotification() error {
 	if err := newRouting("e2e-routing-editable"); err != nil {
 		return err
 	}
+	return nil
+}
+
+// seedWorkflows はsakumockのWorkflowsサーバーにE2Eシナリオ用のサブスクリプション・
+// ワークフロー・リビジョン・実行を投入する。
+func seedWorkflows() error {
+	var sc saclient.Client
+	env := append(os.Environ(),
+		"SAKURA_ACCESS_TOKEN="+e2eAccessToken,
+		"SAKURA_ACCESS_TOKEN_SECRET="+e2eSecretToken,
+	)
+	if err := sc.SetEnviron(env); err != nil {
+		return err
+	}
+	client, err := sdkworkflows.NewClient(&sc)
+	if err != nil {
+		return err
+	}
+	ctx := context.Background()
+
+	subscriptionOp := sdkworkflows.NewSubscriptionOp(client)
+	plans, err := subscriptionOp.ListPlans(ctx)
+	if err != nil {
+		return err
+	}
+	if len(plans.Plans) == 0 {
+		return fmt.Errorf("no workflows plans available")
+	}
+	if err := subscriptionOp.Create(ctx, workflowsv1.CreateSubscriptionReq{PlanId: plans.Plans[0].ID}); err != nil {
+		return err
+	}
+
+	const runbookV1 = `meta:
+  description: E2E表示確認用ワークフロー
+steps:
+  done:
+    return: "hello"
+`
+
+	workflowOp := sdkworkflows.NewWorkflowOp(client)
+	newWorkflow := func(name string) (string, error) {
+		created, err := workflowOp.Create(ctx, workflowsv1.CreateWorkflowReq{
+			Name:        name,
+			Description: workflowsv1.NewOptString("E2E: Workflows表示確認シナリオ用"),
+			Runbook:     runbookV1,
+			Publish:     true,
+			Logging:     true,
+			Tags:        []workflowsv1.CreateWorkflowReqTagsItem{{Name: "env:e2e"}},
+		})
+		if err != nil {
+			return "", err
+		}
+		return created.ID, nil
+	}
+
+	displayID, err := newWorkflow("e2e-workflow-1")
+	if err != nil {
+		return err
+	}
+	if _, err := newWorkflow("e2e-workflow-doomed"); err != nil {
+		return err
+	}
+	if _, err := newWorkflow("e2e-workflow-editable"); err != nil {
+		return err
+	}
+
+	revisionOp := sdkworkflows.NewRevisionOp(client)
+	const runbookV2 = `meta:
+  description: E2E表示確認用ワークフロー v2
+steps:
+  done:
+    return: "world"
+`
+	if _, err := revisionOp.Create(ctx, displayID, workflowsv1.CreateWorkflowRevisionReq{
+		Runbook:       runbookV2,
+		RevisionAlias: workflowsv1.NewOptString("v2"),
+	}); err != nil {
+		return err
+	}
+
+	executionOp := sdkworkflows.NewExecutionOp(client)
+	if _, err := executionOp.Create(ctx, displayID, workflowsv1.OptCreateExecutionReq{
+		Set:   true,
+		Value: workflowsv1.CreateExecutionReq{Name: workflowsv1.NewOptString("e2e-execution-1")},
+	}); err != nil {
+		return err
+	}
+
 	return nil
 }
 

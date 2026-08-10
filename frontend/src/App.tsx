@@ -55,6 +55,8 @@ import { SimpleMQDetail } from './components/SimpleMQDetail';
 import { SimpleNotificationList } from './components/SimpleNotificationList';
 import { IAMList } from './components/IAMList';
 import { IAMServicePrincipalDetail } from './components/IAMServicePrincipalDetail';
+import { WorkflowsList } from './components/WorkflowsList';
+import { WorkflowDetail } from './components/WorkflowDetail';
 
 // ナビゲーション項目の定義
 const zoneResources = [
@@ -81,6 +83,7 @@ const globalResources = [
   { path: 'simplemq', label: 'SimpleMQ' },
   { path: 'simplenotification', label: '簡易通知' },
   { path: 'iam', label: 'IAM' },
+  { path: 'workflows', label: 'ワークフロー' },
   { path: 'apprun-shared', label: 'AppRun共用型' },
   { path: 'apprun-dedicated', label: 'AppRun専有型' },
 ];
@@ -222,6 +225,8 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
               <Route path="simplenotification" element={<span className="breadcrumb-item active">簡易通知</span>} />
               <Route path="iam" element={<span className="breadcrumb-item active">IAM</span>} />
               <Route path="iam/serviceprincipals/:id" element={<IAMServicePrincipalBreadcrumb profile={profile} />} />
+              <Route path="workflows" element={<span className="breadcrumb-item active">ワークフロー</span>} />
+              <Route path="workflows/:id" element={<WorkflowBreadcrumb profile={profile} />} />
               <Route path="apprun-dedicated" element={<span className="breadcrumb-item active">AppRun 専有型</span>} />
               <Route path="apprun-shared" element={<span className="breadcrumb-item active">AppRun 共用型</span>} />
               <Route path="bills" element={<span className="breadcrumb-item active">請求</span>} />
@@ -338,6 +343,10 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
           <Route path="iam" element={<IAMListWrapper profile={profile} />} />
           <Route path="iam/serviceprincipals/:id" element={
             <IAMServicePrincipalDetailWrapper profile={profile} />
+          } />
+          <Route path="workflows" element={<WorkflowsListWrapper profile={profile} />} />
+          <Route path="workflows/:id" element={
+            <WorkflowDetailWrapper profile={profile} />
           } />
           <Route path="apprun-dedicated" element={<AppRunDedicatedList profile={profile} />} />
           <Route path="apprun-shared" element={<AppRunSharedList profile={profile} />} />
@@ -596,6 +605,22 @@ function IAMServicePrincipalDetailWrapper({ profile }: { profile: string }) {
   return <IAMServicePrincipalDetail profile={profile} servicePrincipalId={Number(id)} />;
 }
 
+function WorkflowsListWrapper({ profile }: { profile: string }) {
+  const navigate = useNavigate();
+  return (
+    <WorkflowsList
+      profile={profile}
+      onSelectWorkflow={(id) => navigate(`/${profile}/workflows/${id}`)}
+    />
+  );
+}
+
+function WorkflowDetailWrapper({ profile }: { profile: string }) {
+  const { id } = useParams<{ id: string }>();
+  if (!id) return null;
+  return <WorkflowDetail profile={profile} workflowId={id} />;
+}
+
 function SecretManagerListWrapper({ profile }: { profile: string }) {
   const navigate = useNavigate();
   return (
@@ -755,6 +780,19 @@ function IAMServicePrincipalBreadcrumb({ profile }: { profile: string }) {
       </span>
       <span className="breadcrumb-separator">/</span>
       <span className="breadcrumb-item active">サービスプリンシパル詳細</span>
+    </>
+  );
+}
+
+function WorkflowBreadcrumb({ profile }: { profile: string }) {
+  const navigate = useNavigate();
+  return (
+    <>
+      <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/${profile}/workflows`)}>
+        ワークフロー
+      </span>
+      <span className="breadcrumb-separator">/</span>
+      <span className="breadcrumb-item active">詳細</span>
     </>
   );
 }
