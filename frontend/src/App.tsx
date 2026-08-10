@@ -51,6 +51,7 @@ import { ProxyLBList } from './components/ProxyLBList';
 import { SecretManagerList } from './components/SecretManagerList';
 import { SecretManagerDetail } from './components/SecretManagerDetail';
 import { IAMList } from './components/IAMList';
+import { IAMServicePrincipalDetail } from './components/IAMServicePrincipalDetail';
 
 // ナビゲーション項目の定義
 const zoneResources = [
@@ -212,6 +213,7 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
               <Route path="secretmanager" element={<span className="breadcrumb-item active">シークレットマネージャー</span>} />
               <Route path="secretmanager/:id" element={<SecretManagerBreadcrumb profile={profile} />} />
               <Route path="iam" element={<span className="breadcrumb-item active">IAM</span>} />
+              <Route path="iam/serviceprincipals/:id" element={<IAMServicePrincipalBreadcrumb profile={profile} />} />
               <Route path="apprun-dedicated" element={<span className="breadcrumb-item active">AppRun 専有型</span>} />
               <Route path="apprun-shared" element={<span className="breadcrumb-item active">AppRun 共用型</span>} />
               <Route path="bills" element={<span className="breadcrumb-item active">請求</span>} />
@@ -320,7 +322,10 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
           <Route path="secretmanager/:id" element={
             <SecretManagerDetailWrapper profile={profile} />
           } />
-          <Route path="iam" element={<IAMList profile={profile} />} />
+          <Route path="iam" element={<IAMListWrapper profile={profile} />} />
+          <Route path="iam/serviceprincipals/:id" element={
+            <IAMServicePrincipalDetailWrapper profile={profile} />
+          } />
           <Route path="apprun-dedicated" element={<AppRunDedicatedList profile={profile} />} />
           <Route path="apprun-shared" element={<AppRunSharedList profile={profile} />} />
           <Route path="bills" element={
@@ -562,6 +567,22 @@ function KMSDetailWrapper({ profile }: { profile: string }) {
   return <KMSDetail profile={profile} keyId={id} />;
 }
 
+function IAMListWrapper({ profile }: { profile: string }) {
+  const navigate = useNavigate();
+  return (
+    <IAMList
+      profile={profile}
+      onSelectServicePrincipal={(id) => navigate(`/${profile}/iam/serviceprincipals/${id}`)}
+    />
+  );
+}
+
+function IAMServicePrincipalDetailWrapper({ profile }: { profile: string }) {
+  const { id } = useParams<{ id: string }>();
+  if (!id) return null;
+  return <IAMServicePrincipalDetail profile={profile} servicePrincipalId={Number(id)} />;
+}
+
 function SecretManagerListWrapper({ profile }: { profile: string }) {
   const navigate = useNavigate();
   return (
@@ -692,6 +713,19 @@ function EnhancedDBBreadcrumb({ profile }: { profile: string }) {
       </span>
       <span className="breadcrumb-separator">/</span>
       <span className="breadcrumb-item active">詳細</span>
+    </>
+  );
+}
+
+function IAMServicePrincipalBreadcrumb({ profile }: { profile: string }) {
+  const navigate = useNavigate();
+  return (
+    <>
+      <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/${profile}/iam`)}>
+        IAM
+      </span>
+      <span className="breadcrumb-separator">/</span>
+      <span className="breadcrumb-item active">サービスプリンシパル詳細</span>
     </>
   );
 }

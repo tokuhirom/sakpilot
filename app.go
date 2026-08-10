@@ -2068,7 +2068,7 @@ func (a *App) UnveilSecretManagerSecret(profileName, vaultId, name string, versi
 	return service.UnveilSecret(a.ctx, vaultId, name, version)
 }
 
-// IAM(現状はUser/Group/IAMロール/IDロールの読み取りのみ公開。書き込み系は今後のPLAN.md対応で追加予定)
+// IAM(User/Group/IAMロール/IDロールは読み取りのみ公開。ServicePrincipalはキー管理まで含めて公開)
 func (a *App) GetIAMUsers(profileName string) ([]iam.UserInfo, error) {
 	service, err := iam.NewService(profileName)
 	if err != nil {
@@ -2115,6 +2115,86 @@ func (a *App) GetIAMIDRoles(profileName string) ([]iam.IDRoleInfo, error) {
 		return nil, err
 	}
 	return service.ListIDRoles(a.ctx)
+}
+
+func (a *App) GetIAMServicePrincipals(profileName string) ([]iam.ServicePrincipalInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListServicePrincipals(a.ctx)
+}
+
+func (a *App) GetIAMServicePrincipal(profileName string, id int) (*iam.ServicePrincipalInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetServicePrincipal(a.ctx, id)
+}
+
+func (a *App) CreateIAMServicePrincipal(profileName string, projectId int, name, description string) (*iam.ServicePrincipalInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateServicePrincipal(a.ctx, projectId, name, description)
+}
+
+func (a *App) UpdateIAMServicePrincipal(profileName string, id int, name, description string) (*iam.ServicePrincipalInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateServicePrincipal(a.ctx, id, name, description)
+}
+
+func (a *App) DeleteIAMServicePrincipal(profileName string, id int) error {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteServicePrincipal(a.ctx, id)
+}
+
+func (a *App) GetIAMServicePrincipalKeys(profileName string, id int) ([]iam.ServicePrincipalKeyInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListServicePrincipalKeys(a.ctx, id)
+}
+
+func (a *App) UploadIAMServicePrincipalKey(profileName string, id int, publicKey string) (*iam.ServicePrincipalKeyInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UploadServicePrincipalKey(a.ctx, id, publicKey)
+}
+
+func (a *App) EnableIAMServicePrincipalKey(profileName string, id int, keyId string) (*iam.ServicePrincipalKeyInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.EnableServicePrincipalKey(a.ctx, id, keyId)
+}
+
+func (a *App) DisableIAMServicePrincipalKey(profileName string, id int, keyId string) (*iam.ServicePrincipalKeyInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.DisableServicePrincipalKey(a.ctx, id, keyId)
+}
+
+func (a *App) DeleteIAMServicePrincipalKey(profileName string, id int, keyId string) error {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteServicePrincipalKey(a.ctx, id, keyId)
 }
 
 // ProxyLB (Enhanced Load Balancer)

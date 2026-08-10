@@ -8,8 +8,9 @@ import { shot } from './helpers';
 // (playwright.manual.config.ts、testDir: ./e2e-manual)からのみ実行される。
 //
 // シードデータ:
-//   - e2e-user-1:  ユーザータブ表示確認用
-//   - e2e-group-1: グループタブ表示確認用
+//   - e2e-user-1:              ユーザータブ表示確認用
+//   - e2e-group-1:             グループタブ表示確認用
+//   - e2e-service-principal-1: サービスプリンシパルタブ・詳細表示確認用(登録済みキーを1件持つ)
 // IAMロール/IDロールはsakumock側の固定定義(owner/editor/viewer/...、admin/member)を利用する。
 //
 // 1つのtest内で連番のスクリーンショットを撮ることで、番号どおりの操作順序を保証する。
@@ -46,4 +47,17 @@ test('IAMマニュアル用スクリーンショット', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'IDロール' })).toHaveClass(/btn-primary/);
   await page.waitForTimeout(250);
   await shot(page, RESOURCE, '04-id-roles.png');
+
+  // 05: サービスプリンシパルタブ
+  await page.getByRole('button', { name: 'サービスプリンシパル', exact: true }).click();
+  await expect(page.getByRole('cell', { name: 'e2e-service-principal-1' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'サービスプリンシパル', exact: true })).toHaveClass(/btn-primary/);
+  await page.waitForTimeout(250);
+  await shot(page, RESOURCE, '05-serviceprincipals.png');
+
+  // 06: サービスプリンシパル詳細(基本情報・キー一覧)
+  await page.getByRole('cell', { name: 'e2e-service-principal-1' }).click();
+  await expect(page.getByRole('heading', { name: 'サービスプリンシパル詳細: e2e-service-principal-1' })).toBeVisible();
+  await expect(page.getByText('有効', { exact: true })).toBeVisible();
+  await shot(page, RESOURCE, '06-serviceprincipal-detail.png');
 });

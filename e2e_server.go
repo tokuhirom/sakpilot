@@ -40,6 +40,7 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/fake"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	sdkiam "github.com/sacloud/sacloud-sdk-go/api/iam"
+	iamserviceprincipal "github.com/sacloud/sacloud-sdk-go/api/iam/apis/serviceprincipal"
 	iamuser "github.com/sacloud/sacloud-sdk-go/api/iam/apis/user"
 	sdkkms "github.com/sacloud/sacloud-sdk-go/api/kms"
 	kmsv1 "github.com/sacloud/sacloud-sdk-go/api/kms/apis/v1"
@@ -891,7 +892,7 @@ func seedSecretManagerVaults(kmsKeyID string) error {
 	return nil
 }
 
-// seedIAM はsakumockのIAMサーバーにE2Eシナリオ用のユーザーとグループを投入する。
+// seedIAM はsakumockのIAMサーバーにE2Eシナリオ用のユーザー・グループ・サービスプリンシパルを投入する。
 // IAMロール/IDロールはsakumock側に固定の定義(owner/editor/viewer等)が
 // 最初から用意されているため、ここでの投入は不要。
 func seedIAM() error {
@@ -923,6 +924,28 @@ func seedIAM() error {
 	groupOp := sdkiam.NewGroupOp(client)
 	if _, err := groupOp.Create(context.Background(), "e2e-group-1", "E2E: IAM表示確認シナリオ用"); err != nil {
 		return err
+	}
+
+	servicePrincipalOp := sdkiam.NewServicePrincipalOp(client)
+	sp, err := servicePrincipalOp.Create(context.Background(), iamserviceprincipal.CreateParams{
+		ProjectID:   1,
+		Name:        "e2e-service-principal-1",
+		Description: "E2E: 表示/キー管理シナリオ用",
+	})
+	if err != nil {
+		return err
+	}
+	if _, err := servicePrincipalOp.UploadKey(context.Background(), sp.ID, "-----BEGIN PUBLIC KEY-----e2e-seed-key-----END PUBLIC KEY-----"); err != nil {
+		return err
+	}
+
+	for _, name := range []string{"e2e-service-principal-doomed", "e2e-service-principal-editable"} {
+		if _, err := servicePrincipalOp.Create(context.Background(), iamserviceprincipal.CreateParams{
+			ProjectID: 1,
+			Name:      name,
+		}); err != nil {
+			return err
+		}
 	}
 	return nil
 }
