@@ -186,7 +186,13 @@ CLAUDE.mdに既に記載があるサービスだが未着手。`sacloud-sdk-go/a
 - `dedicated-storage`: disk/contract
 - `cloudhsm`: certificate/peer/license
 - `security-control`: evaluation_rules/automated_actions/activation
-- `service-endpoint-gateway`: エンドポイント管理
+- `service-endpoint-gateway`: エンドポイント管理 — ✅ **対応済み（2026-08-10）**: プライベート接続からオブジェクトストレージ/コンテナレジストリ/モニタリングスイート/AppRun専有型コントロールプレーンへ到達するためのゲートウェイアプライアンス。`sacloud-sdk-go/api/service-endpoint-gateway`はogen生成のOpenAPIクライアントで、認証はKMS等と同型(`saclient`標準パターン)だが、サーバー/ディスクと同じくゾーン依存リソースである点が他の新規対応サービス(apigw/eventbus/workflows等、いずれもゾーン非依存)と異なる。`internal/serviceendpointgateway/service.go`にList/Get/Create/Update/Apply/Delete/ReadInterface/ReadPowerStatus/PowerOn/Shutdown/Resetを実装。設計上のポイント:
+  - **sakumockが本サービス未対応**のため(`~/go/pkg/mod/github.com/sacloud/sakumock@v0.7.2/`に対応パッケージなし、Go Module Proxy上の最新版0.7.2でも同じ)、Goテストは`net/http/httptest`+Go1.22の`http.ServeMux`パターンマッチングで自作したfakeサーバー(`internal/serviceendpointgateway/fake_server_test.go`)を用いる方針にした。sakumock対応が追加され次第、切り替えを検討する
+  - **upstreamの不具合を発見**: `sacloud-sdk-go/api/service-endpoint-gateway`の`NewClient`は、`Zone`が設定されていると`SAKURA_ENDPOINTS_SERVICE_ENDPOINT_GATEWAY`によるエンドポイント上書きを無視して常に実際のさくらのクラウドAPI(`secure.sakura.ad.jp`)へのURLを組み立ててしまう(`docs/upstream-issues.md`項目12)。自作fakeサーバーへ向けるテストがこの不具合により実際のインターネット上のAPIへリクエストしてしまうことが判明したため、`internal/serviceendpointgateway/service.go`では`seg.NewClient`を使わず、同等ロジック(エンドポイント上書き優先→ゾーンURLへフォールバック)を`buildEndpoint`として自前で再実装し、`seg.NewClientWithAPIRootURL`に直接渡す形で回避した
+  - `Appliance`の作成ボディ(`ApplianceCreateBody`)にName/Description相当のフィールドが存在しない(API仕様上、名前は付けられない)。一覧・詳細ともにIDで識別する設計にした
+  - 設定変更(接続先マネージドサービス/モニタリングスイート連携/DNSフォワーディング)は`Update`だけでは反映されず、別途`Apply`の呼び出しが必要という2段階API。UIでは`ServiceEndpointGatewayDetail.tsx`の「保存して適用する」ボタンでUpdate→Applyを一括実行する設計にした
+  - UI設計: NFSList.tsx/NFSDetail.tsxの「一覧+詳細ページ」パターン(ゾーン依存リソース、Switch選択によるNFS作成フォームが最も近い)を踏襲。`ServiceEndpointGatewayList.tsx`(一覧・作成・削除・電源操作、NFSList.tsxのポーリングパターンを流用)と`ServiceEndpointGatewayDetail.tsx`(基本情報+電源操作、接続先マネージドサービス設定の編集フォーム)を新設し、サイドバーのゾーン依存リソースに追加
+  - sakumock未対応のため**E2E(`frontend/e2e/`)・マニュアル(`docs/manual/`)は今回のスコープ外**とした(webaccel/nosqlと同じ制約)。Go側はfakeサーバーでのユニットテスト、フロントエンドはVitestのみで検証している(`internal/serviceendpointgateway/service_test.go`、`ServiceEndpointGatewayList.test.tsx`、`ServiceEndpointGatewayDetail.test.tsx`)
 - `addon`: WAF/CDN/DDoS/ETL/DWH/AI/Datalake/Streaming/Vulnerability等（既存IaaSリソースへの機能追加群、対象リソースごとに個別調査が必要）
 
 ---

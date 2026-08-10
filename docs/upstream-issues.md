@@ -117,6 +117,14 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - 実害: `user2fa`はSakPilot側でGo実装・RPC・フロントエンドを作ってもE2E検証ができないため、PLAN.mdのIAMタスク5では対象外とした(sso/scim/servicepolicyの3つのみ実装)。
 - 提案: 上記エンドポイント群への対応を追加してほしい。追加された場合はSakPilot側でも改めて着手を検討する。
 
+### 12. `sacloud-sdk-go/api/service-endpoint-gateway` の `NewClient` が、`Zone`設定時に`SAKURA_ENDPOINTS_SERVICE_ENDPOINT_GATEWAY`によるエンドポイント上書きを無視する
+
+- パッケージ: `github.com/sacloud/sacloud-sdk-go/api/service-endpoint-gateway`
+- ファイル: `client.go`(`NewClient`)
+- 内容: `NewClient`は`endpointConfig.Endpoints["service_endpoint_gateway"]`(環境変数`SAKURA_ENDPOINTS_SERVICE_ENDPOINT_GATEWAY`由来)がセットされていれば`endpoint`変数に採用するが、直後に`if endpointConfig.Zone != ""`のブロックで無条件に`endpoint`をゾーンベースの既定URL(`https://secure.sakura.ad.jp/cloud/zone/<zone>/api/cloud/1.1/`)で上書きしてしまう。KMS/secretmanager等の他サービスは元々ゾーン非依存のためこの分岐自体が無く問題にならないが、SEGはゾーン依存リソースであり、通常利用では`Zone`を必ず指定する。結果として、`SAKURA_ENDPOINTS_SERVICE_ENDPOINT_GATEWAY`でエンドポイントをテスト用サーバー等に差し替えたいケースで、`Zone`を同時に指定すると常に無視されて実際のさくらのクラウドAPIへリクエストが飛んでしまう(実際に`httptest.Server`を指すよう環境変数を設定した状態でGoテストを実行したところ、本物の`secure.sakura.ad.jp`から401 Unauthorizedが返り気づいた)。
+- 実害: SakPilotはsakumockがSEG未対応のため自作のfakeサーバーでGoテストを書く方針を取ったが、上記の優先順位のせいで`seg.NewClient`をそのまま使うテストコードは(意図せず)実際のインターネット上のさくらのクラウドAPIにリクエストしてしまう。`internal/serviceendpointgateway/service.go`では回避のため`seg.NewClient`を呼ばず、同等のロジック(エンドポイント上書き優先→ゾーンURLへフォールバック)を`buildEndpoint`として自前で再実装し、`seg.NewClientWithAPIRootURL`に直接渡す形にした。
+- 提案: `NewClient`内の優先順位を「明示的なエンドポイント上書き→Zoneベースの既定URL」の順に入れ替えてほしい(他の多くのSDKでの一般的な優先順位と合わせる形)。合わせて、`Zone`指定時にテスト用サーバーへの向き先を差し替える手段(`WithTestServer`は`http_request_doer.go`を見る限りルーティングには使われず`*http.Client`の差し替えのみに留まっており、この用途には使えない)をドキュメント化してもらえると助かる。
+
 ## その他メモ(バグではないが気づいた点)
 
 - `fake.InitDataStore()` / `fake.SwitchFactoryFuncToFake()` はいずれも `sync.Once` でプロセス内1回しか実行されない。同一プロセス内で複数のGoテストが同じデータストアを共有することになるため、テスト間で状態がリークする(SakPilotの `internal/sakura/disk_test.go` ではID/存在ベースの検証に倒すことで対応した)。ドキュメントに明記しておいてもらえると、初見でハマる人が減りそう。

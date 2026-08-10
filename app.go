@@ -13,6 +13,7 @@ import (
 	"sakpilot/internal/kms"
 	"sakpilot/internal/sakura"
 	"sakpilot/internal/secretmanager"
+	"sakpilot/internal/serviceendpointgateway"
 	"sakpilot/internal/simplemq"
 	"sakpilot/internal/simplenotification"
 	"sakpilot/internal/workflows"
@@ -3412,4 +3413,97 @@ func (a *App) SetApigwUserGroup(profileName, userId, groupId string, isAssigned 
 		return err
 	}
 	return service.SetUserGroup(a.ctx, userId, groupId, isAssigned)
+}
+
+// Service Endpoint Gateway
+func (a *App) GetServiceEndpointGateways(profileName, zone string) ([]serviceendpointgateway.ApplianceInfo, error) {
+	service, err := serviceendpointgateway.NewService(profileName, zone)
+	if err != nil {
+		return nil, err
+	}
+	return service.List(a.ctx)
+}
+
+func (a *App) GetServiceEndpointGateway(profileName, zone, id string) (*serviceendpointgateway.ApplianceInfo, error) {
+	service, err := serviceendpointgateway.NewService(profileName, zone)
+	if err != nil {
+		return nil, err
+	}
+	return service.Get(a.ctx, id)
+}
+
+func (a *App) CreateServiceEndpointGateway(profileName, zone, switchId string, networkMaskLen int, serverIPAddresses []string) (*serviceendpointgateway.ApplianceInfo, error) {
+	service, err := serviceendpointgateway.NewService(profileName, zone)
+	if err != nil {
+		return nil, err
+	}
+	return service.Create(a.ctx, serviceendpointgateway.CreateParams{
+		SwitchID:          switchId,
+		NetworkMaskLen:    networkMaskLen,
+		ServerIPAddresses: serverIPAddresses,
+	})
+}
+
+func (a *App) UpdateServiceEndpointGateway(profileName, zone, id string, params serviceendpointgateway.UpdateParams) (*serviceendpointgateway.ApplianceInfo, error) {
+	service, err := serviceendpointgateway.NewService(profileName, zone)
+	if err != nil {
+		return nil, err
+	}
+	return service.Update(a.ctx, id, params)
+}
+
+func (a *App) ApplyServiceEndpointGateway(profileName, zone, id string) error {
+	service, err := serviceendpointgateway.NewService(profileName, zone)
+	if err != nil {
+		return err
+	}
+	return service.Apply(a.ctx, id)
+}
+
+func (a *App) DeleteServiceEndpointGateway(profileName, zone, id string) error {
+	service, err := serviceendpointgateway.NewService(profileName, zone)
+	if err != nil {
+		return err
+	}
+	return service.Delete(a.ctx, id)
+}
+
+func (a *App) GetServiceEndpointGatewayInterface(profileName, zone, id, interfaceId string) (*serviceendpointgateway.InterfaceInfo, error) {
+	service, err := serviceendpointgateway.NewService(profileName, zone)
+	if err != nil {
+		return nil, err
+	}
+	return service.ReadInterface(a.ctx, id, interfaceId)
+}
+
+func (a *App) GetServiceEndpointGatewayPowerStatus(profileName, zone, id string) (string, error) {
+	service, err := serviceendpointgateway.NewService(profileName, zone)
+	if err != nil {
+		return "", err
+	}
+	return service.ReadPowerStatus(a.ctx, id)
+}
+
+func (a *App) PowerOnServiceEndpointGateway(profileName, zone, id string) error {
+	service, err := serviceendpointgateway.NewService(profileName, zone)
+	if err != nil {
+		return err
+	}
+	return service.PowerOn(a.ctx, id)
+}
+
+func (a *App) ShutdownServiceEndpointGateway(profileName, zone, id string) error {
+	service, err := serviceendpointgateway.NewService(profileName, zone)
+	if err != nil {
+		return err
+	}
+	return service.Shutdown(a.ctx, id)
+}
+
+func (a *App) ResetServiceEndpointGateway(profileName, zone, id string) error {
+	service, err := serviceendpointgateway.NewService(profileName, zone)
+	if err != nil {
+		return err
+	}
+	return service.Reset(a.ctx, id)
 }
