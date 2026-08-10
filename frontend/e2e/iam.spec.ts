@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 // E2Eサーバーがsakumock IAMにシードするデータ(e2e_server.go の seedIAM を参照):
 //   - e2e-user-1:                     ユーザー表示確認用
@@ -16,6 +16,15 @@ import { test, expect } from '@playwright/test';
 //   - e2e-project-movable:            プロジェクト移動シナリオ用
 // IAMロール/IDロールはsakumock側の固定定義(owner/editor/viewer/...、admin/member)を利用する。
 // 組織(organization)はsakumock側にデフォルトで1件のみ存在する単数リソース。
+// ポリシーバインディングも以下をシード済み:
+//   - 組織スコープ(IAM):  owner + user:1
+//   - e2e-project-1(IAM): editor + group:1
+//   - e2e-folder-1(IAM):  viewer + service-principal:<e2e-service-principal-1のID>
+//   - 組織スコープ(ID):    admin + user:1
+
+function policySelect(page: Page, labelText: string) {
+  return page.locator('.form-group', { has: page.locator('label', { hasText: labelText }) }).locator('select');
+}
 
 test('ユーザー一覧が表示される', async ({ page }) => {
   await page.goto('/');
@@ -263,4 +272,70 @@ test('組織タブで組織情報が表示され、名前を編集できる', as
   await page.getByRole('button', { name: '更新する' }).click();
 
   await expect(page.getByText('e2e-organization-renamed')).toBeVisible();
+});
+
+test('ポリシータブで組織スコープのIAMポリシーバインディングが表示される', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'IAM', exact: true }).click();
+  await page.getByRole('button', { name: 'ポリシー' }).click();
+
+  const row = page.locator('tbody tr').first();
+  await expect(row.getByRole('combobox').first()).toHaveValue('owner');
+});
+
+test('ポリシータブでプロジェクトを選択するとそのIAMポリシーバインディングが表示される', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'IAM', exact: true }).click();
+  await page.getByRole('button', { name: 'ポリシー' }).click();
+
+  await policySelect(page, 'スコープ').selectOption('project');
+  const projectSelect = policySelect(page, 'プロジェクト');
+  const optionValue = await projectSelect.getByRole('option', { name: /e2e-project-1/ }).getAttribute('value');
+  await projectSelect.selectOption(optionValue!);
+
+  const row = page.locator('tbody tr').first();
+  await expect(row.getByRole('combobox').first()).toHaveValue('editor');
+});
+
+test('ポリシータブでフォルダを選択するとそのIAMポリシーバインディングが表示される', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'IAM', exact: true }).click();
+  await page.getByRole('button', { name: 'ポリシー' }).click();
+
+  await policySelect(page, 'スコープ').selectOption('folder');
+  const folderSelect = policySelect(page, 'フォルダ');
+  const optionValue = await folderSelect.getByRole('option', { name: /e2e-folder-1/ }).getAttribute('value');
+  await folderSelect.selectOption(optionValue!);
+
+  const row = page.locator('tbody tr').first();
+  await expect(row.getByRole('combobox').first()).toHaveValue('viewer');
+});
+
+test('ポリシータブでロール体系をIDに切り替えると組織スコープのIDポリシーバインディングが表示される', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'IAM', exact: true }).click();
+  await page.getByRole('button', { name: 'ポリシー' }).click();
+
+  await policySelect(page, 'ロール体系').selectOption('id');
+
+  const row = page.locator('tbody tr').first();
+  await expect(row.getByRole('combobox').first()).toHaveValue('admin');
+});
+
+test('ポリシータブでバインディングを追加して保存できる', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'IAM', exact: true }).click();
+  await page.getByRole('button', { name: 'ポリシー' }).click();
+
+  await page.getByRole('button', { name: '+ バインディング追加' }).click();
+  const newRow = page.locator('tbody tr').last();
+  await newRow.getByRole('combobox').first().selectOption('viewer');
+  await newRow.getByRole('button', { name: '+ プリンシパル追加' }).click();
+  await newRow.getByRole('spinbutton').fill('42');
+
+  await page.getByRole('button', { name: '保存する' }).click();
+
+  const savedRow = page.locator('tbody tr').last();
+  await expect(savedRow.getByRole('combobox').first()).toHaveValue('viewer');
+  await expect(savedRow.getByRole('spinbutton')).toHaveValue('42');
 });

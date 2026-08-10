@@ -15,6 +15,7 @@ import { shot } from './helpers';
 //   - e2e-project-1:           プロジェクト/フォルダタブ表示確認用(e2e-folder-1の子)
 // IAMロール/IDロールはsakumock側の固定定義(owner/editor/viewer/...、admin/member)を利用する。
 // 組織(organization)はsakumock側にデフォルトで1件存在する単数リソース。
+// ポリシータブ用に組織スコープ(IAM)へowner+user:1のバインディングをシード済み。
 //
 // 1つのtest内で連番のスクリーンショットを撮ることで、番号どおりの操作順序を保証する。
 
@@ -79,4 +80,11 @@ test('IAMマニュアル用スクリーンショット', async ({ page }) => {
   await expect(page.getByRole('button', { name: '組織', exact: true })).toHaveClass(/btn-primary/);
   await page.waitForTimeout(250);
   await shot(page, RESOURCE, '08-organization.png');
+
+  // 09: ポリシータブ(組織スコープ、IAMポリシーバインディング)
+  await page.getByRole('button', { name: 'ポリシー' }).click();
+  await expect(page.locator('tbody tr').first().getByRole('combobox').first()).toHaveValue('owner');
+  await expect(page.getByRole('button', { name: 'ポリシー' })).toHaveClass(/btn-primary/);
+  await page.waitForTimeout(250);
+  await shot(page, RESOURCE, '09-policies.png');
 });

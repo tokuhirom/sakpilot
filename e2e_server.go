@@ -44,6 +44,7 @@ import (
 	iamproject "github.com/sacloud/sacloud-sdk-go/api/iam/apis/project"
 	iamserviceprincipal "github.com/sacloud/sacloud-sdk-go/api/iam/apis/serviceprincipal"
 	iamuser "github.com/sacloud/sacloud-sdk-go/api/iam/apis/user"
+	iamv1 "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
 	sdkkms "github.com/sacloud/sacloud-sdk-go/api/kms"
 	kmsv1 "github.com/sacloud/sacloud-sdk-go/api/kms/apis/v1"
 	sdksecretmanager "github.com/sacloud/sacloud-sdk-go/api/secretmanager"
@@ -1139,12 +1140,13 @@ func seedIAM() error {
 	}
 
 	projectOp := sdkiam.NewProjectOp(client)
-	if _, err := projectOp.Create(context.Background(), iamproject.CreateParams{
+	project, err := projectOp.Create(context.Background(), iamproject.CreateParams{
 		Code:           "e2e-project-code-1",
 		Name:           "e2e-project-1",
 		Description:    "E2E: プロジェクト階層表示シナリオ用",
 		ParentFolderID: &folder.ID,
-	}); err != nil {
+	})
+	if err != nil {
 		return err
 	}
 	for _, name := range []string{"e2e-project-doomed", "e2e-project-editable", "e2e-project-movable"} {
@@ -1155,6 +1157,50 @@ func seedIAM() error {
 			return err
 		}
 	}
+
+	policyPrincipal := func(typ string, id int) iamv1.Principal {
+		return iamv1.Principal{Type: iamv1.NewOptString(typ), ID: iamv1.NewOptInt(id)}
+	}
+	iamPolicyBinding := func(roleID string, principals ...iamv1.Principal) iamv1.IamPolicy {
+		return iamv1.IamPolicy{
+			Role: iamv1.NewOptIamPolicyRole(iamv1.IamPolicyRole{
+				Type: iamv1.NewOptIamPolicyRoleType(iamv1.IamPolicyRoleTypePreset),
+				ID:   iamv1.NewOptString(roleID),
+			}),
+			Principals: principals,
+		}
+	}
+
+	iamPolicyOp := sdkiam.NewIAMPolicyOp(client)
+	if _, err := iamPolicyOp.UpdateOrganizationPolicy(context.Background(), []iamv1.IamPolicy{
+		iamPolicyBinding("owner", policyPrincipal("user", 1)),
+	}); err != nil {
+		return err
+	}
+	if _, err := iamPolicyOp.UpdateProjectPolicy(context.Background(), project.ID, []iamv1.IamPolicy{
+		iamPolicyBinding("editor", policyPrincipal("group", 1)),
+	}); err != nil {
+		return err
+	}
+	if _, err := iamPolicyOp.UpdateFolderPolicy(context.Background(), folder.ID, []iamv1.IamPolicy{
+		iamPolicyBinding("viewer", policyPrincipal("service-principal", sp.ID)),
+	}); err != nil {
+		return err
+	}
+
+	idPolicyOp := sdkiam.NewIDPolicyOp(client)
+	if _, err := idPolicyOp.UpdateOrganizationIdPolicy(context.Background(), []iamv1.IdPolicy{
+		{
+			Role: iamv1.NewOptIdPolicyRole(iamv1.IdPolicyRole{
+				Type: iamv1.NewOptIdPolicyRoleType(iamv1.IdPolicyRoleTypePreset),
+				ID:   iamv1.NewOptString("admin"),
+			}),
+			Principals: []iamv1.Principal{policyPrincipal("user", 1)},
+		},
+	}); err != nil {
+		return err
+	}
+
 	return nil
 }
 
