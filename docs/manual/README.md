@@ -25,6 +25,7 @@
 | コンテナレジストリ | [containerregistry.md](containerregistry.md) |
 | KMS | [kms.md](kms.md) |
 | シークレットマネージャー | [secretmanager.md](secretmanager.md) |
+| IAM | [iam.md](iam.md) |
 | AppRun専有型 | [apprun-dedicated.md](apprun-dedicated.md) |
 | AppRun共用型 | [apprun-shared.md](apprun-shared.md) |
 

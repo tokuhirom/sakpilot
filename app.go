@@ -7,6 +7,7 @@ import (
 
 	"sakpilot/internal/apprun"
 	"sakpilot/internal/apprunshared"
+	"sakpilot/internal/iam"
 	"sakpilot/internal/kms"
 	"sakpilot/internal/sakura"
 	"sakpilot/internal/secretmanager"
@@ -2065,6 +2066,55 @@ func (a *App) UnveilSecretManagerSecret(profileName, vaultId, name string, versi
 		return nil, err
 	}
 	return service.UnveilSecret(a.ctx, vaultId, name, version)
+}
+
+// IAM(現状はUser/Group/IAMロール/IDロールの読み取りのみ公開。書き込み系は今後のPLAN.md対応で追加予定)
+func (a *App) GetIAMUsers(profileName string) ([]iam.UserInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListUsers(a.ctx)
+}
+
+func (a *App) GetIAMUser(profileName string, userId int) (*iam.UserInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetUser(a.ctx, userId)
+}
+
+func (a *App) GetIAMGroups(profileName string) ([]iam.GroupInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListGroups(a.ctx)
+}
+
+func (a *App) GetIAMGroup(profileName string, groupId int) (*iam.GroupInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetGroup(a.ctx, groupId)
+}
+
+func (a *App) GetIAMRoles(profileName string) ([]iam.IAMRoleInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListIAMRoles(a.ctx)
+}
+
+func (a *App) GetIAMIDRoles(profileName string) ([]iam.IDRoleInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListIDRoles(a.ctx)
 }
 
 // ProxyLB (Enhanced Load Balancer)

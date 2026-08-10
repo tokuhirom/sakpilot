@@ -50,6 +50,7 @@ import { KMSDetail } from './components/KMSDetail';
 import { ProxyLBList } from './components/ProxyLBList';
 import { SecretManagerList } from './components/SecretManagerList';
 import { SecretManagerDetail } from './components/SecretManagerDetail';
+import { IAMList } from './components/IAMList';
 
 // ナビゲーション項目の定義
 const zoneResources = [
@@ -73,6 +74,7 @@ const globalResources = [
   { path: 'enhanced-db', label: 'エンハンスドDB' },
   { path: 'kms', label: 'KMS' },
   { path: 'secretmanager', label: 'シークレットマネージャー' },
+  { path: 'iam', label: 'IAM' },
   { path: 'apprun-shared', label: 'AppRun共用型' },
   { path: 'apprun-dedicated', label: 'AppRun専有型' },
 ];
@@ -209,6 +211,7 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
               <Route path="kms/:id" element={<KMSBreadcrumb profile={profile} />} />
               <Route path="secretmanager" element={<span className="breadcrumb-item active">シークレットマネージャー</span>} />
               <Route path="secretmanager/:id" element={<SecretManagerBreadcrumb profile={profile} />} />
+              <Route path="iam" element={<span className="breadcrumb-item active">IAM</span>} />
               <Route path="apprun-dedicated" element={<span className="breadcrumb-item active">AppRun 専有型</span>} />
               <Route path="apprun-shared" element={<span className="breadcrumb-item active">AppRun 共用型</span>} />
               <Route path="bills" element={<span className="breadcrumb-item active">請求</span>} />
@@ -317,6 +320,7 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
           <Route path="secretmanager/:id" element={
             <SecretManagerDetailWrapper profile={profile} />
           } />
+          <Route path="iam" element={<IAMList profile={profile} />} />
           <Route path="apprun-dedicated" element={<AppRunDedicatedList profile={profile} />} />
           <Route path="apprun-shared" element={<AppRunSharedList profile={profile} />} />
           <Route path="bills" element={

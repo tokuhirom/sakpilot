@@ -39,6 +39,8 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/fake"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
+	sdkiam "github.com/sacloud/sacloud-sdk-go/api/iam"
+	iamuser "github.com/sacloud/sacloud-sdk-go/api/iam/apis/user"
 	sdkkms "github.com/sacloud/sacloud-sdk-go/api/kms"
 	kmsv1 "github.com/sacloud/sacloud-sdk-go/api/kms/apis/v1"
 	sdksecretmanager "github.com/sacloud/sacloud-sdk-go/api/secretmanager"
@@ -46,6 +48,7 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 	mockapprunshared "github.com/sacloud/sakumock/apprun"
 	mockapprundedicated "github.com/sacloud/sakumock/apprundedicated"
+	mockiam "github.com/sacloud/sakumock/iam"
 	mockkms "github.com/sacloud/sakumock/kms"
 	mockobjectstorage "github.com/sacloud/sakumock/objectstorage"
 	mocksecretmanager "github.com/sacloud/sakumock/secretmanager"
@@ -127,6 +130,14 @@ func runE2EServer(addr, dist string) error {
 	}
 	if err := seedSecretManagerVaults(kmsKeyIDs[0]); err != nil {
 		return fmt.Errorf("failed to seed secret manager vaults: %w", err)
+	}
+
+	iamSrv := mockiam.NewTestServer(mockiam.Config{})
+	if err := os.Setenv("SAKURA_ENDPOINTS_IAM", iamSrv.TestURL()); err != nil {
+		return err
+	}
+	if err := seedIAM(); err != nil {
+		return fmt.Errorf("failed to seed IAM users/groups: %w", err)
 	}
 
 	// ObjectStorageのS3互換データプレーン(オブジェクト一覧・ダウンロード)はsakumock側で
@@ -876,6 +887,42 @@ func seedSecretManagerVaults(kmsKeyID string) error {
 		}); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// seedIAM はsakumockのIAMサーバーにE2Eシナリオ用のユーザーとグループを投入する。
+// IAMロール/IDロールはsakumock側に固定の定義(owner/editor/viewer等)が
+// 最初から用意されているため、ここでの投入は不要。
+func seedIAM() error {
+	var sc saclient.Client
+	env := append(os.Environ(),
+		"SAKURA_ACCESS_TOKEN="+e2eAccessToken,
+		"SAKURA_ACCESS_TOKEN_SECRET="+e2eSecretToken,
+	)
+	if err := sc.SetEnviron(env); err != nil {
+		return err
+	}
+	client, err := sdkiam.NewClient(&sc)
+	if err != nil {
+		return err
+	}
+
+	userOp := sdkiam.NewUserOp(client)
+	email := "e2e-user-1@example.com"
+	if _, err := userOp.Create(context.Background(), iamuser.CreateParams{
+		Name:        "e2e-user-1",
+		Password:    "E2ePassword123!",
+		Code:        "e2euser001",
+		Description: "E2E: IAM表示確認シナリオ用",
+		Email:       &email,
+	}); err != nil {
+		return err
+	}
+
+	groupOp := sdkiam.NewGroupOp(client)
+	if _, err := groupOp.Create(context.Background(), "e2e-group-1", "E2E: IAM表示確認シナリオ用"); err != nil {
+		return err
 	}
 	return nil
 }
