@@ -46,6 +46,8 @@ import (
 	kmsv1 "github.com/sacloud/sacloud-sdk-go/api/kms/apis/v1"
 	sdksecretmanager "github.com/sacloud/sacloud-sdk-go/api/secretmanager"
 	secretmanagerv1 "github.com/sacloud/sacloud-sdk-go/api/secretmanager/apis/v1"
+	sdksimplemq "github.com/sacloud/sacloud-sdk-go/api/simplemq"
+	simplemqqueue "github.com/sacloud/sacloud-sdk-go/api/simplemq/apis/v1/queue"
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 	mockapprunshared "github.com/sacloud/sakumock/apprun"
 	mockapprundedicated "github.com/sacloud/sakumock/apprundedicated"
@@ -53,6 +55,7 @@ import (
 	mockkms "github.com/sacloud/sakumock/kms"
 	mockobjectstorage "github.com/sacloud/sakumock/objectstorage"
 	mocksecretmanager "github.com/sacloud/sakumock/secretmanager"
+	mocksimplemq "github.com/sacloud/sakumock/simplemq"
 	"github.com/zalando/go-keyring"
 )
 
@@ -139,6 +142,17 @@ func runE2EServer(addr, dist string) error {
 	}
 	if err := seedIAM(); err != nil {
 		return fmt.Errorf("failed to seed IAM users/groups: %w", err)
+	}
+
+	simpleMQSrv := mocksimplemq.NewTestServer(mocksimplemq.Config{})
+	if err := os.Setenv("SAKURA_ENDPOINTS_SIMPLE_MQ_QUEUE", simpleMQSrv.TestURL()); err != nil {
+		return err
+	}
+	if err := os.Setenv("SAKURA_ENDPOINTS_SIMPLE_MQ_MESSAGE", simpleMQSrv.TestURL()); err != nil {
+		return err
+	}
+	if err := seedSimpleMQQueues(); err != nil {
+		return fmt.Errorf("failed to seed SimpleMQ queues: %w", err)
 	}
 
 	// ObjectStorageのS3互換データプレーン(オブジェクト一覧・ダウンロード)はsakumock側で
@@ -885,6 +899,35 @@ func seedSecretManagerVaults(kmsKeyID string) error {
 			Name:     name,
 			KmsKeyID: kmsKeyID,
 			Tags:     []string{"env:e2e"},
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// seedSimpleMQQueues はsakumockのSimpleMQサーバーにE2Eシナリオ用のQueueを投入する。
+func seedSimpleMQQueues() error {
+	var sc saclient.Client
+	env := append(os.Environ(),
+		"SAKURA_ACCESS_TOKEN="+e2eAccessToken,
+		"SAKURA_ACCESS_TOKEN_SECRET="+e2eSecretToken,
+	)
+	if err := sc.SetEnviron(env); err != nil {
+		return err
+	}
+	queueClient, err := sdksimplemq.NewQueueClient(&sc)
+	if err != nil {
+		return err
+	}
+	queueOp := sdksimplemq.NewQueueOp(queueClient)
+
+	for _, name := range []string{"e2e-queue-1", "e2e-doomed-queue", "e2e-editable-queue"} {
+		if _, err := queueOp.Create(context.Background(), simplemqqueue.CreateQueueRequest{
+			CommonServiceItem: simplemqqueue.CreateQueueRequestCommonServiceItem{
+				Name: simplemqqueue.QueueName(name),
+				Tags: []string{"env:e2e"},
+			},
 		}); err != nil {
 			return err
 		}

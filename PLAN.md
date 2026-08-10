@@ -120,13 +120,24 @@ SakPilotは現状「単一アカウント（プロファイル）に対する各
 
 CLAUDE.mdに既に記載があるサービスだが未着手。`sacloud-sdk-go/api/webaccel` の操作一覧を確認の上、サイト管理・キャッシュパージ等の主要機能から着手する。
 
+> **2026-08-10時点の注記**: `webaccel`は`sacloud-sdk-go`側にAPIはあるが、`sakumock`(`github.com/sacloud/sakumock`)側に対応パッケージが存在しない。SakPilotのE2Eテスト運用はsakumockのテストサーバーに依存しているため、このままではE2E(`frontend/e2e/`)・マニュアル撮影(`frontend/e2e-manual/`)が書けない。同様にsakumock未対応なのは `nosql` / `cloudhsm` / `dedicated-storage` / `security-control` / `service-endpoint-gateway` / `addon`(Tier C/D相当)。着手する場合はGoテスト(sakumock無しでSDKのHTTPクライアントを直接叩くfake実装が必要)とE2Eの扱いを先に決めること。sakumockに対応が追加されるまでは優先度を下げ、Tier Bの中では`simplemq`/`simple-notification`を先に着手するのが妥当。
+
 ## Tier B: simplemq / simple-notification
 
 いずれもシンプルなCRUD構造:
 - `simplemq`: `queue`, `message`
 - `simple-notification`: `destination`, `routing`, `history`, `group`
 
-実装コストが低く、既存の単一リソースCRUDパターン（PacketFilter等）を踏襲しやすい。
+実装コストが低く、既存の単一リソースCRUDパターン（PacketFilter等）を踏襲しやすい。sakumockに両方とも対応パッケージ(`simplemq`/`simplenotification`)がある。
+
+✅ **`simplemq`対応済み(2026-08-10)**: `internal/simplemq/service.go`にQueue(List/Get/Create/Config(Update)/Delete + CountMessages/RotateAPIKey/ClearMessages)とMessage(Send/Receive/ExtendTimeout/Delete)を実装。`sacloud-sdk-go/api/simplemq`は旧来型ではなくogen生成のOpenAPIクライアントで、KMS/secretmanagerと同じ`saclient.Client`+環境変数注入パターンがそのまま使える(`simplemq.NewQueueClient(&sc)`)。設計上のポイント:
+- Queue管理(control plane)とMessage送受信(data plane)は別クライアント・別認証。Message側は`RotateAPIKey`で発行した専用APIキー(Bearer)が必要で、**発行後は取得する手段がない**(サービスプリンシパルキーと同様の一度きり表示パターン)。Serviceは`NewService(profileName)`がRPC呼び出しごとに使い捨てで生成される既存方針のため、APIキーはService内に保持できず、`SendMessage`等のメソッド引数として都度受け取る設計にした。フロントは発行直後のキーをコンポーネントのローカルstateに保持するのみでアプリ側には永続化しない
+- メッセージ本文(`content`)はAPI仕様上base64エンコードされたASCII文字列である必要がある(sakumockのバリデーションで判明)。`SendMessage`でエンコード、受信系で自動デコードしてUIには平文を渡す
+- メッセージAPIのqueue識別子はQueue作成時の`Name`(`CommonServiceItem.Status.QueueName`と同値)を使う。IDではない点に注意
+- Queue名はAPI側で`^[0-9a-zA-Z]+(-[0-9a-zA-Z]+)*$`・5〜64文字の制約があり、フォームに`pattern`/`minLength`/`maxLength`を設定済み
+- `internal/simplemq/service_test.go`にCRUD一式・APIキー発行〜メッセージ送受信・タイムアウト延長・削除・全削除のGoテストを追加。`frontend/src/components/SimpleMQList.tsx`(一覧・作成・削除)と`SimpleMQDetail.tsx`(基本情報編集・APIキー発行・メッセージ送受信)を新設し、サイドバーのグローバルリソースに追加。Vitestテストを追加、`e2e_server.go`にsakumock simplemqサーバー起動・シード(`seedSimpleMQQueues`)を追加し、`frontend/e2e/simplemq.spec.ts`・`frontend/e2e-manual/simplemq.spec.ts`・`docs/manual/simplemq.md`を新設。既存のE2Eスイート(107件)全件パス確認済み
+
+`simple-notification`は次点候補として未着手のまま残す。
 
 ---
 
