@@ -375,3 +375,184 @@ func TestService_ServicePrincipal_KeyLifecycle(t *testing.T) {
 		t.Fatalf("keys after delete = %+v, want empty", keys)
 	}
 }
+
+func TestService_Folder_CRUD(t *testing.T) {
+	srv := mockiam.NewTestServer(mockiam.Config{})
+	defer srv.Close()
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_IAM", srv.TestURL())
+
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	created, err := service.CreateFolder(context.Background(), "test-folder", "a test folder", 0)
+	if err != nil {
+		t.Fatalf("CreateFolder: %v", err)
+	}
+	if created.Name != "test-folder" || created.Description != "a test folder" || created.ParentID != 0 {
+		t.Errorf("created = %+v, want Name=test-folder Description=%q ParentID=0", created, "a test folder")
+	}
+
+	child, err := service.CreateFolder(context.Background(), "child-folder", "", created.ID)
+	if err != nil {
+		t.Fatalf("CreateFolder(child): %v", err)
+	}
+	if child.ParentID != created.ID {
+		t.Errorf("child.ParentID = %d, want %d", child.ParentID, created.ID)
+	}
+
+	list, err := service.ListFolders(context.Background())
+	if err != nil {
+		t.Fatalf("ListFolders: %v", err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("list = %+v, want 2 items", list)
+	}
+
+	got, err := service.GetFolder(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("GetFolder: %v", err)
+	}
+	if got.ID != created.ID || got.Name != "test-folder" {
+		t.Errorf("got = %+v, want ID=%d Name=test-folder", got, created.ID)
+	}
+
+	updated, err := service.UpdateFolder(context.Background(), created.ID, "renamed-folder", "updated description")
+	if err != nil {
+		t.Fatalf("UpdateFolder: %v", err)
+	}
+	if updated.Name != "renamed-folder" || updated.Description != "updated description" {
+		t.Errorf("updated = %+v, want Name=renamed-folder Description=%q", updated, "updated description")
+	}
+
+	if err := service.MoveFolders(context.Background(), []int{child.ID}, 0); err != nil {
+		t.Fatalf("MoveFolders: %v", err)
+	}
+	moved, err := service.GetFolder(context.Background(), child.ID)
+	if err != nil {
+		t.Fatalf("GetFolder(child) after move: %v", err)
+	}
+	if moved.ParentID != 0 {
+		t.Errorf("moved.ParentID = %d, want 0", moved.ParentID)
+	}
+
+	if err := service.DeleteFolder(context.Background(), child.ID); err != nil {
+		t.Fatalf("DeleteFolder(child): %v", err)
+	}
+	if err := service.DeleteFolder(context.Background(), created.ID); err != nil {
+		t.Fatalf("DeleteFolder: %v", err)
+	}
+
+	list, err = service.ListFolders(context.Background())
+	if err != nil {
+		t.Fatalf("ListFolders after delete: %v", err)
+	}
+	if len(list) != 0 {
+		t.Fatalf("list after delete = %+v, want empty", list)
+	}
+}
+
+func TestService_Project_CRUD(t *testing.T) {
+	srv := mockiam.NewTestServer(mockiam.Config{})
+	defer srv.Close()
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_IAM", srv.TestURL())
+
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	folder, err := service.CreateFolder(context.Background(), "test-folder", "", 0)
+	if err != nil {
+		t.Fatalf("CreateFolder: %v", err)
+	}
+
+	created, err := service.CreateProject(context.Background(), "test-code", "test-project", "a test project", 0)
+	if err != nil {
+		t.Fatalf("CreateProject: %v", err)
+	}
+	if created.Code != "test-code" || created.Name != "test-project" || created.Description != "a test project" || created.ParentFolderID != 0 {
+		t.Errorf("created = %+v, want Code=test-code Name=test-project Description=%q ParentFolderID=0", created, "a test project")
+	}
+
+	list, err := service.ListProjects(context.Background())
+	if err != nil {
+		t.Fatalf("ListProjects: %v", err)
+	}
+	if len(list) != 1 || list[0].ID != created.ID {
+		t.Fatalf("list = %+v, want 1 item with ID=%d", list, created.ID)
+	}
+
+	got, err := service.GetProject(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("GetProject: %v", err)
+	}
+	if got.ID != created.ID || got.Name != "test-project" {
+		t.Errorf("got = %+v, want ID=%d Name=test-project", got, created.ID)
+	}
+
+	updated, err := service.UpdateProject(context.Background(), created.ID, "renamed-project", "updated description")
+	if err != nil {
+		t.Fatalf("UpdateProject: %v", err)
+	}
+	if updated.Name != "renamed-project" || updated.Description != "updated description" {
+		t.Errorf("updated = %+v, want Name=renamed-project Description=%q", updated, "updated description")
+	}
+
+	if err := service.MoveProjects(context.Background(), []int{created.ID}, folder.ID); err != nil {
+		t.Fatalf("MoveProjects: %v", err)
+	}
+	moved, err := service.GetProject(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("GetProject after move: %v", err)
+	}
+	if moved.ParentFolderID != folder.ID {
+		t.Errorf("moved.ParentFolderID = %d, want %d", moved.ParentFolderID, folder.ID)
+	}
+
+	if err := service.DeleteProject(context.Background(), created.ID); err != nil {
+		t.Fatalf("DeleteProject: %v", err)
+	}
+
+	list, err = service.ListProjects(context.Background())
+	if err != nil {
+		t.Fatalf("ListProjects after delete: %v", err)
+	}
+	if len(list) != 0 {
+		t.Fatalf("list after delete = %+v, want empty", list)
+	}
+}
+
+func TestService_Organization_ReadUpdate(t *testing.T) {
+	srv := mockiam.NewTestServer(mockiam.Config{})
+	defer srv.Close()
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_IAM", srv.TestURL())
+
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	got, err := service.GetOrganization(context.Background())
+	if err != nil {
+		t.Fatalf("GetOrganization: %v", err)
+	}
+	if got.Name == "" {
+		t.Errorf("got.Name is empty, want sakumock-seeded default name")
+	}
+
+	updated, err := service.UpdateOrganization(context.Background(), "renamed-organization")
+	if err != nil {
+		t.Fatalf("UpdateOrganization: %v", err)
+	}
+	if updated.Name != "renamed-organization" {
+		t.Errorf("updated.Name = %q, want renamed-organization", updated.Name)
+	}
+}

@@ -9,7 +9,9 @@ import (
 
 	"github.com/google/uuid"
 	sdkiam "github.com/sacloud/sacloud-sdk-go/api/iam"
+	iamfolder "github.com/sacloud/sacloud-sdk-go/api/iam/apis/folder"
 	iamgroup "github.com/sacloud/sacloud-sdk-go/api/iam/apis/group"
+	iamproject "github.com/sacloud/sacloud-sdk-go/api/iam/apis/project"
 	iamserviceprincipal "github.com/sacloud/sacloud-sdk-go/api/iam/apis/serviceprincipal"
 	iamuser "github.com/sacloud/sacloud-sdk-go/api/iam/apis/user"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
@@ -74,6 +76,34 @@ type ServicePrincipalKeyInfo struct {
 	KeyExpiresAt string `json:"keyExpiresAt"`
 }
 
+// ProjectInfo IAMプロジェクト情報
+type ProjectInfo struct {
+	ID             int    `json:"id"`
+	Code           string `json:"code"`
+	Name           string `json:"name"`
+	Description    string `json:"description"`
+	Status         string `json:"status"`
+	ParentFolderID int    `json:"parentFolderId"` // 0の場合は組織ルート直下(フォルダに属さない)
+	CreatedAt      string `json:"createdAt"`
+	UpdatedAt      string `json:"updatedAt"`
+}
+
+// FolderInfo IAMフォルダ情報
+type FolderInfo struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	ParentID    int    `json:"parentId"` // 0の場合は組織ルート直下(親フォルダなし)
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
+}
+
+// OrganizationInfo IAM組織情報
+type OrganizationInfo struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
 // Service IAM API サービス。User/Group/IAMRole/IDRoleは読み取りのみ、ServicePrincipalはキー管理まで含めて公開する
 type Service struct {
 	userOp             sdkiam.UserAPI
@@ -81,6 +111,9 @@ type Service struct {
 	iamRoleOp          sdkiam.IAMRoleAPI
 	idRoleOp           sdkiam.IDRoleAPI
 	servicePrincipalOp sdkiam.ServicePrincipalAPI
+	projectOp          sdkiam.ProjectAPI
+	folderOp           sdkiam.FolderAPI
+	organizationOp     sdkiam.OrganizationAPI
 }
 
 // profileConfig usacloud プロファイルの設定
@@ -116,6 +149,9 @@ func NewService(profileName string) (*Service, error) {
 		iamRoleOp:          sdkiam.NewIAMRoleOp(client),
 		idRoleOp:           sdkiam.NewIDRoleOp(client),
 		servicePrincipalOp: sdkiam.NewServicePrincipalOp(client),
+		projectOp:          sdkiam.NewProjectOp(client),
+		folderOp:           sdkiam.NewFolderOp(client),
+		organizationOp:     sdkiam.NewOrganizationOp(client),
 	}, nil
 }
 
@@ -329,6 +365,142 @@ func (s *Service) DeleteServicePrincipalKey(ctx context.Context, id int, keyID s
 	return s.servicePrincipalOp.DeleteKey(ctx, id, parsedKeyID)
 }
 
+// ListProjects プロジェクト一覧を取得
+func (s *Service) ListProjects(ctx context.Context) ([]ProjectInfo, error) {
+	res, err := s.projectOp.List(ctx, iamproject.ListParams{})
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]ProjectInfo, 0, len(res.Items))
+	for _, p := range res.Items {
+		result = append(result, *toProjectInfo(&p))
+	}
+	return result, nil
+}
+
+// GetProject プロジェクトの詳細を取得
+func (s *Service) GetProject(ctx context.Context, id int) (*ProjectInfo, error) {
+	p, err := s.projectOp.Read(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return toProjectInfo(p), nil
+}
+
+// CreateProject プロジェクトを新規作成する。parentFolderIDが0の場合は組織ルート直下に作成する
+func (s *Service) CreateProject(ctx context.Context, code, name, description string, parentFolderID int) (*ProjectInfo, error) {
+	params := iamproject.CreateParams{Code: code, Name: name, Description: description}
+	if parentFolderID != 0 {
+		params.ParentFolderID = &parentFolderID
+	}
+	p, err := s.projectOp.Create(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	return toProjectInfo(p), nil
+}
+
+// UpdateProject プロジェクトの名前・説明を更新する
+func (s *Service) UpdateProject(ctx context.Context, id int, name, description string) (*ProjectInfo, error) {
+	p, err := s.projectOp.Update(ctx, id, name, description)
+	if err != nil {
+		return nil, err
+	}
+	return toProjectInfo(p), nil
+}
+
+// DeleteProject プロジェクトを削除する
+func (s *Service) DeleteProject(ctx context.Context, id int) error {
+	return s.projectOp.Delete(ctx, id)
+}
+
+// MoveProjects プロジェクトを別のフォルダへ移動する。parentFolderIDが0の場合は組織ルート直下へ移動する
+func (s *Service) MoveProjects(ctx context.Context, ids []int, parentFolderID int) error {
+	var parent *int
+	if parentFolderID != 0 {
+		parent = &parentFolderID
+	}
+	return s.projectOp.Move(ctx, ids, parent)
+}
+
+// ListFolders フォルダ一覧を取得
+func (s *Service) ListFolders(ctx context.Context) ([]FolderInfo, error) {
+	res, err := s.folderOp.List(ctx, iamfolder.ListParams{})
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]FolderInfo, 0, len(res.Items))
+	for _, f := range res.Items {
+		result = append(result, *toFolderInfo(&f))
+	}
+	return result, nil
+}
+
+// GetFolder フォルダの詳細を取得
+func (s *Service) GetFolder(ctx context.Context, id int) (*FolderInfo, error) {
+	f, err := s.folderOp.Read(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return toFolderInfo(f), nil
+}
+
+// CreateFolder フォルダを新規作成する。parentIDが0の場合は組織ルート直下に作成する
+func (s *Service) CreateFolder(ctx context.Context, name, description string, parentID int) (*FolderInfo, error) {
+	params := iamfolder.CreateParams{Name: name, Description: &description}
+	if parentID != 0 {
+		params.ParentID = &parentID
+	}
+	f, err := s.folderOp.Create(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	return toFolderInfo(f), nil
+}
+
+// UpdateFolder フォルダの名前・説明を更新する
+func (s *Service) UpdateFolder(ctx context.Context, id int, name, description string) (*FolderInfo, error) {
+	f, err := s.folderOp.Update(ctx, id, name, &description)
+	if err != nil {
+		return nil, err
+	}
+	return toFolderInfo(f), nil
+}
+
+// DeleteFolder フォルダを削除する
+func (s *Service) DeleteFolder(ctx context.Context, id int) error {
+	return s.folderOp.Delete(ctx, id)
+}
+
+// MoveFolders フォルダを別のフォルダの子へ移動する。parentIDが0の場合は組織ルート直下へ移動する
+func (s *Service) MoveFolders(ctx context.Context, ids []int, parentID int) error {
+	var parent *int
+	if parentID != 0 {
+		parent = &parentID
+	}
+	return s.folderOp.Move(ctx, ids, parent)
+}
+
+// GetOrganization 組織情報を取得
+func (s *Service) GetOrganization(ctx context.Context) (*OrganizationInfo, error) {
+	o, err := s.organizationOp.Read(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return toOrganizationInfo(o), nil
+}
+
+// UpdateOrganization 組織名を更新する
+func (s *Service) UpdateOrganization(ctx context.Context, name string) (*OrganizationInfo, error) {
+	o, err := s.organizationOp.Update(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	return toOrganizationInfo(o), nil
+}
+
 // toUserInfo v1.User を UserInfo に変換
 func toUserInfo(u *v1.User) *UserInfo {
 	return &UserInfo{
@@ -376,5 +548,47 @@ func toServicePrincipalKeyInfo(k *v1.ServicePrincipalKey) *ServicePrincipalKeyIn
 		PublicKey:    string(k.PublicKey),
 		CreatedAt:    k.CreatedAt,
 		KeyExpiresAt: k.KeyExpiresAt.Value,
+	}
+}
+
+// toProjectInfo v1.Project を ProjectInfo に変換
+func toProjectInfo(p *v1.Project) *ProjectInfo {
+	parentFolderID := 0
+	if !p.ParentFolderID.IsNull() {
+		parentFolderID = p.ParentFolderID.Value
+	}
+	return &ProjectInfo{
+		ID:             p.ID,
+		Code:           p.Code,
+		Name:           p.Name,
+		Description:    p.Description,
+		Status:         string(p.Status),
+		ParentFolderID: parentFolderID,
+		CreatedAt:      p.CreatedAt,
+		UpdatedAt:      p.UpdatedAt,
+	}
+}
+
+// toFolderInfo v1.Folder を FolderInfo に変換
+func toFolderInfo(f *v1.Folder) *FolderInfo {
+	parentID := 0
+	if !f.ParentID.IsNull() {
+		parentID = f.ParentID.Value
+	}
+	return &FolderInfo{
+		ID:          f.ID,
+		Name:        f.Name,
+		Description: f.Description,
+		ParentID:    parentID,
+		CreatedAt:   f.CreatedAt,
+		UpdatedAt:   f.UpdatedAt,
+	}
+}
+
+// toOrganizationInfo v1.Organization を OrganizationInfo に変換
+func toOrganizationInfo(o *v1.Organization) *OrganizationInfo {
+	return &OrganizationInfo{
+		ID:   o.ID.Or(0),
+		Name: o.Name,
 	}
 }

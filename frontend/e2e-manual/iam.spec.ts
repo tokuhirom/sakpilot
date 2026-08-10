@@ -11,7 +11,10 @@ import { shot } from './helpers';
 //   - e2e-user-1:              ユーザータブ表示確認用
 //   - e2e-group-1:             グループタブ表示確認用
 //   - e2e-service-principal-1: サービスプリンシパルタブ・詳細表示確認用(登録済みキーを1件持つ)
+//   - e2e-folder-1:            プロジェクト/フォルダタブ表示確認用(子にe2e-project-1を持つ)
+//   - e2e-project-1:           プロジェクト/フォルダタブ表示確認用(e2e-folder-1の子)
 // IAMロール/IDロールはsakumock側の固定定義(owner/editor/viewer/...、admin/member)を利用する。
+// 組織(organization)はsakumock側にデフォルトで1件存在する単数リソース。
 //
 // 1つのtest内で連番のスクリーンショットを撮ることで、番号どおりの操作順序を保証する。
 
@@ -60,4 +63,20 @@ test('IAMマニュアル用スクリーンショット', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'サービスプリンシパル詳細: e2e-service-principal-1' })).toBeVisible();
   await expect(page.getByText('有効', { exact: true })).toBeVisible();
   await shot(page, RESOURCE, '06-serviceprincipal-detail.png');
+
+  // 07: プロジェクト/フォルダタブ(ツリー表示)
+  await page.getByRole('link', { name: 'IAM', exact: true }).click();
+  await page.getByRole('button', { name: 'プロジェクト/フォルダ' }).click();
+  await expect(page.locator('.iam-tree-row', { hasText: 'e2e-folder-1' })).toBeVisible();
+  await expect(page.locator('.iam-tree-row', { hasText: 'e2e-project-1' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'プロジェクト/フォルダ' })).toHaveClass(/btn-primary/);
+  await page.waitForTimeout(250);
+  await shot(page, RESOURCE, '07-projects-folders.png');
+
+  // 08: 組織タブ
+  await page.getByRole('button', { name: '組織', exact: true }).click();
+  await expect(page.getByText('組織ID')).toBeVisible();
+  await expect(page.getByRole('button', { name: '組織', exact: true })).toHaveClass(/btn-primary/);
+  await page.waitForTimeout(250);
+  await shot(page, RESOURCE, '08-organization.png');
 });

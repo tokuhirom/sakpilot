@@ -11,6 +11,16 @@ import {
   GetIAMServicePrincipals,
   CreateIAMServicePrincipal,
   DeleteIAMServicePrincipal,
+  GetIAMProjects,
+  GetIAMFolders,
+  CreateIAMProject,
+  UpdateIAMProject,
+  DeleteIAMProject,
+  MoveIAMProjects,
+  CreateIAMFolder,
+  DeleteIAMFolder,
+  GetIAMOrganization,
+  UpdateIAMOrganization,
 } from '../../wailsjs/go/main/App';
 
 vi.mock('../../wailsjs/go/main/App');
@@ -76,6 +86,40 @@ function makeServicePrincipal(overrides: Partial<iam.ServicePrincipalInfo> = {})
   });
 }
 
+function makeFolder(overrides: Partial<iam.FolderInfo> = {}): iam.FolderInfo {
+  return new iam.FolderInfo({
+    id: 400,
+    name: 'root-folder',
+    description: '',
+    parentId: 0,
+    createdAt: '2026-01-01T00:00:00+09:00',
+    updatedAt: '2026-01-01T00:00:00+09:00',
+    ...overrides,
+  });
+}
+
+function makeProject(overrides: Partial<iam.ProjectInfo> = {}): iam.ProjectInfo {
+  return new iam.ProjectInfo({
+    id: 500,
+    code: 'proj-code',
+    name: 'my-project',
+    description: '',
+    status: 'available',
+    parentFolderId: 0,
+    createdAt: '2026-01-01T00:00:00+09:00',
+    updatedAt: '2026-01-01T00:00:00+09:00',
+    ...overrides,
+  });
+}
+
+function makeOrganization(overrides: Partial<iam.OrganizationInfo> = {}): iam.OrganizationInfo {
+  return new iam.OrganizationInfo({
+    id: 1,
+    name: 'my-organization',
+    ...overrides,
+  });
+}
+
 describe('IAMList', () => {
   beforeEach(() => {
     vi.mocked(GetIAMUsers).mockReset();
@@ -85,6 +129,16 @@ describe('IAMList', () => {
     vi.mocked(GetIAMServicePrincipals).mockReset();
     vi.mocked(CreateIAMServicePrincipal).mockReset();
     vi.mocked(DeleteIAMServicePrincipal).mockReset();
+    vi.mocked(GetIAMProjects).mockReset();
+    vi.mocked(GetIAMFolders).mockReset();
+    vi.mocked(CreateIAMProject).mockReset();
+    vi.mocked(UpdateIAMProject).mockReset();
+    vi.mocked(DeleteIAMProject).mockReset();
+    vi.mocked(MoveIAMProjects).mockReset();
+    vi.mocked(CreateIAMFolder).mockReset();
+    vi.mocked(DeleteIAMFolder).mockReset();
+    vi.mocked(GetIAMOrganization).mockReset();
+    vi.mocked(UpdateIAMOrganization).mockReset();
   });
 
   it('shows users on the default tab', async () => {
@@ -212,5 +266,176 @@ describe('IAMList', () => {
 
     expect(DeleteIAMServicePrincipal).toHaveBeenCalledWith('default', 300);
     expect(await screen.findByText('サービスプリンシパルがありません')).toBeInTheDocument();
+  });
+
+  it('switches to the projects/folders tab and renders the tree', async () => {
+    vi.mocked(GetIAMUsers).mockResolvedValueOnce([]);
+    vi.mocked(GetIAMFolders).mockResolvedValueOnce([makeFolder()]);
+    vi.mocked(GetIAMProjects).mockResolvedValueOnce([makeProject({ parentFolderId: 400 })]);
+    const user = userEvent.setup();
+
+    renderIAMList();
+    await screen.findByText('ユーザーがありません');
+
+    await user.click(screen.getByRole('button', { name: 'プロジェクト/フォルダ' }));
+
+    expect(await screen.findByText('root-folder')).toBeInTheDocument();
+    expect(screen.getByText('my-project')).toBeInTheDocument();
+    expect(GetIAMFolders).toHaveBeenCalledWith('default');
+    expect(GetIAMProjects).toHaveBeenCalledWith('default');
+  });
+
+  it('shows an empty state when there are no projects or folders', async () => {
+    vi.mocked(GetIAMUsers).mockResolvedValueOnce([]);
+    vi.mocked(GetIAMFolders).mockResolvedValueOnce([]);
+    vi.mocked(GetIAMProjects).mockResolvedValueOnce([]);
+    const user = userEvent.setup();
+
+    renderIAMList();
+    await screen.findByText('ユーザーがありません');
+
+    await user.click(screen.getByRole('button', { name: 'プロジェクト/フォルダ' }));
+
+    expect(await screen.findByText('プロジェクト・フォルダがありません')).toBeInTheDocument();
+  });
+
+  it('creates a root folder from the create dialog', async () => {
+    vi.mocked(GetIAMUsers).mockResolvedValueOnce([]);
+    vi.mocked(GetIAMFolders)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([makeFolder()]);
+    vi.mocked(GetIAMProjects).mockResolvedValue([]);
+    vi.mocked(CreateIAMFolder).mockResolvedValueOnce(makeFolder());
+    const user = userEvent.setup();
+
+    renderIAMList();
+    await screen.findByText('ユーザーがありません');
+    await user.click(screen.getByRole('button', { name: 'プロジェクト/フォルダ' }));
+    await screen.findByText('プロジェクト・フォルダがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ フォルダ作成' }));
+    await user.type(screen.getByPlaceholderText('my-folder'), 'root-folder');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    expect(CreateIAMFolder).toHaveBeenCalledWith('default', 'root-folder', '', 0);
+    expect(await screen.findByText('root-folder')).toBeInTheDocument();
+  });
+
+  it('creates a root project from the create dialog', async () => {
+    vi.mocked(GetIAMUsers).mockResolvedValueOnce([]);
+    vi.mocked(GetIAMFolders).mockResolvedValue([]);
+    vi.mocked(GetIAMProjects)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([makeProject()]);
+    vi.mocked(CreateIAMProject).mockResolvedValueOnce(makeProject());
+    const user = userEvent.setup();
+
+    renderIAMList();
+    await screen.findByText('ユーザーがありません');
+    await user.click(screen.getByRole('button', { name: 'プロジェクト/フォルダ' }));
+    await screen.findByText('プロジェクト・フォルダがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ プロジェクト作成' }));
+    await user.type(screen.getByPlaceholderText('my-project-code'), 'proj-code');
+    await user.type(screen.getByPlaceholderText('my-project'), 'my-project');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    expect(CreateIAMProject).toHaveBeenCalledWith('default', 'proj-code', 'my-project', '', 0);
+    expect(await screen.findByText('my-project')).toBeInTheDocument();
+  });
+
+  it('edits a project name from the tree', async () => {
+    vi.mocked(GetIAMUsers).mockResolvedValueOnce([]);
+    vi.mocked(GetIAMFolders).mockResolvedValue([]);
+    const project = makeProject();
+    vi.mocked(GetIAMProjects)
+      .mockResolvedValueOnce([project])
+      .mockResolvedValueOnce([makeProject({ name: 'renamed-project' })]);
+    vi.mocked(UpdateIAMProject).mockResolvedValueOnce(makeProject({ name: 'renamed-project' }));
+    const user = userEvent.setup();
+
+    renderIAMList();
+    await screen.findByText('ユーザーがありません');
+    await user.click(screen.getByRole('button', { name: 'プロジェクト/フォルダ' }));
+    await screen.findByText('my-project');
+
+    await user.click(screen.getByRole('button', { name: '編集' }));
+    const nameInput = screen.getByPlaceholderText('my-project');
+    await user.clear(nameInput);
+    await user.type(nameInput, 'renamed-project');
+    await user.click(screen.getByRole('button', { name: '更新する' }));
+
+    expect(UpdateIAMProject).toHaveBeenCalledWith('default', project.id, 'renamed-project', '');
+    expect(await screen.findByText('renamed-project')).toBeInTheDocument();
+  });
+
+  it('moves a project to another folder from the tree', async () => {
+    vi.mocked(GetIAMUsers).mockResolvedValueOnce([]);
+    const folder = makeFolder();
+    const project = makeProject();
+    vi.mocked(GetIAMFolders).mockResolvedValue([folder]);
+    vi.mocked(GetIAMProjects)
+      .mockResolvedValueOnce([project])
+      .mockResolvedValueOnce([makeProject({ parentFolderId: folder.id })]);
+    vi.mocked(MoveIAMProjects).mockResolvedValueOnce();
+    const user = userEvent.setup();
+
+    renderIAMList();
+    await screen.findByText('ユーザーがありません');
+    await user.click(screen.getByRole('button', { name: 'プロジェクト/フォルダ' }));
+    await screen.findByText('my-project');
+
+    const moveButtons = screen.getAllByRole('button', { name: '移動' });
+    await user.click(moveButtons[moveButtons.length - 1]); // 一覧末尾はプロジェクト(root-folderの後に描画される)
+    await user.selectOptions(screen.getByRole('combobox'), String(folder.id));
+    await user.click(screen.getByRole('button', { name: '移動する' }));
+
+    expect(MoveIAMProjects).toHaveBeenCalledWith('default', [project.id], folder.id);
+  });
+
+  it('deletes a folder after confirmation', async () => {
+    vi.mocked(GetIAMUsers).mockResolvedValueOnce([]);
+    vi.mocked(GetIAMProjects).mockResolvedValue([]);
+    const folder = makeFolder();
+    vi.mocked(GetIAMFolders)
+      .mockResolvedValueOnce([folder])
+      .mockResolvedValueOnce([]);
+    vi.mocked(DeleteIAMFolder).mockResolvedValueOnce();
+    const user = userEvent.setup();
+
+    renderIAMList();
+    await screen.findByText('ユーザーがありません');
+    await user.click(screen.getByRole('button', { name: 'プロジェクト/フォルダ' }));
+    await screen.findByText('root-folder');
+
+    await user.click(screen.getByRole('button', { name: '削除' }));
+    await user.click(screen.getByRole('button', { name: '削除する' }));
+
+    expect(DeleteIAMFolder).toHaveBeenCalledWith('default', folder.id);
+    expect(await screen.findByText('プロジェクト・フォルダがありません')).toBeInTheDocument();
+  });
+
+  it('shows organization info and edits the name', async () => {
+    vi.mocked(GetIAMUsers).mockResolvedValueOnce([]);
+    vi.mocked(GetIAMOrganization).mockResolvedValueOnce(makeOrganization());
+    vi.mocked(UpdateIAMOrganization).mockResolvedValueOnce(makeOrganization({ name: 'renamed-organization' }));
+    const user = userEvent.setup();
+
+    renderIAMList();
+    await screen.findByText('ユーザーがありません');
+
+    await user.click(screen.getByRole('button', { name: '組織' }));
+
+    expect(await screen.findByText('my-organization')).toBeInTheDocument();
+    expect(GetIAMOrganization).toHaveBeenCalledWith('default');
+
+    await user.click(screen.getByRole('button', { name: '組織名を編集' }));
+    const input = screen.getByDisplayValue('my-organization');
+    await user.clear(input);
+    await user.type(input, 'renamed-organization');
+    await user.click(screen.getByRole('button', { name: '更新する' }));
+
+    expect(UpdateIAMOrganization).toHaveBeenCalledWith('default', 'renamed-organization');
+    expect(await screen.findByText('renamed-organization')).toBeInTheDocument();
   });
 });
