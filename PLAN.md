@@ -13,7 +13,7 @@
 | サービス | 概要 | 主なリソース/操作 | 優先度 |
 |---|---|---|---|
 | **iam** | ユーザー・グループ・ロール・ポリシー・サービスプリンシパル管理 | user, group, iamrole, iampolicy, serviceprincipal(+キー管理), organization, project, folder, sso, scim, user2fa, servicepolicy, auth | A |
-| **secretmanager** | シークレット管理 | vault, secret（CRUD） | A |
+| **secretmanager** | シークレット管理 | vault, secret（CRUD） | A（✅ 対応済み） |
 | **webaccel** | ウェブアクセラレータ | サイト管理・キャッシュ制御等（CLAUDE.mdに既記載だが未着手） | B |
 | **simplemq** | メッセージキュー | queue, message（CRUD） | B |
 | **simple-notification** | 通知サービス | destination, routing, history, group | B |
@@ -95,6 +95,8 @@ SakPilotは現状「単一アカウント（プロファイル）に対する各
 - `secret`: 個々のシークレット値（CRUD想定）
 
 実装イメージ: `internal/secretmanager/service.go` を新設し、KMSの実装パターン（List/Get/Create/Update/Delete + Goテスト）を踏襲する。
+
+✅ **対応済み（2026-08-10）**: `internal/secretmanager/service.go`にVault（List/Get/Create/Update/Delete）とSecret（List/Set(Create兼Update)/Delete/Unveil）を実装。`sacloud-sdk-go/api/secretmanager`の`SecretAPI`はvaultごとに`NewSecretOp(client, vaultId)`で生成する設計のため、`Service`が保持する`*v1.Client`から都度Secret用opを作る形にした。VaultのUpdateはKmsKeyID(暗号化キー)が不変のため、KMSの`UpdateKey`と同じく事前ReadでKmsKeyIDを引き継いでから送信する。SecretはRead単体APIが無く、値の取得はUnveil（バージョン指定可、省略時は最新版）のみで行う設計をそのままフロントに反映し、「値を表示」ボタンでその場でUnveilして表示・再度隠せるUIとした（一覧取得用の`SecretInfo`には値を含めない）。`app.go`に8つのRPC(`GetSecretManagerVaults`/`GetSecretManagerVault`/`CreateSecretManagerVault`/`UpdateSecretManagerVault`/`DeleteSecretManagerVault`/`GetSecretManagerSecrets`/`SetSecretManagerSecret`/`DeleteSecretManagerSecret`/`UnveilSecretManagerSecret`)を公開。フロントエンドは`SecretManagerList.tsx`（Vault一覧・作成・削除、作成時はVault必須項目のKMSキーを`GetKMSKeys`から選択させるKMS連携）と`SecretManagerDetail.tsx`（Vault基本情報のインライン編集、シークレット一覧・追加・削除・値表示/非表示）を新設し、サイドバーのグローバルリソースに追加。Goテスト（`sakumock/secretmanager`使用）とVitestテスト（`SecretManagerList.test.tsx`/`SecretManagerDetail.test.tsx`）を追加、`golangci-lint`/`tsc --noEmit`/フロントエンド全テストで確認済み。あわせて`e2e_server.go`にsakumock secretmanagerサーバーの起動・シード（`seedSecretManagerVaults`、KmsKeyIDは`seedKMSKeys`が返すよう変更した実際のKMSキーIDを流用）を追加し、`frontend/e2e/secretmanager.spec.ts`（一覧表示/作成/編集/削除/シークレット表示・追加・削除）を新設。既存93件を含むE2Eスイート全件が通ることを確認済み。マニュアル（`docs/manual/`）は新規リソースのため今回は未着手（既存ルール上、新設リソースでの必須事項ではない）
 
 ---
 

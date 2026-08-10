@@ -9,6 +9,7 @@ import (
 	"sakpilot/internal/apprunshared"
 	"sakpilot/internal/kms"
 	"sakpilot/internal/sakura"
+	"sakpilot/internal/secretmanager"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -1991,6 +1992,79 @@ func (a *App) UpdateKMSKey(profileName, keyId, name, description string, tags []
 		return nil, err
 	}
 	return service.UpdateKey(a.ctx, keyId, name, description, tags)
+}
+
+// Secret Manager
+func (a *App) GetSecretManagerVaults(profileName string) ([]secretmanager.VaultInfo, error) {
+	service, err := secretmanager.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListVaults(a.ctx)
+}
+
+func (a *App) GetSecretManagerVault(profileName, vaultId string) (*secretmanager.VaultInfo, error) {
+	service, err := secretmanager.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetVault(a.ctx, vaultId)
+}
+
+func (a *App) CreateSecretManagerVault(profileName, name, description, kmsKeyId string, tags []string) (*secretmanager.VaultInfo, error) {
+	service, err := secretmanager.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateVault(a.ctx, name, description, kmsKeyId, tags)
+}
+
+func (a *App) UpdateSecretManagerVault(profileName, vaultId, name, description string, tags []string) (*secretmanager.VaultInfo, error) {
+	service, err := secretmanager.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateVault(a.ctx, vaultId, name, description, tags)
+}
+
+func (a *App) DeleteSecretManagerVault(profileName, vaultId string) error {
+	service, err := secretmanager.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteVault(a.ctx, vaultId)
+}
+
+func (a *App) GetSecretManagerSecrets(profileName, vaultId string) ([]secretmanager.SecretInfo, error) {
+	service, err := secretmanager.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListSecrets(a.ctx, vaultId)
+}
+
+func (a *App) SetSecretManagerSecret(profileName, vaultId, name, value string) (*secretmanager.SecretInfo, error) {
+	service, err := secretmanager.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.SetSecret(a.ctx, vaultId, name, value)
+}
+
+func (a *App) DeleteSecretManagerSecret(profileName, vaultId, name string) error {
+	service, err := secretmanager.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteSecret(a.ctx, vaultId, name)
+}
+
+func (a *App) UnveilSecretManagerSecret(profileName, vaultId, name string, version int) (*secretmanager.SecretValue, error) {
+	service, err := secretmanager.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UnveilSecret(a.ctx, vaultId, name, version)
 }
 
 // ProxyLB (Enhanced Load Balancer)
