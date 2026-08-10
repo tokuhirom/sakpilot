@@ -79,11 +79,19 @@ SakPilotは現状「単一アカウント（プロファイル）に対する各
 
 ### 提案タスク分割
 
-1. `iamrole`/`user`/`group` の一覧・詳細（読み取りのみ）
+1. ✅ **対応済み（2026-08-10）**: `iamrole`/`user`/`group` の一覧・詳細（読み取りのみ）
 2. `serviceprincipal` の一覧・詳細・キー管理（発行/無効化/削除）
 3. `project`/`folder`/`organization` の階層表示
 4. `iampolicy` のポリシーバインディング表示・編集
 5. `sso`/`scim`/`user2fa`/`servicepolicy`（需要を見て判断）
+
+#### タスク1完了メモ
+
+- 認証方式の懸念は解消: `sacloud-sdk-go/api/iam/client.go` は KMS/secretmanager と同じく `saclient.WithForceAutomaticAuthentication()` を使っており、既存のAPIキー（ACCESS_TOKEN/SECRET）認証をそのまま利用できる。サービスプリンシパル固有のセットアップは不要
+- `internal/iam/service.go` に User/Group/IAMRole/IDRoleの読み取り専用サービスを実装。User/GroupはSDK上Create/Update/Delete/Membershipsも揃っているが、ユーザー削除は実際のアカウント削除に相当し既存リソース削除よりブラスト半径が大きいため、このタスクでは意図的にList/Readのみに留めた（書き込み系はタスク2以降で改めて検討）
+- UI設計: PLAN.mdの懸念どおり既存のゾーン/グローバル2分類とは毛色が異なるため、詳細画面を作らずタブ切り替え1画面（`IAMList.tsx`、Monitoring.tsxのタブパターンを踏襲）で完結させた。サイドバーは既存の「グローバルリソース」に「IAM」を1エントリ追加
+- `idrole`(旧ロール体系)は`iamrole`と並んでsakumockが固定シードデータ(owner/editor/viewer/resource-creator/organization-admin、admin/member)を持つ読み取り専用APIのため、あわせて一覧表示に対応
+- e2e_server.go/frontend/e2e/frontend/e2e-manual/docs/manual一式まで対応し、既存97件のE2E含め全件パス確認済み
 
 ---
 

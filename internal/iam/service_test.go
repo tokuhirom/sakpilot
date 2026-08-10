@@ -1,0 +1,250 @@
+package iam_test
+
+import (
+	"context"
+	"testing"
+
+	sdkiam "github.com/sacloud/sacloud-sdk-go/api/iam"
+	iamuser "github.com/sacloud/sacloud-sdk-go/api/iam/apis/user"
+	"github.com/sacloud/sacloud-sdk-go/common/saclient"
+	mockiam "github.com/sacloud/sakumock/iam"
+
+	"sakpilot/internal/iam"
+)
+
+// newTestSaclient builds a saclient.Client pointed at the sakumock IAM test
+// server, mirroring how internal/iam.Service authenticates in production.
+func newTestSaclient(t *testing.T, endpoint string) *saclient.Client {
+	t.Helper()
+	var sc saclient.Client
+	if err := sc.SetEnviron([]string{
+		"SAKURA_ACCESS_TOKEN=dummy",
+		"SAKURA_ACCESS_TOKEN_SECRET=dummy",
+		"SAKURA_ENDPOINTS_IAM=" + endpoint,
+	}); err != nil {
+		t.Fatalf("SetEnviron: %v", err)
+	}
+	return &sc
+}
+
+func TestService_ListUsers(t *testing.T) {
+	srv := mockiam.NewTestServer(mockiam.Config{})
+	defer srv.Close()
+
+	sc := newTestSaclient(t, srv.TestURL())
+	rawClient, err := sdkiam.NewClient(sc)
+	if err != nil {
+		t.Fatalf("sdkiam.NewClient: %v", err)
+	}
+	userOp := sdkiam.NewUserOp(rawClient)
+	email := "test-user@example.com"
+	created, err := userOp.Create(context.Background(), iamuser.CreateParams{
+		Name:        "test-user",
+		Password:    "Password12345!",
+		Code:        "test-code",
+		Description: "a test user",
+		Email:       &email,
+	})
+	if err != nil {
+		t.Fatalf("seed Create: %v", err)
+	}
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_IAM", srv.TestURL())
+
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	users, err := service.ListUsers(context.Background())
+	if err != nil {
+		t.Fatalf("ListUsers: %v", err)
+	}
+	if len(users) != 1 {
+		t.Fatalf("got %d users, want 1: %+v", len(users), users)
+	}
+
+	got := users[0]
+	if got.ID != created.ID {
+		t.Errorf("ID = %d, want %d", got.ID, created.ID)
+	}
+	if got.Name != "test-user" {
+		t.Errorf("Name = %q, want %q", got.Name, "test-user")
+	}
+	if got.Code != "test-code" {
+		t.Errorf("Code = %q, want %q", got.Code, "test-code")
+	}
+	if got.Description != "a test user" {
+		t.Errorf("Description = %q, want %q", got.Description, "a test user")
+	}
+}
+
+func TestService_GetUser(t *testing.T) {
+	srv := mockiam.NewTestServer(mockiam.Config{})
+	defer srv.Close()
+
+	sc := newTestSaclient(t, srv.TestURL())
+	rawClient, err := sdkiam.NewClient(sc)
+	if err != nil {
+		t.Fatalf("sdkiam.NewClient: %v", err)
+	}
+	userOp := sdkiam.NewUserOp(rawClient)
+	created, err := userOp.Create(context.Background(), iamuser.CreateParams{
+		Name:     "test-user",
+		Password: "Password12345!",
+		Code:     "test-code",
+	})
+	if err != nil {
+		t.Fatalf("seed Create: %v", err)
+	}
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_IAM", srv.TestURL())
+
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	got, err := service.GetUser(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("GetUser: %v", err)
+	}
+	if got.ID != created.ID {
+		t.Errorf("ID = %d, want %d", got.ID, created.ID)
+	}
+	if got.Name != "test-user" {
+		t.Errorf("Name = %q, want %q", got.Name, "test-user")
+	}
+}
+
+func TestService_ListGroups(t *testing.T) {
+	srv := mockiam.NewTestServer(mockiam.Config{})
+	defer srv.Close()
+
+	sc := newTestSaclient(t, srv.TestURL())
+	rawClient, err := sdkiam.NewClient(sc)
+	if err != nil {
+		t.Fatalf("sdkiam.NewClient: %v", err)
+	}
+	groupOp := sdkiam.NewGroupOp(rawClient)
+	created, err := groupOp.Create(context.Background(), "test-group", "a test group")
+	if err != nil {
+		t.Fatalf("seed Create: %v", err)
+	}
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_IAM", srv.TestURL())
+
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	groups, err := service.ListGroups(context.Background())
+	if err != nil {
+		t.Fatalf("ListGroups: %v", err)
+	}
+	if len(groups) != 1 {
+		t.Fatalf("got %d groups, want 1: %+v", len(groups), groups)
+	}
+	if groups[0].ID != created.ID || groups[0].Name != "test-group" {
+		t.Errorf("groups[0] = %+v, want ID=%d Name=test-group", groups[0], created.ID)
+	}
+}
+
+func TestService_GetGroup(t *testing.T) {
+	srv := mockiam.NewTestServer(mockiam.Config{})
+	defer srv.Close()
+
+	sc := newTestSaclient(t, srv.TestURL())
+	rawClient, err := sdkiam.NewClient(sc)
+	if err != nil {
+		t.Fatalf("sdkiam.NewClient: %v", err)
+	}
+	groupOp := sdkiam.NewGroupOp(rawClient)
+	created, err := groupOp.Create(context.Background(), "test-group", "a test group")
+	if err != nil {
+		t.Fatalf("seed Create: %v", err)
+	}
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_IAM", srv.TestURL())
+
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	got, err := service.GetGroup(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("GetGroup: %v", err)
+	}
+	if got.ID != created.ID || got.Name != "test-group" {
+		t.Errorf("got = %+v, want ID=%d Name=test-group", got, created.ID)
+	}
+}
+
+func TestService_ListIAMRoles(t *testing.T) {
+	srv := mockiam.NewTestServer(mockiam.Config{})
+	defer srv.Close()
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_IAM", srv.TestURL())
+
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	roles, err := service.ListIAMRoles(context.Background())
+	if err != nil {
+		t.Fatalf("ListIAMRoles: %v", err)
+	}
+	if len(roles) == 0 {
+		t.Fatal("got 0 IAM roles, want the sakumock-seeded defaults")
+	}
+	found := false
+	for _, r := range roles {
+		if r.ID == "owner" {
+			found = true
+			if r.LowestGrantableResource != "project" {
+				t.Errorf("owner LowestGrantableResource = %q, want %q", r.LowestGrantableResource, "project")
+			}
+		}
+	}
+	if !found {
+		t.Errorf("owner role not found in %+v", roles)
+	}
+}
+
+func TestService_ListIDRoles(t *testing.T) {
+	srv := mockiam.NewTestServer(mockiam.Config{})
+	defer srv.Close()
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_IAM", srv.TestURL())
+
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	roles, err := service.ListIDRoles(context.Background())
+	if err != nil {
+		t.Fatalf("ListIDRoles: %v", err)
+	}
+	if len(roles) == 0 {
+		t.Fatal("got 0 ID roles, want the sakumock-seeded defaults")
+	}
+	found := false
+	for _, r := range roles {
+		if r.ID == "admin" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("admin role not found in %+v", roles)
+	}
+}
