@@ -83,7 +83,7 @@ SakPilotは現状「単一アカウント（プロファイル）に対する各
 2. ✅ **対応済み（2026-08-10）**: `serviceprincipal` の一覧・詳細・キー管理（発行/無効化/削除）
 3. ✅ **対応済み（2026-08-10）**: `project`/`folder`/`organization` の階層表示
 4. ✅ **対応済み（2026-08-10）**: `iampolicy` のポリシーバインディング表示・編集
-5. `sso`/`scim`/`user2fa`/`servicepolicy`（需要を見て判断）
+5. ✅ **対応済み（2026-08-10、user2faを除く3リソース）**: `sso`/`scim`/`servicepolicy`(`user2fa`はsakumock未対応のためスコープ外)
 
 #### タスク1完了メモ
 
@@ -115,6 +115,14 @@ SakPilotは現状「単一アカウント（プロファイル）に対する各
 - `sakumock/iam`は`handler_policy.go`でこれらのエンドポイントにフル対応しており、ロールID・プリンシパルの存在検証もしていない(サービスプリンシパル作成時のプロジェクトIDと同様、任意の文字列/数値をそのまま保存する)ため、E2E・Goテストとも問題なく書けた
 - UI設計: `IAMList.tsx`に「ポリシー」タブを追加。PUTが全量置換である都合上、画面側は常にそのスコープの全バインディング配列をローカルstateとして保持し、「+バインディング追加」「+プリンシパル追加」「削除」で配列を組み立てた上で「保存する」ボタンで一括Updateする設計にした(個々の追加/削除操作のたびにAPIを呼ばない)。スコープ切り替え(組織/プロジェクト/フォルダ)用のセレクトと、組織スコープのみで有効な「ロール体系」(IAM/ID)セレクトをタブ直下に配置し、プロジェクト/フォルダ選択時は既存の`projectsFolders`タブで使っているprojects/foldersのリストを流用した
 - `internal/iam/service_test.go`に組織/プロジェクト/フォルダそれぞれのIAMポリシーCRUD・組織IDポリシーCRUDのGoテストを追加。e2e_server.goの`seedIAM`に組織IAMポリシー(owner+user:1)・`e2e-project-1`のIAMポリシー(editor+group:1)・`e2e-folder-1`のIAMポリシー(viewer+service-principal:<seed済みSPのID>)・組織IDポリシー(admin+user:1)を追加し、`frontend/e2e/iam.spec.ts`(表示4件+保存1件の5件追加)・`frontend/e2e-manual/iam.spec.ts`(ポリシータブのスクリーンショット追加)・`docs/manual/iam.md`を更新。既存を含むE2Eスイート130件全件パス確認済み
+
+#### タスク5完了メモ
+
+- `sacloud-sdk-go/api/iam/apis/{sso,scim,servicepolicy}`はいずれも`sdkiam.NewClient`が返すのと同じ`*v1.Client`を受け取る単純なラッパーで、認証まわりの追加検証は不要だった(タスク1で解消済みの懸念のとおり)。`internal/iam/service.go`の`Service`に`ssoOp sdksso.SSOAPI`/`scimOp sdkscim.ScimAPI`/`servicePolicyOp sdkservicepolicy.ServicePolicyAPI`を追加し、SSOはList/Create/Read/Update/Delete/Link/Unlink、SCIMはList/Create/Read/Update/Delete/RegenerateToken、ServicePolicyはEnable/Disable/IsEnabled/ListRuleTemplatesを実装した
+- SCIMの`SecretToken`はCreate直後・RegenerateToken直後のレスポンスにしか含まれない一度きり表示のフィールドのため(サービスプリンシパルキー・apigw証明書と同じパターン)、DTOを`ScimConfigurationInfo`(一覧・詳細用、SecretTokenなし)と`ScimConfigurationSecretInfo`(Create応答専用、SecretTokenあり)に分け、RegenerateTokenは新しいトークン文字列(`string`)のみを返す設計にした(simplemqの`RotateAPIKey`と同じ形)。SCIMのIDは`uuid.UUID`だがRPC/Service層では既存パターンどおり`string`のまま扱い、SDK内部で`uuid.Parse`される
+- **sakumockの不具合を発見**: `GET /service-policy-status`はSDKが期待するフィールド名`enabled`ではなく`is_active`を返すため`ServicePolicyAPI.IsEnabled`のデコードが常に失敗する(かつ`is_active`自体もEnable/Disable呼び出しに関わらず常に`false`固定で状態を永続化していない)。また`GET /service-policy-rule-templates`はページネーション付きオブジェクトを期待するSDKに対し素のJSON配列`[]`を返すため`ListRuleTemplates`のデコードも常に失敗する。`docs/upstream-issues.md`の項目4に記録の上、`internal/iam/service.go`の`IsServicePolicyEnabled`/`ListServicePolicyRuleTemplates`でこれらのデコードエラーメッセージを検出してフォールバック(前者は無効`false`、後者は空スライス)する実装にした。Enable/Disable自体(204のみ返す)は問題なく動作する
+- UI設計: `IAMList.tsx`のタブ切り替え1画面パターンを踏襲し、「SSO」「SCIM」「サービスポリシー」の3タブを追加(サービスプリンシパルのみ詳細ページ遷移という既存の例外はここでも踏襲せず、3リソースともタブ内で完結)。SSOは一覧に組織への割り当て状態を`.status`クラス(緑/赤)で表示し、行ごとに「割り当てる」/「割り当て解除」ボタンを出し分け。SCIMはCreate/トークン再発行のたびにシークレットトークンをモーダルで一度だけ表示し(コピー機能付き)、以降は取得不可であることを明示。サービスポリシーは「状態」カード+トグルボタン、その下に参照専用の「ルールテンプレート」一覧という単数リソース寄りの構成(組織タブに近い設計)にした
+- `internal/iam/service_test.go`にSSO/SCIMのCRUD一式・ServicePolicyのEnable/Disable/IsEnabled/ListRuleTemplates(sakumockのフォールバック経路を通ることを確認するテスト)を追加。e2e_server.goの`seedIAM`にSSOプロファイル3件(表示/削除/編集シナリオ用)・SCIM設定3件(表示/削除/編集シナリオ用)を追加(サービスポリシーは状態を永続化しないためシード不要)し、`frontend/e2e/iam.spec.ts`(SSO一覧・作成・削除・編集・割り当て/解除、SCIM一覧・作成(シークレット表示)・削除・編集・トークン再発行、サービスポリシー状態表示+ルールテンプレート+有効化操作、計12件追加)・`IAMList.test.tsx`(同3タブ分のVitestテスト12件追加)・`frontend/e2e-manual/iam.spec.ts`(SSO/SCIM/サービスポリシータブのスクリーンショット追加)・`docs/manual/iam.md`を更新。既存を含むE2Eスイート170件全件パス確認済み
 
 ---
 

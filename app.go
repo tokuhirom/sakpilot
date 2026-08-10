@@ -2378,6 +2378,142 @@ func (a *App) UpdateIDOrganizationPolicy(profileName string, bindings []iam.Poli
 	return service.UpdateIDOrganizationPolicy(a.ctx, bindings)
 }
 
+func (a *App) GetIAMSSOProfiles(profileName string) ([]iam.SSOProfileInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListSSOProfiles(a.ctx)
+}
+
+func (a *App) GetIAMSSOProfile(profileName string, id int) (*iam.SSOProfileInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetSSOProfile(a.ctx, id)
+}
+
+func (a *App) CreateIAMSSOProfile(profileName, name, description, idpEntityId, idpLoginUrl, idpLogoutUrl, idpCertificate string) (*iam.SSOProfileInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateSSOProfile(a.ctx, name, description, idpEntityId, idpLoginUrl, idpLogoutUrl, idpCertificate)
+}
+
+func (a *App) UpdateIAMSSOProfile(profileName string, id int, name, description, idpEntityId, idpLoginUrl, idpLogoutUrl, idpCertificate string) (*iam.SSOProfileInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateSSOProfile(a.ctx, id, name, description, idpEntityId, idpLoginUrl, idpLogoutUrl, idpCertificate)
+}
+
+func (a *App) DeleteIAMSSOProfile(profileName string, id int) error {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteSSOProfile(a.ctx, id)
+}
+
+func (a *App) LinkIAMSSOProfile(profileName string, id int) (*iam.SSOProfileInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.LinkSSOProfile(a.ctx, id)
+}
+
+func (a *App) UnlinkIAMSSOProfile(profileName string, id int) (*iam.SSOProfileInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UnlinkSSOProfile(a.ctx, id)
+}
+
+func (a *App) GetIAMScimConfigurations(profileName string) ([]iam.ScimConfigurationInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListScimConfigurations(a.ctx)
+}
+
+func (a *App) GetIAMScimConfiguration(profileName, id string) (*iam.ScimConfigurationInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetScimConfiguration(a.ctx, id)
+}
+
+func (a *App) CreateIAMScimConfiguration(profileName, name string) (*iam.ScimConfigurationSecretInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateScimConfiguration(a.ctx, name)
+}
+
+func (a *App) UpdateIAMScimConfiguration(profileName, id, name string) (*iam.ScimConfigurationInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateScimConfiguration(a.ctx, id, name)
+}
+
+func (a *App) DeleteIAMScimConfiguration(profileName, id string) error {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteScimConfiguration(a.ctx, id)
+}
+
+func (a *App) RegenerateIAMScimConfigurationToken(profileName, id string) (string, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return "", err
+	}
+	return service.RegenerateScimConfigurationToken(a.ctx, id)
+}
+
+func (a *App) GetIAMServicePolicyStatus(profileName string) (bool, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return false, err
+	}
+	return service.IsServicePolicyEnabled(a.ctx)
+}
+
+func (a *App) EnableIAMServicePolicy(profileName string) error {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.EnableServicePolicy(a.ctx)
+}
+
+func (a *App) DisableIAMServicePolicy(profileName string) error {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DisableServicePolicy(a.ctx)
+}
+
+func (a *App) GetIAMServicePolicyRuleTemplates(profileName string) ([]iam.ServicePolicyRuleTemplateInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListServicePolicyRuleTemplates(a.ctx)
+}
+
 // ProxyLB (Enhanced Load Balancer)
 func (a *App) GetProxyLBs(profileName string) ([]sakura.ProxyLBInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)

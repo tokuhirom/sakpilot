@@ -6,13 +6,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/google/uuid"
 	sdkiam "github.com/sacloud/sacloud-sdk-go/api/iam"
 	iamfolder "github.com/sacloud/sacloud-sdk-go/api/iam/apis/folder"
 	iamgroup "github.com/sacloud/sacloud-sdk-go/api/iam/apis/group"
 	iamproject "github.com/sacloud/sacloud-sdk-go/api/iam/apis/project"
+	sdkscim "github.com/sacloud/sacloud-sdk-go/api/iam/apis/scim"
 	iamserviceprincipal "github.com/sacloud/sacloud-sdk-go/api/iam/apis/serviceprincipal"
+	sdkservicepolicy "github.com/sacloud/sacloud-sdk-go/api/iam/apis/servicepolicy"
+	sdksso "github.com/sacloud/sacloud-sdk-go/api/iam/apis/sso"
 	iamuser "github.com/sacloud/sacloud-sdk-go/api/iam/apis/user"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
@@ -116,6 +120,51 @@ type PolicyBindingInfo struct {
 	Principals []PolicyPrincipalInfo `json:"principals"`
 }
 
+// SSOProfileInfo SSOプロファイル情報
+type SSOProfileInfo struct {
+	ID             int    `json:"id"`
+	Name           string `json:"name"`
+	Description    string `json:"description"`
+	SpEntityID     string `json:"spEntityId"`
+	SpAcsURL       string `json:"spAcsUrl"`
+	IdpEntityID    string `json:"idpEntityId"`
+	IdpLoginURL    string `json:"idpLoginUrl"`
+	IdpLogoutURL   string `json:"idpLogoutUrl"`
+	IdpCertificate string `json:"idpCertificate"`
+	Assigned       bool   `json:"assigned"`
+	CreatedAt      string `json:"createdAt"`
+	UpdatedAt      string `json:"updatedAt"`
+}
+
+// ScimConfigurationInfo ユーザープロビジョニング(SCIM)情報。一覧・詳細取得ではSecretTokenを含まない(作成時・トークン再発行時にしか取得できないため)
+type ScimConfigurationInfo struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	BaseURL   string `json:"baseUrl"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+// ScimConfigurationSecretInfo ユーザープロビジョニング作成直後にのみ取得できるシークレットトークンを含む情報(一度きり表示)
+type ScimConfigurationSecretInfo struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	BaseURL     string `json:"baseUrl"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
+	SecretToken string `json:"secretToken"`
+}
+
+// ServicePolicyRuleTemplateInfo サービスポリシーのルールテンプレート情報(参照専用)
+type ServicePolicyRuleTemplateInfo struct {
+	Code           string   `json:"code"`
+	Name           string   `json:"name"`
+	Description    string   `json:"description"`
+	Type           string   `json:"type"`
+	SupportsDryRun bool     `json:"supportsDryRun"`
+	Prefixes       []string `json:"prefixes"`
+}
+
 // Service IAM API サービス。User/Group/IAMRole/IDRoleは読み取りのみ、ServicePrincipalはキー管理まで含めて公開する
 type Service struct {
 	userOp             sdkiam.UserAPI
@@ -128,6 +177,9 @@ type Service struct {
 	organizationOp     sdkiam.OrganizationAPI
 	iamPolicyOp        sdkiam.IAMPolicyAPI
 	idPolicyOp         sdkiam.IDPolicyAPI
+	ssoOp              sdksso.SSOAPI
+	scimOp             sdkscim.ScimAPI
+	servicePolicyOp    sdkservicepolicy.ServicePolicyAPI
 }
 
 // profileConfig usacloud プロファイルの設定
@@ -168,6 +220,9 @@ func NewService(profileName string) (*Service, error) {
 		organizationOp:     sdkiam.NewOrganizationOp(client),
 		iamPolicyOp:        sdkiam.NewIAMPolicyOp(client),
 		idPolicyOp:         sdkiam.NewIDPolicyOp(client),
+		ssoOp:              sdksso.NewSSOOp(client),
+		scimOp:             sdkscim.NewScimOp(client),
+		servicePolicyOp:    sdkservicepolicy.NewServicePolicyOp(client),
 	}, nil
 }
 
@@ -589,6 +644,198 @@ func (s *Service) UpdateIDOrganizationPolicy(ctx context.Context, bindings []Pol
 	return toIDPolicyBindingInfos(res), nil
 }
 
+// ListSSOProfiles SSOプロファイル一覧を取得
+func (s *Service) ListSSOProfiles(ctx context.Context) ([]SSOProfileInfo, error) {
+	res, err := s.ssoOp.List(ctx, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]SSOProfileInfo, 0, len(res.Items))
+	for _, p := range res.Items {
+		result = append(result, *toSSOProfileInfo(&p))
+	}
+	return result, nil
+}
+
+// GetSSOProfile SSOプロファイルの詳細を取得
+func (s *Service) GetSSOProfile(ctx context.Context, id int) (*SSOProfileInfo, error) {
+	p, err := s.ssoOp.Read(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return toSSOProfileInfo(p), nil
+}
+
+// CreateSSOProfile SSOプロファイルを新規作成する
+func (s *Service) CreateSSOProfile(ctx context.Context, name, description, idpEntityID, idpLoginURL, idpLogoutURL, idpCertificate string) (*SSOProfileInfo, error) {
+	p, err := s.ssoOp.Create(ctx, sdksso.CreateParams{
+		Name:           name,
+		Description:    description,
+		IdpEntityID:    idpEntityID,
+		IdpLoginURL:    idpLoginURL,
+		IdpLogoutURL:   idpLogoutURL,
+		IdpCertificate: idpCertificate,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return toSSOProfileInfo(p), nil
+}
+
+// UpdateSSOProfile SSOプロファイルを更新する
+func (s *Service) UpdateSSOProfile(ctx context.Context, id int, name, description, idpEntityID, idpLoginURL, idpLogoutURL, idpCertificate string) (*SSOProfileInfo, error) {
+	p, err := s.ssoOp.Update(ctx, id, sdksso.UpdateParams{
+		Name:           name,
+		Description:    description,
+		IdpEntityID:    idpEntityID,
+		IdpLoginURL:    idpLoginURL,
+		IdpLogoutURL:   idpLogoutURL,
+		IdpCertificate: idpCertificate,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return toSSOProfileInfo(p), nil
+}
+
+// DeleteSSOProfile SSOプロファイルを削除する
+func (s *Service) DeleteSSOProfile(ctx context.Context, id int) error {
+	return s.ssoOp.Delete(ctx, id)
+}
+
+// LinkSSOProfile SSOプロファイルを組織に割り当てる
+func (s *Service) LinkSSOProfile(ctx context.Context, id int) (*SSOProfileInfo, error) {
+	p, err := s.ssoOp.Link(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return toSSOProfileInfo(p), nil
+}
+
+// UnlinkSSOProfile SSOプロファイルの組織への割り当てを解除する
+func (s *Service) UnlinkSSOProfile(ctx context.Context, id int) (*SSOProfileInfo, error) {
+	p, err := s.ssoOp.Unlink(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return toSSOProfileInfo(p), nil
+}
+
+// ListScimConfigurations ユーザープロビジョニング(SCIM)設定一覧を取得
+func (s *Service) ListScimConfigurations(ctx context.Context) ([]ScimConfigurationInfo, error) {
+	res, err := s.scimOp.List(ctx, sdkscim.ListParams{})
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]ScimConfigurationInfo, 0, len(res.Items))
+	for _, c := range res.Items {
+		result = append(result, *toScimConfigurationInfo(&c))
+	}
+	return result, nil
+}
+
+// GetScimConfiguration ユーザープロビジョニング(SCIM)設定の詳細を取得
+func (s *Service) GetScimConfiguration(ctx context.Context, id string) (*ScimConfigurationInfo, error) {
+	c, err := s.scimOp.Read(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return toScimConfigurationInfo(c), nil
+}
+
+// CreateScimConfiguration ユーザープロビジョニング(SCIM)設定を新規作成する。SecretTokenはこの応答でのみ取得できる(一度きり表示)
+func (s *Service) CreateScimConfiguration(ctx context.Context, name string) (*ScimConfigurationSecretInfo, error) {
+	c, err := s.scimOp.Create(ctx, sdkscim.CreateParams{Name: name})
+	if err != nil {
+		return nil, err
+	}
+	return &ScimConfigurationSecretInfo{
+		ID:          c.ID.String(),
+		Name:        c.Name,
+		BaseURL:     c.BaseURL.String(),
+		CreatedAt:   c.CreatedAt,
+		UpdatedAt:   c.UpdatedAt,
+		SecretToken: c.SecretToken,
+	}, nil
+}
+
+// UpdateScimConfiguration ユーザープロビジョニング(SCIM)設定の名前を更新する
+func (s *Service) UpdateScimConfiguration(ctx context.Context, id, name string) (*ScimConfigurationInfo, error) {
+	c, err := s.scimOp.Update(ctx, id, sdkscim.UpdateParams{Name: name})
+	if err != nil {
+		return nil, err
+	}
+	return toScimConfigurationInfo(c), nil
+}
+
+// DeleteScimConfiguration ユーザープロビジョニング(SCIM)設定を削除する
+func (s *Service) DeleteScimConfiguration(ctx context.Context, id string) error {
+	return s.scimOp.Delete(ctx, id)
+}
+
+// RegenerateScimConfigurationToken ユーザープロビジョニング(SCIM)設定のシークレットトークンを再発行する。戻り値は再発行後のトークンのみで、以降取得する手段はない(一度きり表示)
+func (s *Service) RegenerateScimConfigurationToken(ctx context.Context, id string) (string, error) {
+	res, err := s.scimOp.RegenerateToken(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	return res.SecretToken.Or(""), nil
+}
+
+// IsServicePolicyEnabled サービスポリシーが有効かどうかを取得する
+func (s *Service) IsServicePolicyEnabled(ctx context.Context) (bool, error) {
+	enabled, err := s.servicePolicyOp.IsEnabled(ctx)
+	if err != nil {
+		// sakumockの/service-policy-statusはSDKが期待するフィールド名"enabled"ではなく
+		// "is_active"を返すため、SDK側のデコードが常に失敗する(docs/upstream-issues.md参照)。
+		// 有効状態を確認できないため無効(false)として扱う
+		if strings.Contains(err.Error(), "enabled (field required)") {
+			return false, nil
+		}
+		return false, err
+	}
+	return enabled, nil
+}
+
+// EnableServicePolicy サービスポリシーを有効化する
+func (s *Service) EnableServicePolicy(ctx context.Context) error {
+	return s.servicePolicyOp.Enable(ctx)
+}
+
+// DisableServicePolicy サービスポリシーを無効化する
+func (s *Service) DisableServicePolicy(ctx context.Context) error {
+	return s.servicePolicyOp.Disable(ctx)
+}
+
+// ListServicePolicyRuleTemplates サービスポリシーのルールテンプレート一覧を取得する(参照専用)
+func (s *Service) ListServicePolicyRuleTemplates(ctx context.Context) ([]ServicePolicyRuleTemplateInfo, error) {
+	res, err := s.servicePolicyOp.ListRuleTemplates(ctx, sdkservicepolicy.ListRuleTemplatesParams{})
+	if err != nil {
+		// sakumockの/service-policy-rule-templatesはページネーション付きオブジェクトではなく
+		// 素の配列を返すため、SDK側のデコードが常に失敗する(docs/upstream-issues.md参照)。
+		// 一覧を取得できないため空として扱う
+		if strings.Contains(err.Error(), "ServicePolicyRuleTemplatesGetOK") {
+			return []ServicePolicyRuleTemplateInfo{}, nil
+		}
+		return nil, err
+	}
+
+	result := make([]ServicePolicyRuleTemplateInfo, 0, len(res.Items))
+	for _, t := range res.Items {
+		result = append(result, ServicePolicyRuleTemplateInfo{
+			Code:           t.Code.Or(""),
+			Name:           t.Name.Or(""),
+			Description:    t.Description.Or(""),
+			Type:           t.Type.Or(""),
+			SupportsDryRun: t.SupportsDryRun.Or(false),
+			Prefixes:       t.Prefixes,
+		})
+	}
+	return result, nil
+}
+
 // toUserInfo v1.User を UserInfo に変換
 func toUserInfo(u *v1.User) *UserInfo {
 	return &UserInfo{
@@ -757,4 +1004,33 @@ func toIDPolicies(bindings []PolicyBindingInfo) []v1.IdPolicy {
 		})
 	}
 	return result
+}
+
+// toSSOProfileInfo v1.SSOProfile を SSOProfileInfo に変換
+func toSSOProfileInfo(p *v1.SSOProfile) *SSOProfileInfo {
+	return &SSOProfileInfo{
+		ID:             p.ID,
+		Name:           p.Name,
+		Description:    p.Description,
+		SpEntityID:     p.SpEntityID,
+		SpAcsURL:       p.SpAcsURL,
+		IdpEntityID:    p.IdpEntityID,
+		IdpLoginURL:    p.IdpLoginURL,
+		IdpLogoutURL:   p.IdpLogoutURL,
+		IdpCertificate: p.IdpCertificate,
+		Assigned:       p.Assigned,
+		CreatedAt:      p.CreatedAt,
+		UpdatedAt:      p.UpdatedAt,
+	}
+}
+
+// toScimConfigurationInfo v1.ScimConfigurationBase を ScimConfigurationInfo に変換
+func toScimConfigurationInfo(c *v1.ScimConfigurationBase) *ScimConfigurationInfo {
+	return &ScimConfigurationInfo{
+		ID:        c.ID.String(),
+		Name:      c.Name,
+		BaseURL:   c.BaseURL.String(),
+		CreatedAt: c.CreatedAt,
+		UpdatedAt: c.UpdatedAt,
+	}
 }

@@ -53,7 +53,9 @@ import (
 	sdkiam "github.com/sacloud/sacloud-sdk-go/api/iam"
 	iamfolder "github.com/sacloud/sacloud-sdk-go/api/iam/apis/folder"
 	iamproject "github.com/sacloud/sacloud-sdk-go/api/iam/apis/project"
+	iamscim "github.com/sacloud/sacloud-sdk-go/api/iam/apis/scim"
 	iamserviceprincipal "github.com/sacloud/sacloud-sdk-go/api/iam/apis/serviceprincipal"
+	iamsso "github.com/sacloud/sacloud-sdk-go/api/iam/apis/sso"
 	iamuser "github.com/sacloud/sacloud-sdk-go/api/iam/apis/user"
 	iamv1 "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
 	sdkkms "github.com/sacloud/sacloud-sdk-go/api/kms"
@@ -1518,9 +1520,11 @@ func seedApigw() error {
 	return nil
 }
 
-// seedIAM はsakumockのIAMサーバーにE2Eシナリオ用のユーザー・グループ・サービスプリンシパルを投入する。
+// seedIAM はsakumockのIAMサーバーにE2Eシナリオ用のユーザー・グループ・サービスプリンシパル・
+// SSOプロファイル・SCIM設定を投入する。
 // IAMロール/IDロールはsakumock側に固定の定義(owner/editor/viewer等)が
-// 最初から用意されているため、ここでの投入は不要。
+// 最初から用意されているため、ここでの投入は不要。サービスポリシーは有効/無効状態を
+// sakumockが永続化しないため(docs/upstream-issues.md参照)シード不要。
 func seedIAM() error {
 	var sc saclient.Client
 	env := append(os.Environ(),
@@ -1648,6 +1652,38 @@ func seedIAM() error {
 		},
 	}); err != nil {
 		return err
+	}
+
+	ssoOp := sdkiam.NewSSOOp(client)
+	if _, err := ssoOp.Create(context.Background(), iamsso.CreateParams{
+		Name:           "e2e-sso-profile-1",
+		Description:    "E2E: SSO表示/割り当て確認シナリオ用",
+		IdpEntityID:    "https://idp.e2e.example.com/metadata",
+		IdpLoginURL:    "https://idp.e2e.example.com/sso",
+		IdpLogoutURL:   "https://idp.e2e.example.com/slo",
+		IdpCertificate: "-----BEGIN CERTIFICATE-----e2e-seed-cert-----END CERTIFICATE-----",
+	}); err != nil {
+		return err
+	}
+	for _, name := range []string{"e2e-sso-profile-doomed", "e2e-sso-profile-editable"} {
+		if _, err := ssoOp.Create(context.Background(), iamsso.CreateParams{
+			Name:           name,
+			IdpEntityID:    "https://idp.e2e.example.com/metadata",
+			IdpLoginURL:    "https://idp.e2e.example.com/sso",
+			IdpCertificate: "-----BEGIN CERTIFICATE-----e2e-seed-cert-----END CERTIFICATE-----",
+		}); err != nil {
+			return err
+		}
+	}
+
+	scimOp := sdkiam.NewScimOp(client)
+	if _, err := scimOp.Create(context.Background(), iamscim.CreateParams{Name: "e2e-scim-config-1"}); err != nil {
+		return err
+	}
+	for _, name := range []string{"e2e-scim-config-doomed", "e2e-scim-config-editable"} {
+		if _, err := scimOp.Create(context.Background(), iamscim.CreateParams{Name: name}); err != nil {
+			return err
+		}
 	}
 
 	return nil

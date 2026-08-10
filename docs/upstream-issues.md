@@ -40,9 +40,20 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - SakPilotでの回避: `internal/workflows/service.go` の `GetSubscription` で、エラーメッセージに `"MonthAppliedPlan"` が含まれる場合は未契約(`Subscribed: false`)とみなすフォールバックを実装した。`CurrentPlan`/`MonthAppliedPlan` は常にセットで存在/不在が一致する設計のため、このデコード失敗は実質的に「未契約」の代替シグナルとして安全に使える。
 - 報告時の提案: `handleGetSubscription` で未契約時は `MonthAppliedPlan` キー自体を省略する(値を送らない)、またはOpenAPI仕様側で `MonthAppliedPlan` に `nullable: true` を追加してSDKを再生成するかのいずれかで解消できる。
 
+### 4. `sakumock/iam` の `servicepolicy` 系エンドポイント2件がSDKの期待するレスポンス形式と食い違っており、デコードが常に失敗する
+
+- パッケージ: `github.com/sacloud/sakumock/iam`
+- ファイル: `handler_servicepolicy.go`(`handleServicePolicyStatus`、`handleServicePolicyRuleTemplates`)
+- 内容: 2箇所で不一致がある。
+  1. `GET /service-policy-status` は `{"is_active": false}` を返すが、SDKが生成する `ServicePolicyStatusGetOK` は `enabled`(必須フィールド)を期待しており、フィールド名が一致しないため `ServicePolicyAPI.IsEnabled` は毎回 `decode application/json: invalid: enabled (field required)` で失敗する。しかも `is_active` は常に `false` 固定で、`POST /enable-service-policy`/`POST /disable-service-policy`(いずれも204のみ返し、状態を永続化していない)を呼んでも変化しない。
+  2. `GET /service-policy-rule-templates` はページネーション付きオブジェクト(`{"items": [...], "count": ..., "next": ..., "previous": ...}`)を期待するSDKの `ServicePolicyRuleTemplatesGetOK` に対し、素のJSON配列 `[]` を返すため、`ServicePolicyAPI.ListRuleTemplates` は毎回 `decode ServicePolicyRuleTemplatesGetOK: "{" expected: unexpected byte 91 '['` で失敗する。
+- 実害: SDK経由で `ServicePolicyAPI.IsEnabled`/`ListRuleTemplates` を呼ぶと(Enable/Disable自体は204で成功するにもかかわらず)状態確認やルールテンプレート参照が100%エラーになり、sakumock上でこの2つのユースケースを検証できない。
+- SakPilotでの回避: `internal/iam/service.go` の `IsServicePolicyEnabled`/`ListServicePolicyRuleTemplates` で、それぞれ上記のデコードエラーメッセージ(`"enabled (field required)"`/`"ServicePolicyRuleTemplatesGetOK"`)を検出した場合にフォールバック(前者は無効`false`、後者は空スライス)を返すようにした。`is_active`が状態を反映せず常に固定値である以上、いずれにせよ実際の有効/無効はsakumock上では検証しようがない。
+- 報告時の提案: `handleServicePolicyStatus` のレスポンスフィールド名を `is_active` から `enabled` に修正し、Enable/Disableの呼び出しを実際にストアへ反映する。`handleServicePolicyRuleTemplates` は他の一覧系ハンドラと同じ `writePage` (ページネーション付きオブジェクト)でラップして返すようにしてほしい。
+
 ## 改善要望(upstream向け)
 
-### 4. AppRun専有型 `version.CreateParams.CPU` / SDK内の `Version.CPU` の単位がコード上どこにもドキュメント化されていない
+### 5. AppRun専有型 `version.CreateParams.CPU` / SDK内の `Version.CPU` の単位がコード上どこにもドキュメント化されていない
 
 - パッケージ: `github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/version`
 - 該当: `version.go` の `CreateParams.CPU int64` / `Version.CPU int64`(`json:"cpu"`)
@@ -50,7 +61,7 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - 実害: SakPilot側でこの単位を誤解しており、デプロイフォームの「CPU (vCPU)」欄のデフォルト値 `0.1` をそのまま送信すると `json: cannot unmarshal number 0.1 into ... int64` で必ず失敗するバグになっていた(SakPilot側で修正済み: ミリvCPUに変換してから送るよう修正)。単位がコード上明記されていれば防げたクラスの不具合。
 - 提案: `CPU int64` フィールドに `// CPU ミリvCPU単位のCPU割り当て(例: 1000 = 1 vCPU)` のようなdocコメントを追加してほしい。可能なら `Memory` 等の他の数値フィールドも単位を明記してほしい。
 
-### 5. `sakumock/objectstorage` のS3データプレーンが、control planeで発行したアクセスキーを検証しないため、キー発行込みの結合テストができない
+### 6. `sakumock/objectstorage` のS3データプレーンが、control planeで発行したアクセスキーを検証しないため、キー発行込みの結合テストができない
 
 - パッケージ: `github.com/sacloud/sakumock/objectstorage`
 - 参照: [README「Data plane (S3)」](https://github.com/sacloud/sakumock/tree/main/objectstorage#data-plane-s3)
@@ -59,7 +70,7 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - 実害: SakPilotの実際のUIフロー(アクセスキーを作成 → そのキーでバケット一覧/オブジェクト一覧を取得)をEnd-to-Endに検証できない。versitygwを追加してもキーの紐付けが再現できないため意味がなく、SakPilotではバケット作成リクエスト自体が(control plane経由のため)成功することのみ確認し、一覧反映やオブジェクト操作はE2E対象外にした(`frontend/e2e/objectstorage.spec.ts` 参照)。これはsakumockの不具合ではなく、現状の設計を把握した上でのSakPilot側の判断。
 - 提案(バグ報告ではなく機能要望): data planeがcontrol planeで発行したアクセスキー/シークレットも(固定ルート資格情報に加えて)受け付けるようにしてもらえると、`versitygw` を用意しさえすればキー発行〜オブジェクト操作までを実際のアプリと同じ資格情報で一気通貫にテストできるようになる。
 
-### 6. `sakumock/apprun` のバージョン `CreatedAt` が秒単位に丸められており、短時間に複数回更新すると「最新バージョン」の判定順が不定になる
+### 7. `sakumock/apprun` のバージョン `CreatedAt` が秒単位に丸められており、短時間に複数回更新すると「最新バージョン」の判定順が不定になる
 
 - パッケージ: `github.com/sacloud/sakumock/apprun`
 - ファイル: `store_memory.go` の `createVersionLocked`(`time.Now().UTC().Truncate(time.Second)`)、`ListVersions`(`sort.Slice` で `CreatedAt` の降順ソート、デフォルト`SortOrder=desc`)
@@ -67,7 +78,7 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - 実害: AppRun共用型のVersion Delete API(`handleDeleteVersion`)は「`ListVersions`の先頭要素と同じIDは削除不可(最新版のため)」というチェックを行っているため、この不定性がそのままAPIレスポンスの不定性になる。SakPilot側でVersion Delete機能のテストを書く際、「作成直後のバージョンではない、かつ削除不可能な最新版でもない、中間バージョン」を用意しようとしても`CreatedAt`だけでは判別できず、最終的に「削除を試みて失敗したら次の候補を試す」というフォールバック実装(`internal/apprunshared/service_test.go`の`TestService_DeleteVersion`)で回避する必要があった。内部的には`MemoryStore`が`versionSeq`という単調増加のシーケンス番号を持っており(`Version.Name`のサフィックスに埋め込まれている)、実際の生成順序自体は失われていないため、ソートに使えばこの問題自体は容易に解消できるはずである。
 - 提案: `ListVersions`のソートキーに`CreatedAt`だけでなく`versionSeq`(または相当する単調増加ID)をタイブレーカーとして使う、あるいは`Version.CreatedAt`をより高精度(ナノ秒単位)で記録するようにしてほしい。
 
-### 7. `sakumock/simplenotification` が通知履歴・ソース一覧・ルーティング並び替え・ステータス取得のAPIに未対応
+### 8. `sakumock/simplenotification` が通知履歴・ソース一覧・ルーティング並び替え・ステータス取得のAPIに未対応
 
 - パッケージ: `github.com/sacloud/sakumock/simplenotification`
 - ファイル: `route.go`(`routeTable`)
@@ -80,7 +91,7 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - 実害: SakPilotの簡易通知機能(`internal/simplenotification/`)はDestination/Group/RoutingのCRUD + テストメッセージ送信のみをE2E対象にできた。通知履歴の閲覧、ルーティング作成時のソースID選択UI(現状は数値ID直接入力)、ルーティングの並び替えはUI自体を実装してもE2E検証ができないため、今回のスコープでは見送った(`docs/manual/simplenotification.md`の「未対応の機能」参照)。
 - 提案: 上記4エンドポイントの対応を追加してほしい。特に`ListSources`が使えるようになれば、ルーティング作成フォームでソースIDをID直接入力ではなく選択式にでき、UXが大きく改善する。
 
-### 8. `sacloud-sdk-go/api/eventbus` の `Provider.Class` クエリ注入ミドルウェアが実際のリクエストに反映されず、`Trigger`/`Schedule`/`ProcessConfiguration`のList APIが常に全件を返す
+### 9. `sacloud-sdk-go/api/eventbus` の `Provider.Class` クエリ注入ミドルウェアが実際のリクエストに反映されず、`Trigger`/`Schedule`/`ProcessConfiguration`のList APIが常に全件を返す
 
 - パッケージ: `github.com/sacloud/sacloud-sdk-go/api/eventbus`
 - ファイル: `filter.go`(`injectFilterMiddleware`/`injectFilterToRequest`)、`triggers.go`/`schedules.go`/`process_configurations.go`(各`List`メソッド)
@@ -89,7 +100,7 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - SakPilotでの回避: `internal/eventbus/service.go`の`ListTriggers`/`ListSchedules`/`ListProcessConfigurations`で、レスポンスの各アイテムを`item.Settings.IsTriggerSettings()`等のSettings型判定でクライアント側フィルタしてから返すようにした。
 - 報告時の提案: `injectFilterMiddleware`が生成するミドルウェアが実際に`saclient`のミドルウェアチェーンに乗っているか(`WithMiddleware`オプションの適用順序、複数回の`DupWith`呼び出しでの上書き等)を調査してほしい。可能であれば`client_test.go`に「`RawQuery`が期待通り設定されているか」を検証するテストケースを追加すると再発を防げる。
 
-### 9. `sacloud-sdk-go/api/apigw` の `Service.ConnectTimeout`/`WriteTimeout`/`ReadTimeout` のGodocが「秒数」だが、実際の単位はミリ秒
+### 10. `sacloud-sdk-go/api/apigw` の `Service.ConnectTimeout`/`WriteTimeout`/`ReadTimeout` のGodocが「秒数」だが、実際の単位はミリ秒
 
 - パッケージ: `github.com/sacloud/sacloud-sdk-go/api/apigw`
 - ファイル: `apis/v1/oas_schemas_gen.go`(`ServiceDetailRequest`/`ServiceDetail`/`ServiceDetailResponse`の`ConnectTimeout`/`WriteTimeout`/`ReadTimeout`フィールド、コメントはそれぞれ「接続タイムアウト秒数」「書き込みタイムアウト秒数」「読み込みタイムアウト秒数」)
@@ -97,6 +108,14 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - 実害: SakPilotの初期実装では`internal/apigw/service.go`のフィールド名・フロントエンドのフォームラベルをGodoc通り「秒」として実装してしまい、E2Eマニュアル用スクリーンショット撮影時にサービス詳細画面の表示値(デフォルト適用後の`60000s`)を見て初めて単位の誤りに気づいた。`docs/manual/apigw.md`用のスクリーンショットで実際の表示を確認する工程が無ければ本番相当のデータでも気づきにくいバグだった。
 - 対応: SakPilot側はUIラベルを「(ミリ秒)」に修正し、フォームのデフォルト値もミリ秒基準(5000/60000/60000)に変更して回避した。SDK・sakumock側の修正は行っていない。
 - 提案: Godocのコメントを「ミリ秒」に修正するか、可能であればOpenAPI定義(`openapi/openapi.json`)のフィールド説明・`example`値を実態に合わせてほしい。
+
+### 11. `sakumock/iam` が `user2fa`(2要素認証管理)のAPIに未対応
+
+- パッケージ: `github.com/sacloud/sakumock/iam`
+- ファイル: `route.go`(`routeTable`)
+- 内容: `sacloud-sdk-go/api/iam/apis/user2fa`にはOTP無効化・信頼済みデバイス一覧/削除/全削除・セキュリティキー管理のAPIが定義されているが、sakumockの`routeTable()`には対応するハンドラが1件も登録されていない(`sso`/`scim`/`servicepolicy`は同じPLAN.mdタスクで対応確認済み)。
+- 実害: `user2fa`はSakPilot側でGo実装・RPC・フロントエンドを作ってもE2E検証ができないため、PLAN.mdのIAMタスク5では対象外とした(sso/scim/servicepolicyの3つのみ実装)。
+- 提案: 上記エンドポイント群への対応を追加してほしい。追加された場合はSakPilot側でも改めて着手を検討する。
 
 ## その他メモ(バグではないが気づいた点)
 

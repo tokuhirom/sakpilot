@@ -21,6 +21,21 @@ import {
   DeleteIAMFolder,
   GetIAMOrganization,
   UpdateIAMOrganization,
+  GetIAMSSOProfiles,
+  CreateIAMSSOProfile,
+  UpdateIAMSSOProfile,
+  DeleteIAMSSOProfile,
+  LinkIAMSSOProfile,
+  UnlinkIAMSSOProfile,
+  GetIAMScimConfigurations,
+  CreateIAMScimConfiguration,
+  UpdateIAMScimConfiguration,
+  DeleteIAMScimConfiguration,
+  RegenerateIAMScimConfigurationToken,
+  GetIAMServicePolicyStatus,
+  EnableIAMServicePolicy,
+  DisableIAMServicePolicy,
+  GetIAMServicePolicyRuleTemplates,
 } from '../../wailsjs/go/main/App';
 
 vi.mock('../../wailsjs/go/main/App');
@@ -120,6 +135,59 @@ function makeOrganization(overrides: Partial<iam.OrganizationInfo> = {}): iam.Or
   });
 }
 
+function makeSSOProfile(overrides: Partial<iam.SSOProfileInfo> = {}): iam.SSOProfileInfo {
+  return new iam.SSOProfileInfo({
+    id: 600,
+    name: 'sso-ci',
+    description: '',
+    spEntityId: 'https://secure.sakura.ad.jp/cloud/sso/saml/metadata',
+    spAcsUrl: 'https://secure.sakura.ad.jp/cloud/sso/saml/acs',
+    idpEntityId: 'https://idp.example.com/metadata',
+    idpLoginUrl: 'https://idp.example.com/sso',
+    idpLogoutUrl: '',
+    idpCertificate: '-----BEGIN CERTIFICATE-----test-----END CERTIFICATE-----',
+    assigned: false,
+    createdAt: '2026-01-01T00:00:00+09:00',
+    updatedAt: '2026-01-01T00:00:00+09:00',
+    ...overrides,
+  });
+}
+
+function makeScimConfiguration(overrides: Partial<iam.ScimConfigurationInfo> = {}): iam.ScimConfigurationInfo {
+  return new iam.ScimConfigurationInfo({
+    id: '700',
+    name: 'scim-ci',
+    baseUrl: 'https://secure.sakura.ad.jp/cloud/api/iam/1.0/scim/700',
+    createdAt: '2026-01-01T00:00:00+09:00',
+    updatedAt: '2026-01-01T00:00:00+09:00',
+    ...overrides,
+  });
+}
+
+function makeScimConfigurationSecret(overrides: Partial<iam.ScimConfigurationSecretInfo> = {}): iam.ScimConfigurationSecretInfo {
+  return new iam.ScimConfigurationSecretInfo({
+    id: '700',
+    name: 'scim-ci',
+    baseUrl: 'https://secure.sakura.ad.jp/cloud/api/iam/1.0/scim/700',
+    createdAt: '2026-01-01T00:00:00+09:00',
+    updatedAt: '2026-01-01T00:00:00+09:00',
+    secretToken: 'test-secret-token',
+    ...overrides,
+  });
+}
+
+function makeServicePolicyRuleTemplate(overrides: Partial<iam.ServicePolicyRuleTemplateInfo> = {}): iam.ServicePolicyRuleTemplateInfo {
+  return new iam.ServicePolicyRuleTemplateInfo({
+    code: 'deny-public-bucket',
+    name: 'パブリックバケット禁止',
+    description: '',
+    type: 'boolean',
+    supportsDryRun: true,
+    prefixes: ['objectstorage'],
+    ...overrides,
+  });
+}
+
 describe('IAMList', () => {
   beforeEach(() => {
     vi.mocked(GetIAMUsers).mockReset();
@@ -139,6 +207,21 @@ describe('IAMList', () => {
     vi.mocked(DeleteIAMFolder).mockReset();
     vi.mocked(GetIAMOrganization).mockReset();
     vi.mocked(UpdateIAMOrganization).mockReset();
+    vi.mocked(GetIAMSSOProfiles).mockReset();
+    vi.mocked(CreateIAMSSOProfile).mockReset();
+    vi.mocked(UpdateIAMSSOProfile).mockReset();
+    vi.mocked(DeleteIAMSSOProfile).mockReset();
+    vi.mocked(LinkIAMSSOProfile).mockReset();
+    vi.mocked(UnlinkIAMSSOProfile).mockReset();
+    vi.mocked(GetIAMScimConfigurations).mockReset();
+    vi.mocked(CreateIAMScimConfiguration).mockReset();
+    vi.mocked(UpdateIAMScimConfiguration).mockReset();
+    vi.mocked(DeleteIAMScimConfiguration).mockReset();
+    vi.mocked(RegenerateIAMScimConfigurationToken).mockReset();
+    vi.mocked(GetIAMServicePolicyStatus).mockReset();
+    vi.mocked(EnableIAMServicePolicy).mockReset();
+    vi.mocked(DisableIAMServicePolicy).mockReset();
+    vi.mocked(GetIAMServicePolicyRuleTemplates).mockReset();
   });
 
   it('shows users on the default tab', async () => {
@@ -437,5 +520,189 @@ describe('IAMList', () => {
 
     expect(UpdateIAMOrganization).toHaveBeenCalledWith('default', 'renamed-organization');
     expect(await screen.findByText('renamed-organization')).toBeInTheDocument();
+  });
+
+  it('switches to the SSO tab and shows profiles', async () => {
+    vi.mocked(GetIAMUsers).mockResolvedValueOnce([]);
+    vi.mocked(GetIAMSSOProfiles).mockResolvedValueOnce([makeSSOProfile()]);
+    const user = userEvent.setup();
+
+    renderIAMList();
+    await screen.findByText('ユーザーがありません');
+
+    await user.click(screen.getByRole('button', { name: 'SSO' }));
+
+    expect(await screen.findByText('sso-ci')).toBeInTheDocument();
+    expect(screen.getByText('未割り当て')).toBeInTheDocument();
+    expect(GetIAMSSOProfiles).toHaveBeenCalledWith('default');
+  });
+
+  it('creates an SSO profile from the create dialog', async () => {
+    vi.mocked(GetIAMUsers).mockResolvedValueOnce([]);
+    vi.mocked(GetIAMSSOProfiles)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([makeSSOProfile()]);
+    vi.mocked(CreateIAMSSOProfile).mockResolvedValueOnce(makeSSOProfile());
+    const user = userEvent.setup();
+
+    renderIAMList();
+    await screen.findByText('ユーザーがありません');
+    await user.click(screen.getByRole('button', { name: 'SSO' }));
+    await screen.findByText('SSOプロファイルがありません');
+
+    await user.click(screen.getByRole('button', { name: '+ SSOプロファイル作成' }));
+    await user.type(screen.getByPlaceholderText('my-sso-profile'), 'sso-ci');
+    await user.type(screen.getByPlaceholderText('https://idp.example.com/metadata'), 'https://idp.example.com/metadata');
+    await user.type(screen.getByPlaceholderText('https://idp.example.com/sso'), 'https://idp.example.com/sso');
+    await user.type(screen.getByPlaceholderText('-----BEGIN CERTIFICATE-----...'), '-----BEGIN CERTIFICATE-----test-----END CERTIFICATE-----');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    expect(CreateIAMSSOProfile).toHaveBeenCalledWith(
+      'default', 'sso-ci', '', 'https://idp.example.com/metadata', 'https://idp.example.com/sso', '',
+      '-----BEGIN CERTIFICATE-----test-----END CERTIFICATE-----',
+    );
+    expect(await screen.findByText('sso-ci')).toBeInTheDocument();
+  });
+
+  it('deletes an SSO profile after confirmation', async () => {
+    vi.mocked(GetIAMUsers).mockResolvedValueOnce([]);
+    vi.mocked(GetIAMSSOProfiles)
+      .mockResolvedValueOnce([makeSSOProfile()])
+      .mockResolvedValueOnce([]);
+    vi.mocked(DeleteIAMSSOProfile).mockResolvedValueOnce();
+    const user = userEvent.setup();
+
+    renderIAMList();
+    await screen.findByText('ユーザーがありません');
+    await user.click(screen.getByRole('button', { name: 'SSO' }));
+    await screen.findByText('sso-ci');
+
+    await user.click(screen.getByRole('button', { name: '削除' }));
+    await user.click(screen.getByRole('button', { name: '削除する' }));
+
+    expect(DeleteIAMSSOProfile).toHaveBeenCalledWith('default', 600);
+    expect(await screen.findByText('SSOプロファイルがありません')).toBeInTheDocument();
+  });
+
+  it('links and unlinks an SSO profile', async () => {
+    vi.mocked(GetIAMUsers).mockResolvedValueOnce([]);
+    vi.mocked(GetIAMSSOProfiles)
+      .mockResolvedValueOnce([makeSSOProfile()])
+      .mockResolvedValueOnce([makeSSOProfile({ assigned: true })])
+      .mockResolvedValueOnce([makeSSOProfile({ assigned: false })]);
+    vi.mocked(LinkIAMSSOProfile).mockResolvedValueOnce(makeSSOProfile({ assigned: true }));
+    vi.mocked(UnlinkIAMSSOProfile).mockResolvedValueOnce(makeSSOProfile({ assigned: false }));
+    const user = userEvent.setup();
+
+    renderIAMList();
+    await screen.findByText('ユーザーがありません');
+    await user.click(screen.getByRole('button', { name: 'SSO' }));
+    await screen.findByText('未割り当て');
+
+    await user.click(screen.getByRole('button', { name: '割り当てる' }));
+    expect(LinkIAMSSOProfile).toHaveBeenCalledWith('default', 600);
+    await screen.findByText('割り当て済み');
+
+    await user.click(screen.getByRole('button', { name: '割り当て解除' }));
+    expect(UnlinkIAMSSOProfile).toHaveBeenCalledWith('default', 600);
+    await screen.findByText('未割り当て');
+  });
+
+  it('switches to the SCIM tab and shows configurations', async () => {
+    vi.mocked(GetIAMUsers).mockResolvedValueOnce([]);
+    vi.mocked(GetIAMScimConfigurations).mockResolvedValueOnce([makeScimConfiguration()]);
+    const user = userEvent.setup();
+
+    renderIAMList();
+    await screen.findByText('ユーザーがありません');
+
+    await user.click(screen.getByRole('button', { name: 'SCIM' }));
+
+    expect(await screen.findByText('scim-ci')).toBeInTheDocument();
+    expect(GetIAMScimConfigurations).toHaveBeenCalledWith('default');
+  });
+
+  it('creates a SCIM configuration and reveals the secret token once', async () => {
+    vi.mocked(GetIAMUsers).mockResolvedValueOnce([]);
+    vi.mocked(GetIAMScimConfigurations)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([makeScimConfiguration()]);
+    vi.mocked(CreateIAMScimConfiguration).mockResolvedValueOnce(makeScimConfigurationSecret());
+    const user = userEvent.setup();
+
+    renderIAMList();
+    await screen.findByText('ユーザーがありません');
+    await user.click(screen.getByRole('button', { name: 'SCIM' }));
+    await screen.findByText('ユーザープロビジョニング(SCIM)設定がありません');
+
+    await user.click(screen.getByRole('button', { name: '+ ユーザープロビジョニング作成' }));
+    await user.type(screen.getByPlaceholderText('my-scim-config'), 'scim-ci');
+    await user.click(screen.getByRole('button', { name: '作成する' }));
+
+    expect(CreateIAMScimConfiguration).toHaveBeenCalledWith('default', 'scim-ci');
+    expect(await screen.findByText('シークレットトークン「scim-ci」')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('test-secret-token')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '閉じる' }));
+    expect(await screen.findByText('scim-ci')).toBeInTheDocument();
+  });
+
+  it('deletes a SCIM configuration after confirmation', async () => {
+    vi.mocked(GetIAMUsers).mockResolvedValueOnce([]);
+    vi.mocked(GetIAMScimConfigurations)
+      .mockResolvedValueOnce([makeScimConfiguration()])
+      .mockResolvedValueOnce([]);
+    vi.mocked(DeleteIAMScimConfiguration).mockResolvedValueOnce();
+    const user = userEvent.setup();
+
+    renderIAMList();
+    await screen.findByText('ユーザーがありません');
+    await user.click(screen.getByRole('button', { name: 'SCIM' }));
+    await screen.findByText('scim-ci');
+
+    await user.click(screen.getByRole('button', { name: '削除' }));
+    await user.click(screen.getByRole('button', { name: '削除する' }));
+
+    expect(DeleteIAMScimConfiguration).toHaveBeenCalledWith('default', '700');
+    expect(await screen.findByText('ユーザープロビジョニング(SCIM)設定がありません')).toBeInTheDocument();
+  });
+
+  it('regenerates a SCIM configuration token', async () => {
+    vi.mocked(GetIAMUsers).mockResolvedValueOnce([]);
+    vi.mocked(GetIAMScimConfigurations).mockResolvedValue([makeScimConfiguration()]);
+    vi.mocked(RegenerateIAMScimConfigurationToken).mockResolvedValueOnce('regenerated-token');
+    const user = userEvent.setup();
+
+    renderIAMList();
+    await screen.findByText('ユーザーがありません');
+    await user.click(screen.getByRole('button', { name: 'SCIM' }));
+    await screen.findByText('scim-ci');
+
+    await user.click(screen.getByRole('button', { name: 'トークン再発行' }));
+
+    expect(RegenerateIAMScimConfigurationToken).toHaveBeenCalledWith('default', '700');
+    expect(await screen.findByText('シークレットトークン「scim-ci」')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('regenerated-token')).toBeInTheDocument();
+  });
+
+  it('shows service policy status and rule templates, and toggles enablement', async () => {
+    vi.mocked(GetIAMUsers).mockResolvedValueOnce([]);
+    vi.mocked(GetIAMServicePolicyStatus)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false);
+    vi.mocked(GetIAMServicePolicyRuleTemplates).mockResolvedValueOnce([makeServicePolicyRuleTemplate()]);
+    vi.mocked(EnableIAMServicePolicy).mockResolvedValueOnce();
+    const user = userEvent.setup();
+
+    renderIAMList();
+    await screen.findByText('ユーザーがありません');
+
+    await user.click(screen.getByRole('button', { name: 'サービスポリシー' }));
+
+    expect(await screen.findByText('無効')).toBeInTheDocument();
+    expect(screen.getByText('パブリックバケット禁止')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '有効化する' }));
+    expect(EnableIAMServicePolicy).toHaveBeenCalledWith('default');
   });
 });
