@@ -81,7 +81,7 @@ SakPilotは現状「単一アカウント（プロファイル）に対する各
 
 1. ✅ **対応済み（2026-08-10）**: `iamrole`/`user`/`group` の一覧・詳細（読み取りのみ）
 2. ✅ **対応済み（2026-08-10）**: `serviceprincipal` の一覧・詳細・キー管理（発行/無効化/削除）
-3. `project`/`folder`/`organization` の階層表示
+3. ✅ **対応済み（2026-08-10）**: `project`/`folder`/`organization` の階層表示
 4. `iampolicy` のポリシーバインディング表示・編集
 5. `sso`/`scim`/`user2fa`/`servicepolicy`（需要を見て判断）
 
@@ -100,6 +100,13 @@ SakPilotは現状「単一アカウント（プロファイル）に対する各
 - `CreateParams.ProjectID`が必須（`int`）だが、IAMのプロジェクト管理（タスク3）は未実装のため、作成フォームでは「プロジェクトID」を数値入力させる暫定対応とした。sakumock側もプロジェクトの存在検証はしていないため、E2Eでは検証用に`ProjectID: 1`を決め打ちで使っている。タスク3実装時にプロジェクト選択式へ置き換える想定
 - UI設計: PLAN.mdの提案どおり、`IAMList.tsx`に「サービスプリンシパル」タブ（一覧・作成・削除）を追加し、行クリックで新設の`IAMServicePrincipalDetail.tsx`（ルート`iam/serviceprincipals/:id`、KMSDetail.tsxのステータス変更UIを踏襲）に遷移してキー管理を行う構成にした。既存のIAMタブ画面はタブ切り替えのみで完結していたが、キー一覧・登録・状態変更は情報量が多くタブ内には収まらないため、このリソースだけ詳細ページに遷移する設計とした（react-router、KMSList/KMSDetailと同じ`*Wrapper`パターン）
 - `internal/iam/service_test.go`にCRUD一式・キーライフサイクル一式のGoテストを追加。e2e_server.goの`seedIAM`にサービスプリンシパル3件（表示/キー管理用に登録済みキー1件を持つもの、削除シナリオ用、編集シナリオ用）を追加し、`frontend/e2e/iam.spec.ts`（一覧/作成/削除/編集/キー登録・有効化・無効化・削除）・`frontend/e2e-manual/iam.spec.ts`（スクリーンショット追加）・`docs/manual/iam.md`を更新。既存102件を含むE2Eスイート全件パス確認済み
+
+#### タスク3完了メモ
+
+- `internal/iam/service.go`に`projectOp sdkiam.ProjectAPI`/`folderOp sdkiam.FolderAPI`/`organizationOp sdkiam.OrganizationAPI`を追加し、Project/FolderはList/Create/Read/Update/Delete/Move、OrganizationはRead/Updateを実装(`ReadServicePolicy`/`UpdateServicePolicy`はタスク5のservicepolicy系と合わせて改めて検討することとし今回は対象外)。SDK上の階層関係フィールドはProjectが`ParentFolderID`(`NilInt`)、Folderが`ParentID`(`NilInt`)と命名が異なるが、RPC/フロント側では両方とも「0=組織ルート直下」という単純な`int`(0起点)に統一し、Wailsバインディング越しにポインタ型を扱う複雑さを避けた(実際のリソースIDは常に正の値のため0を「親なし」の番兵として使える)
+- UI設計: `IAMList.tsx`に「プロジェクト/フォルダ」タブを追加し、フォルダは再帰的に子フォルダ・子プロジェクトを展開するツリー表示(テーブルではなくdiv+インデントで表現)とした。各行に「+サブフォルダ」「+プロジェクト」「編集」「移動」「削除」ボタンを持ち、移動は移動先フォルダ(または組織ルート)をセレクトボックスで選ぶモーダルとした。移動先の選択肢から自分自身とその子孫フォルダを除外することで、フォルダを自分の子孫に移動して循環参照になる操作をUI側で防いでいる(API/sakumock側の循環検証は未確認だが、UIレベルで一般的な誤操作は防止できる)
+- 「組織」タブは他リソースと異なり単数リソース(常に1件、IDパラメータなしでRead/Update)のため、一覧ではなく組織ID・組織名を表示するだけの簡易なカード+編集モーダルとした
+- `internal/iam/service_test.go`にFolder/Project各CRUD+Move、OrganizationのRead/UpdateのGoテストを追加。e2e_server.goの`seedIAM`にフォルダ4件(表示用の親、削除/編集/移動先シナリオ用)・プロジェクト4件(表示用は親フォルダの子として、削除/編集/移動シナリオ用)を追加し、`frontend/e2e/iam.spec.ts`(ツリー表示/フォルダ・プロジェクトの作成・削除・編集・移動/組織の表示・編集、9件追加)・`frontend/e2e-manual/iam.spec.ts`(プロジェクト/フォルダ・組織タブのスクリーンショット追加)・`docs/manual/iam.md`を更新。既存を含むE2Eスイート125件全件パス確認済み
 
 ---
 

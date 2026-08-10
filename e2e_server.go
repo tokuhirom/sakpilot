@@ -40,6 +40,8 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/fake"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	sdkiam "github.com/sacloud/sacloud-sdk-go/api/iam"
+	iamfolder "github.com/sacloud/sacloud-sdk-go/api/iam/apis/folder"
+	iamproject "github.com/sacloud/sacloud-sdk-go/api/iam/apis/project"
 	iamserviceprincipal "github.com/sacloud/sacloud-sdk-go/api/iam/apis/serviceprincipal"
 	iamuser "github.com/sacloud/sacloud-sdk-go/api/iam/apis/user"
 	sdkkms "github.com/sacloud/sacloud-sdk-go/api/kms"
@@ -1121,8 +1123,42 @@ func seedIAM() error {
 			return err
 		}
 	}
+
+	folderOp := sdkiam.NewFolderOp(client)
+	folder, err := folderOp.Create(context.Background(), iamfolder.CreateParams{
+		Name:        "e2e-folder-1",
+		Description: strPtr("E2E: フォルダ階層表示シナリオ用"),
+	})
+	if err != nil {
+		return err
+	}
+	for _, name := range []string{"e2e-folder-doomed", "e2e-folder-editable", "e2e-folder-move-target"} {
+		if _, err := folderOp.Create(context.Background(), iamfolder.CreateParams{Name: name}); err != nil {
+			return err
+		}
+	}
+
+	projectOp := sdkiam.NewProjectOp(client)
+	if _, err := projectOp.Create(context.Background(), iamproject.CreateParams{
+		Code:           "e2e-project-code-1",
+		Name:           "e2e-project-1",
+		Description:    "E2E: プロジェクト階層表示シナリオ用",
+		ParentFolderID: &folder.ID,
+	}); err != nil {
+		return err
+	}
+	for _, name := range []string{"e2e-project-doomed", "e2e-project-editable", "e2e-project-movable"} {
+		if _, err := projectOp.Create(context.Background(), iamproject.CreateParams{
+			Code: name + "-code",
+			Name: name,
+		}); err != nil {
+			return err
+		}
+	}
 	return nil
 }
+
+func strPtr(s string) *string { return &s }
 
 // rpcHandler はAppのバインドメソッドをリフレクションで呼び出すHTTPハンドラを返す。
 // Wailsのバインディング呼び出し規約と同じく、引数はJSON配列で受け取り、

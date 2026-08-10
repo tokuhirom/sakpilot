@@ -2199,6 +2199,118 @@ func (a *App) DeleteIAMServicePrincipalKey(profileName string, id int, keyId str
 	return service.DeleteServicePrincipalKey(a.ctx, id, keyId)
 }
 
+func (a *App) GetIAMProjects(profileName string) ([]iam.ProjectInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListProjects(a.ctx)
+}
+
+func (a *App) GetIAMProject(profileName string, id int) (*iam.ProjectInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetProject(a.ctx, id)
+}
+
+func (a *App) CreateIAMProject(profileName string, code, name, description string, parentFolderId int) (*iam.ProjectInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateProject(a.ctx, code, name, description, parentFolderId)
+}
+
+func (a *App) UpdateIAMProject(profileName string, id int, name, description string) (*iam.ProjectInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateProject(a.ctx, id, name, description)
+}
+
+func (a *App) DeleteIAMProject(profileName string, id int) error {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteProject(a.ctx, id)
+}
+
+func (a *App) MoveIAMProjects(profileName string, ids []int, parentFolderId int) error {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.MoveProjects(a.ctx, ids, parentFolderId)
+}
+
+func (a *App) GetIAMFolders(profileName string) ([]iam.FolderInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListFolders(a.ctx)
+}
+
+func (a *App) GetIAMFolder(profileName string, id int) (*iam.FolderInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetFolder(a.ctx, id)
+}
+
+func (a *App) CreateIAMFolder(profileName string, name, description string, parentId int) (*iam.FolderInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateFolder(a.ctx, name, description, parentId)
+}
+
+func (a *App) UpdateIAMFolder(profileName string, id int, name, description string) (*iam.FolderInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateFolder(a.ctx, id, name, description)
+}
+
+func (a *App) DeleteIAMFolder(profileName string, id int) error {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteFolder(a.ctx, id)
+}
+
+func (a *App) MoveIAMFolders(profileName string, ids []int, parentId int) error {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.MoveFolders(a.ctx, ids, parentId)
+}
+
+func (a *App) GetIAMOrganization(profileName string) (*iam.OrganizationInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetOrganization(a.ctx)
+}
+
+func (a *App) UpdateIAMOrganization(profileName string, name string) (*iam.OrganizationInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateOrganization(a.ctx, name)
+}
+
 // ProxyLB (Enhanced Load Balancer)
 func (a *App) GetProxyLBs(profileName string) ([]sakura.ProxyLBInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)
