@@ -2311,6 +2311,70 @@ func (a *App) UpdateIAMOrganization(profileName string, name string) (*iam.Organ
 	return service.UpdateOrganization(a.ctx, name)
 }
 
+func (a *App) GetIAMOrganizationPolicy(profileName string) ([]iam.PolicyBindingInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetIAMOrganizationPolicy(a.ctx)
+}
+
+func (a *App) UpdateIAMOrganizationPolicy(profileName string, bindings []iam.PolicyBindingInfo) ([]iam.PolicyBindingInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateIAMOrganizationPolicy(a.ctx, bindings)
+}
+
+func (a *App) GetIAMProjectPolicy(profileName string, projectId int) ([]iam.PolicyBindingInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetIAMProjectPolicy(a.ctx, projectId)
+}
+
+func (a *App) UpdateIAMProjectPolicy(profileName string, projectId int, bindings []iam.PolicyBindingInfo) ([]iam.PolicyBindingInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateIAMProjectPolicy(a.ctx, projectId, bindings)
+}
+
+func (a *App) GetIAMFolderPolicy(profileName string, folderId int) ([]iam.PolicyBindingInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetIAMFolderPolicy(a.ctx, folderId)
+}
+
+func (a *App) UpdateIAMFolderPolicy(profileName string, folderId int, bindings []iam.PolicyBindingInfo) ([]iam.PolicyBindingInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateIAMFolderPolicy(a.ctx, folderId, bindings)
+}
+
+func (a *App) GetIDOrganizationPolicy(profileName string) ([]iam.PolicyBindingInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetIDOrganizationPolicy(a.ctx)
+}
+
+func (a *App) UpdateIDOrganizationPolicy(profileName string, bindings []iam.PolicyBindingInfo) ([]iam.PolicyBindingInfo, error) {
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateIDOrganizationPolicy(a.ctx, bindings)
+}
+
 // ProxyLB (Enhanced Load Balancer)
 func (a *App) GetProxyLBs(profileName string) ([]sakura.ProxyLBInfo, error) {
 	client, err := sakura.NewClientFromProfile(profileName)

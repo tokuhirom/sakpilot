@@ -556,3 +556,141 @@ func TestService_Organization_ReadUpdate(t *testing.T) {
 		t.Errorf("updated.Name = %q, want renamed-organization", updated.Name)
 	}
 }
+
+func TestService_IAMPolicy_Organization(t *testing.T) {
+	srv := mockiam.NewTestServer(mockiam.Config{})
+	defer srv.Close()
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_IAM", srv.TestURL())
+
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	empty, err := service.GetIAMOrganizationPolicy(context.Background())
+	if err != nil {
+		t.Fatalf("GetIAMOrganizationPolicy: %v", err)
+	}
+	if len(empty) != 0 {
+		t.Fatalf("empty = %+v, want no bindings initially", empty)
+	}
+
+	bindings := []iam.PolicyBindingInfo{
+		{RoleID: "owner", Principals: []iam.PolicyPrincipalInfo{{Type: "user", ID: 1}, {Type: "group", ID: 2}}},
+	}
+	updated, err := service.UpdateIAMOrganizationPolicy(context.Background(), bindings)
+	if err != nil {
+		t.Fatalf("UpdateIAMOrganizationPolicy: %v", err)
+	}
+	if len(updated) != 1 || updated[0].RoleID != "owner" || len(updated[0].Principals) != 2 {
+		t.Fatalf("updated = %+v, want 1 binding for role=owner with 2 principals", updated)
+	}
+
+	got, err := service.GetIAMOrganizationPolicy(context.Background())
+	if err != nil {
+		t.Fatalf("GetIAMOrganizationPolicy after update: %v", err)
+	}
+	if len(got) != 1 || got[0].RoleID != "owner" {
+		t.Fatalf("got = %+v, want 1 binding for role=owner", got)
+	}
+
+	cleared, err := service.UpdateIAMOrganizationPolicy(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("UpdateIAMOrganizationPolicy(clear): %v", err)
+	}
+	if len(cleared) != 0 {
+		t.Fatalf("cleared = %+v, want no bindings", cleared)
+	}
+}
+
+func TestService_IAMPolicy_ProjectAndFolder(t *testing.T) {
+	srv := mockiam.NewTestServer(mockiam.Config{})
+	defer srv.Close()
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_IAM", srv.TestURL())
+
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	folder, err := service.CreateFolder(context.Background(), "policy-folder", "", 0)
+	if err != nil {
+		t.Fatalf("CreateFolder: %v", err)
+	}
+	project, err := service.CreateProject(context.Background(), "policy-project", "policy-project", "", 0)
+	if err != nil {
+		t.Fatalf("CreateProject: %v", err)
+	}
+
+	bindings := []iam.PolicyBindingInfo{
+		{RoleID: "owner", Principals: []iam.PolicyPrincipalInfo{{Type: "user", ID: 1}}},
+	}
+
+	updatedProject, err := service.UpdateIAMProjectPolicy(context.Background(), project.ID, bindings)
+	if err != nil {
+		t.Fatalf("UpdateIAMProjectPolicy: %v", err)
+	}
+	if len(updatedProject) != 1 || updatedProject[0].RoleID != "owner" {
+		t.Fatalf("updatedProject = %+v, want 1 binding for role=owner", updatedProject)
+	}
+
+	gotProject, err := service.GetIAMProjectPolicy(context.Background(), project.ID)
+	if err != nil {
+		t.Fatalf("GetIAMProjectPolicy: %v", err)
+	}
+	if len(gotProject) != 1 || gotProject[0].RoleID != "owner" {
+		t.Fatalf("gotProject = %+v, want 1 binding for role=owner", gotProject)
+	}
+
+	updatedFolder, err := service.UpdateIAMFolderPolicy(context.Background(), folder.ID, bindings)
+	if err != nil {
+		t.Fatalf("UpdateIAMFolderPolicy: %v", err)
+	}
+	if len(updatedFolder) != 1 || updatedFolder[0].RoleID != "owner" {
+		t.Fatalf("updatedFolder = %+v, want 1 binding for role=owner", updatedFolder)
+	}
+
+	gotFolder, err := service.GetIAMFolderPolicy(context.Background(), folder.ID)
+	if err != nil {
+		t.Fatalf("GetIAMFolderPolicy: %v", err)
+	}
+	if len(gotFolder) != 1 || gotFolder[0].RoleID != "owner" {
+		t.Fatalf("gotFolder = %+v, want 1 binding for role=owner", gotFolder)
+	}
+}
+
+func TestService_IDPolicy_Organization(t *testing.T) {
+	srv := mockiam.NewTestServer(mockiam.Config{})
+	defer srv.Close()
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_IAM", srv.TestURL())
+
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	bindings := []iam.PolicyBindingInfo{
+		{RoleID: "admin", Principals: []iam.PolicyPrincipalInfo{{Type: "user", ID: 1}}},
+	}
+	updated, err := service.UpdateIDOrganizationPolicy(context.Background(), bindings)
+	if err != nil {
+		t.Fatalf("UpdateIDOrganizationPolicy: %v", err)
+	}
+	if len(updated) != 1 || updated[0].RoleID != "admin" {
+		t.Fatalf("updated = %+v, want 1 binding for role=admin", updated)
+	}
+
+	got, err := service.GetIDOrganizationPolicy(context.Background())
+	if err != nil {
+		t.Fatalf("GetIDOrganizationPolicy: %v", err)
+	}
+	if len(got) != 1 || got[0].RoleID != "admin" {
+		t.Fatalf("got = %+v, want 1 binding for role=admin", got)
+	}
+}

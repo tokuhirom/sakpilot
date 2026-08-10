@@ -20,6 +20,14 @@ import {
   MoveIAMFolders,
   GetIAMOrganization,
   UpdateIAMOrganization,
+  GetIAMOrganizationPolicy,
+  UpdateIAMOrganizationPolicy,
+  GetIAMProjectPolicy,
+  UpdateIAMProjectPolicy,
+  GetIAMFolderPolicy,
+  UpdateIAMFolderPolicy,
+  GetIDOrganizationPolicy,
+  UpdateIDOrganizationPolicy,
 } from '../../wailsjs/go/main/App';
 import { iam } from '../../wailsjs/go/models';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -29,7 +37,7 @@ interface IAMListProps {
   onSelectServicePrincipal: (id: number) => void;
 }
 
-type SubPage = 'users' | 'groups' | 'iamRoles' | 'idRoles' | 'servicePrincipals' | 'projectsFolders' | 'organization';
+type SubPage = 'users' | 'groups' | 'iamRoles' | 'idRoles' | 'servicePrincipals' | 'projectsFolders' | 'organization' | 'policies';
 
 const TAB_LABEL: Record<SubPage, string> = {
   users: 'ユーザー',
@@ -39,7 +47,11 @@ const TAB_LABEL: Record<SubPage, string> = {
   servicePrincipals: 'サービスプリンシパル',
   projectsFolders: 'プロジェクト/フォルダ',
   organization: '組織',
+  policies: 'ポリシー',
 };
+
+type PolicyScope = 'organization' | 'project' | 'folder';
+type PolicyRoleSystem = 'iam' | 'id';
 
 function childFolders(folders: iam.FolderInfo[], parentId: number): iam.FolderInfo[] {
   return folders.filter(f => f.parentId === parentId);
@@ -105,6 +117,13 @@ export function IAMList({ profile, onSelectServicePrincipal }: IAMListProps) {
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  const [policyScope, setPolicyScope] = useState<PolicyScope>('organization');
+  const [policyRoleSystem, setPolicyRoleSystem] = useState<PolicyRoleSystem>('iam');
+  const [policyScopeId, setPolicyScopeId] = useState<number | null>(null);
+  const [policyBindings, setPolicyBindings] = useState<iam.PolicyBindingInfo[]>([]);
+  const [policySaving, setPolicySaving] = useState(false);
+  const [policySaveError, setPolicySaveError] = useState<string | null>(null);
+
   const loadData = useCallback(async () => {
     if (!profile) return;
     setLoading(true);
@@ -124,8 +143,28 @@ export function IAMList({ profile, onSelectServicePrincipal }: IAMListProps) {
         const [p, f] = await Promise.all([GetIAMProjects(profile), GetIAMFolders(profile)]);
         setProjects(p || []);
         setFolders(f || []);
-      } else {
+      } else if (subPage === 'organization') {
         setOrganization(await GetIAMOrganization(profile));
+      } else {
+        const [p, f, ir, idr] = await Promise.all([
+          GetIAMProjects(profile), GetIAMFolders(profile), GetIAMRoles(profile), GetIAMIDRoles(profile),
+        ]);
+        setProjects(p || []);
+        setFolders(f || []);
+        setIamRoles(ir || []);
+        setIdRoles(idr || []);
+        setPolicySaveError(null);
+        if (policyScope === 'organization') {
+          setPolicyBindings((policyRoleSystem === 'iam'
+            ? await GetIAMOrganizationPolicy(profile)
+            : await GetIDOrganizationPolicy(profile)) || []);
+        } else if (policyScopeId !== null) {
+          setPolicyBindings((policyScope === 'project'
+            ? await GetIAMProjectPolicy(profile, policyScopeId)
+            : await GetIAMFolderPolicy(profile, policyScopeId)) || []);
+        } else {
+          setPolicyBindings([]);
+        }
       }
     } catch (err) {
       console.error(`[IAMList] loadData error (${subPage}):`, err);
@@ -133,7 +172,7 @@ export function IAMList({ profile, onSelectServicePrincipal }: IAMListProps) {
     } finally {
       setLoading(false);
     }
-  }, [profile, subPage]);
+  }, [profile, subPage, policyScope, policyRoleSystem, policyScopeId]);
 
   useGlobalReload(loadData);
 
@@ -319,6 +358,10 @@ export function IAMList({ profile, onSelectServicePrincipal }: IAMListProps) {
       );
     }
 
+    if (subPage === 'policies') {
+      return renderPolicies();
+    }
+
     // projectsFolders
     const rootFolders = childFolders(folders, 0);
     const rootProjects = childProjects(projects, 0);
@@ -329,6 +372,78 @@ export function IAMList({ profile, onSelectServicePrincipal }: IAMListProps) {
       <div className="iam-tree">
         {rootFolders.map(f => renderFolderNode(f, 0))}
         {rootProjects.map(renderProjectRow)}
+      </div>
+    );
+  };
+
+  const policyRoleOptions = policyScope === 'organization' && policyRoleSystem === 'id' ? idRoles : iamRoles;
+
+  const renderPolicies = (): ReactNode => {
+    const needsScopeId = policyScope !== 'organization';
+    if (needsScopeId && policyScopeId === null) {
+      return <div className="empty-state">対象の{policyScope === 'project' ? 'プロジェクト' : 'フォルダ'}を選択してください</div>;
+    }
+    return (
+      <div>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>ロール</th>
+              <th>プリンシパル</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {policyBindings.length === 0 && (
+              <tr>
+                <td colSpan={3}>バインディングがありません</td>
+              </tr>
+            )}
+            {policyBindings.map((b, bi) => (
+              <tr key={bi}>
+                <td>
+                  <select value={b.roleId} onChange={(e) => handleBindingRoleChange(bi, e.target.value)}>
+                    <option value="">選択してください</option>
+                    {policyRoleOptions.map(r => (
+                      <option key={r.id} value={r.id}>{r.name} ({r.id})</option>
+                    ))}
+                  </select>
+                </td>
+                <td>
+                  {b.principals.map((p, pi) => (
+                    <div key={pi} style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.3rem', alignItems: 'center' }}>
+                      <select value={p.type} onChange={(e) => handlePrincipalChange(bi, pi, 'type', e.target.value)}>
+                        <option value="user">ユーザー</option>
+                        <option value="group">グループ</option>
+                        <option value="service-principal">サービスプリンシパル</option>
+                      </select>
+                      <input
+                        type="number"
+                        value={p.id}
+                        onChange={(e) => handlePrincipalChange(bi, pi, 'id', e.target.value)}
+                        style={{ width: '80px' }}
+                      />
+                      <button className="btn btn-secondary btn-small" onClick={() => handleRemovePrincipal(bi, pi)}>削除</button>
+                    </div>
+                  ))}
+                  <button className="btn btn-secondary btn-small" onClick={() => handleAddPrincipal(bi)}>+ プリンシパル追加</button>
+                </td>
+                <td>
+                  <button className="btn btn-danger btn-small" onClick={() => handleRemoveBinding(bi)}>削除</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', alignItems: 'center' }}>
+          <button className="btn btn-secondary btn-small" onClick={handleAddBinding}>+ バインディング追加</button>
+          <button className="btn btn-primary btn-small" onClick={handleSavePolicy} disabled={policySaving}>
+            {policySaving ? '保存中...' : '保存する'}
+          </button>
+          {policySaveError && (
+            <span style={{ color: '#ff6b6b', fontSize: '0.85rem' }}>エラー: {policySaveError}</span>
+          )}
+        </div>
       </div>
     );
   };
@@ -568,6 +683,78 @@ export function IAMList({ profile, onSelectServicePrincipal }: IAMListProps) {
     ? folders.filter(f => f.id !== moveTarget.item.id && !descendantFolderIds(folders, moveTarget.item.id).includes(f.id))
     : folders;
 
+  const handlePolicyScopeChange = (scope: PolicyScope) => {
+    setPolicyScope(scope);
+    setPolicyScopeId(null);
+    if (scope !== 'organization') {
+      setPolicyRoleSystem('iam');
+    }
+  };
+
+  const handleAddBinding = () => {
+    setPolicyBindings(prev => [...prev, new iam.PolicyBindingInfo({ roleId: '', principals: [] })]);
+  };
+
+  const handleRemoveBinding = (bindingIndex: number) => {
+    setPolicyBindings(prev => prev.filter((_, i) => i !== bindingIndex));
+  };
+
+  const handleBindingRoleChange = (bindingIndex: number, roleId: string) => {
+    setPolicyBindings(prev => prev.map((b, i) => (
+      i === bindingIndex ? new iam.PolicyBindingInfo({ ...b, roleId }) : b
+    )));
+  };
+
+  const handleAddPrincipal = (bindingIndex: number) => {
+    setPolicyBindings(prev => prev.map((b, i) => (
+      i === bindingIndex
+        ? new iam.PolicyBindingInfo({ ...b, principals: [...b.principals, new iam.PolicyPrincipalInfo({ type: 'user', id: 0 })] })
+        : b
+    )));
+  };
+
+  const handleRemovePrincipal = (bindingIndex: number, principalIndex: number) => {
+    setPolicyBindings(prev => prev.map((b, i) => (
+      i === bindingIndex
+        ? new iam.PolicyBindingInfo({ ...b, principals: b.principals.filter((_, pi) => pi !== principalIndex) })
+        : b
+    )));
+  };
+
+  const handlePrincipalChange = (bindingIndex: number, principalIndex: number, field: 'type' | 'id', value: string) => {
+    setPolicyBindings(prev => prev.map((b, i) => {
+      if (i !== bindingIndex) return b;
+      return new iam.PolicyBindingInfo({
+        ...b,
+        principals: b.principals.map((p, pi) => (
+          pi === principalIndex ? new iam.PolicyPrincipalInfo({ ...p, [field]: field === 'id' ? Number(value) : value }) : p
+        )),
+      });
+    }));
+  };
+
+  const handleSavePolicy = async () => {
+    setPolicySaving(true);
+    setPolicySaveError(null);
+    try {
+      let updated: iam.PolicyBindingInfo[];
+      if (policyScope === 'organization') {
+        updated = policyRoleSystem === 'iam'
+          ? await UpdateIAMOrganizationPolicy(profile, policyBindings)
+          : await UpdateIDOrganizationPolicy(profile, policyBindings);
+      } else if (policyScope === 'project') {
+        updated = await UpdateIAMProjectPolicy(profile, policyScopeId!, policyBindings);
+      } else {
+        updated = await UpdateIAMFolderPolicy(profile, policyScopeId!, policyBindings);
+      }
+      setPolicyBindings(updated || []);
+    } catch (err) {
+      setPolicySaveError(String(err));
+    } finally {
+      setPolicySaving(false);
+    }
+  };
+
   return (
     <>
       <div className="header">
@@ -594,6 +781,50 @@ export function IAMList({ profile, onSelectServicePrincipal }: IAMListProps) {
           </button>
         ))}
       </div>
+
+      {subPage === 'policies' && (
+        <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label>スコープ</label>
+            <select value={policyScope} onChange={(e) => handlePolicyScopeChange(e.target.value as PolicyScope)}>
+              <option value="organization">組織</option>
+              <option value="project">プロジェクト</option>
+              <option value="folder">フォルダ</option>
+            </select>
+          </div>
+          {policyScope === 'organization' && (
+            <div className="form-group" style={{ margin: 0 }}>
+              <label>ロール体系</label>
+              <select value={policyRoleSystem} onChange={(e) => setPolicyRoleSystem(e.target.value as PolicyRoleSystem)}>
+                <option value="iam">IAMロール</option>
+                <option value="id">IDロール(旧)</option>
+              </select>
+            </div>
+          )}
+          {policyScope === 'project' && (
+            <div className="form-group" style={{ margin: 0 }}>
+              <label>プロジェクト</label>
+              <select value={policyScopeId ?? ''} onChange={(e) => setPolicyScopeId(e.target.value ? Number(e.target.value) : null)}>
+                <option value="">選択してください</option>
+                {projects.map(p => (
+                  <option key={p.id} value={p.id}>{p.name} (ID:{p.id})</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {policyScope === 'folder' && (
+            <div className="form-group" style={{ margin: 0 }}>
+              <label>フォルダ</label>
+              <select value={policyScopeId ?? ''} onChange={(e) => setPolicyScopeId(e.target.value ? Number(e.target.value) : null)}>
+                <option value="">選択してください</option>
+                {folders.map(f => (
+                  <option key={f.id} value={f.id}>{f.name} (ID:{f.id})</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      )}
 
       {renderContent()}
 

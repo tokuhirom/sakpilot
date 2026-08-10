@@ -104,6 +104,18 @@ type OrganizationInfo struct {
 	Name string `json:"name"`
 }
 
+// PolicyPrincipalInfo ポリシーバインディングの対象(ユーザー/グループ/サービスプリンシパル等)
+type PolicyPrincipalInfo struct {
+	Type string `json:"type"`
+	ID   int    `json:"id"`
+}
+
+// PolicyBindingInfo ロールとプリンシパルの紐付け(IAMポリシー/IDポリシー共通のDTO)
+type PolicyBindingInfo struct {
+	RoleID     string                `json:"roleId"`
+	Principals []PolicyPrincipalInfo `json:"principals"`
+}
+
 // Service IAM API サービス。User/Group/IAMRole/IDRoleは読み取りのみ、ServicePrincipalはキー管理まで含めて公開する
 type Service struct {
 	userOp             sdkiam.UserAPI
@@ -114,6 +126,8 @@ type Service struct {
 	projectOp          sdkiam.ProjectAPI
 	folderOp           sdkiam.FolderAPI
 	organizationOp     sdkiam.OrganizationAPI
+	iamPolicyOp        sdkiam.IAMPolicyAPI
+	idPolicyOp         sdkiam.IDPolicyAPI
 }
 
 // profileConfig usacloud プロファイルの設定
@@ -152,6 +166,8 @@ func NewService(profileName string) (*Service, error) {
 		projectOp:          sdkiam.NewProjectOp(client),
 		folderOp:           sdkiam.NewFolderOp(client),
 		organizationOp:     sdkiam.NewOrganizationOp(client),
+		iamPolicyOp:        sdkiam.NewIAMPolicyOp(client),
+		idPolicyOp:         sdkiam.NewIDPolicyOp(client),
 	}, nil
 }
 
@@ -501,6 +517,78 @@ func (s *Service) UpdateOrganization(ctx context.Context, name string) (*Organiz
 	return toOrganizationInfo(o), nil
 }
 
+// GetIAMOrganizationPolicy 組織スコープのIAMポリシーバインディングを取得する
+func (s *Service) GetIAMOrganizationPolicy(ctx context.Context) ([]PolicyBindingInfo, error) {
+	bindings, err := s.iamPolicyOp.ReadOrganizationPolicy(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return toIAMPolicyBindingInfos(bindings), nil
+}
+
+// UpdateIAMOrganizationPolicy 組織スコープのIAMポリシーバインディングを全量置換する
+func (s *Service) UpdateIAMOrganizationPolicy(ctx context.Context, bindings []PolicyBindingInfo) ([]PolicyBindingInfo, error) {
+	res, err := s.iamPolicyOp.UpdateOrganizationPolicy(ctx, toIAMPolicies(bindings))
+	if err != nil {
+		return nil, err
+	}
+	return toIAMPolicyBindingInfos(res), nil
+}
+
+// GetIAMProjectPolicy プロジェクトスコープのIAMポリシーバインディングを取得する
+func (s *Service) GetIAMProjectPolicy(ctx context.Context, projectID int) ([]PolicyBindingInfo, error) {
+	bindings, err := s.iamPolicyOp.ReadProjectPolicy(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	return toIAMPolicyBindingInfos(bindings), nil
+}
+
+// UpdateIAMProjectPolicy プロジェクトスコープのIAMポリシーバインディングを全量置換する
+func (s *Service) UpdateIAMProjectPolicy(ctx context.Context, projectID int, bindings []PolicyBindingInfo) ([]PolicyBindingInfo, error) {
+	res, err := s.iamPolicyOp.UpdateProjectPolicy(ctx, projectID, toIAMPolicies(bindings))
+	if err != nil {
+		return nil, err
+	}
+	return toIAMPolicyBindingInfos(res), nil
+}
+
+// GetIAMFolderPolicy フォルダスコープのIAMポリシーバインディングを取得する
+func (s *Service) GetIAMFolderPolicy(ctx context.Context, folderID int) ([]PolicyBindingInfo, error) {
+	bindings, err := s.iamPolicyOp.ReadFolderPolicy(ctx, folderID)
+	if err != nil {
+		return nil, err
+	}
+	return toIAMPolicyBindingInfos(bindings), nil
+}
+
+// UpdateIAMFolderPolicy フォルダスコープのIAMポリシーバインディングを全量置換する
+func (s *Service) UpdateIAMFolderPolicy(ctx context.Context, folderID int, bindings []PolicyBindingInfo) ([]PolicyBindingInfo, error) {
+	res, err := s.iamPolicyOp.UpdateFolderPolicy(ctx, folderID, toIAMPolicies(bindings))
+	if err != nil {
+		return nil, err
+	}
+	return toIAMPolicyBindingInfos(res), nil
+}
+
+// GetIDOrganizationPolicy 組織スコープのIDポリシーバインディング(旧ロール体系)を取得する
+func (s *Service) GetIDOrganizationPolicy(ctx context.Context) ([]PolicyBindingInfo, error) {
+	bindings, err := s.idPolicyOp.ReadOrganizationIdPolicy(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return toIDPolicyBindingInfos(bindings), nil
+}
+
+// UpdateIDOrganizationPolicy 組織スコープのIDポリシーバインディング(旧ロール体系)を全量置換する
+func (s *Service) UpdateIDOrganizationPolicy(ctx context.Context, bindings []PolicyBindingInfo) ([]PolicyBindingInfo, error) {
+	res, err := s.idPolicyOp.UpdateOrganizationIdPolicy(ctx, toIDPolicies(bindings))
+	if err != nil {
+		return nil, err
+	}
+	return toIDPolicyBindingInfos(res), nil
+}
+
 // toUserInfo v1.User を UserInfo に変換
 func toUserInfo(u *v1.User) *UserInfo {
 	return &UserInfo{
@@ -591,4 +679,82 @@ func toOrganizationInfo(o *v1.Organization) *OrganizationInfo {
 		ID:   o.ID.Or(0),
 		Name: o.Name,
 	}
+}
+
+// toPrincipalInfos v1.Principal のスライスを PolicyPrincipalInfo のスライスに変換
+func toPrincipalInfos(principals []v1.Principal) []PolicyPrincipalInfo {
+	result := make([]PolicyPrincipalInfo, 0, len(principals))
+	for _, p := range principals {
+		result = append(result, PolicyPrincipalInfo{
+			Type: p.Type.Value,
+			ID:   p.ID.Value,
+		})
+	}
+	return result
+}
+
+// toPrincipals PolicyPrincipalInfo のスライスを v1.Principal のスライスに変換
+func toPrincipals(principals []PolicyPrincipalInfo) []v1.Principal {
+	result := make([]v1.Principal, 0, len(principals))
+	for _, p := range principals {
+		result = append(result, v1.Principal{
+			Type: v1.NewOptString(p.Type),
+			ID:   v1.NewOptInt(p.ID),
+		})
+	}
+	return result
+}
+
+// toIAMPolicyBindingInfos v1.IamPolicy のスライスを PolicyBindingInfo のスライスに変換
+func toIAMPolicyBindingInfos(bindings []v1.IamPolicy) []PolicyBindingInfo {
+	result := make([]PolicyBindingInfo, 0, len(bindings))
+	for _, b := range bindings {
+		result = append(result, PolicyBindingInfo{
+			RoleID:     b.Role.Value.ID.Value,
+			Principals: toPrincipalInfos(b.Principals),
+		})
+	}
+	return result
+}
+
+// toIAMPolicies PolicyBindingInfo のスライスを v1.IamPolicy のスライスに変換
+func toIAMPolicies(bindings []PolicyBindingInfo) []v1.IamPolicy {
+	result := make([]v1.IamPolicy, 0, len(bindings))
+	for _, b := range bindings {
+		result = append(result, v1.IamPolicy{
+			Role: v1.NewOptIamPolicyRole(v1.IamPolicyRole{
+				Type: v1.NewOptIamPolicyRoleType(v1.IamPolicyRoleTypePreset),
+				ID:   v1.NewOptString(b.RoleID),
+			}),
+			Principals: toPrincipals(b.Principals),
+		})
+	}
+	return result
+}
+
+// toIDPolicyBindingInfos v1.IdPolicy のスライスを PolicyBindingInfo のスライスに変換
+func toIDPolicyBindingInfos(bindings []v1.IdPolicy) []PolicyBindingInfo {
+	result := make([]PolicyBindingInfo, 0, len(bindings))
+	for _, b := range bindings {
+		result = append(result, PolicyBindingInfo{
+			RoleID:     b.Role.Value.ID.Value,
+			Principals: toPrincipalInfos(b.Principals),
+		})
+	}
+	return result
+}
+
+// toIDPolicies PolicyBindingInfo のスライスを v1.IdPolicy のスライスに変換
+func toIDPolicies(bindings []PolicyBindingInfo) []v1.IdPolicy {
+	result := make([]v1.IdPolicy, 0, len(bindings))
+	for _, b := range bindings {
+		result = append(result, v1.IdPolicy{
+			Role: v1.NewOptIdPolicyRole(v1.IdPolicyRole{
+				Type: v1.NewOptIdPolicyRoleType(v1.IdPolicyRoleTypePreset),
+				ID:   v1.NewOptString(b.RoleID),
+			}),
+			Principals: toPrincipals(b.Principals),
+		})
+	}
+	return result
 }

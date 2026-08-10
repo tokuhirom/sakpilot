@@ -82,7 +82,7 @@ SakPilotは現状「単一アカウント（プロファイル）に対する各
 1. ✅ **対応済み（2026-08-10）**: `iamrole`/`user`/`group` の一覧・詳細（読み取りのみ）
 2. ✅ **対応済み（2026-08-10）**: `serviceprincipal` の一覧・詳細・キー管理（発行/無効化/削除）
 3. ✅ **対応済み（2026-08-10）**: `project`/`folder`/`organization` の階層表示
-4. `iampolicy` のポリシーバインディング表示・編集
+4. ✅ **対応済み（2026-08-10）**: `iampolicy` のポリシーバインディング表示・編集
 5. `sso`/`scim`/`user2fa`/`servicepolicy`（需要を見て判断）
 
 #### タスク1完了メモ
@@ -107,6 +107,14 @@ SakPilotは現状「単一アカウント（プロファイル）に対する各
 - UI設計: `IAMList.tsx`に「プロジェクト/フォルダ」タブを追加し、フォルダは再帰的に子フォルダ・子プロジェクトを展開するツリー表示(テーブルではなくdiv+インデントで表現)とした。各行に「+サブフォルダ」「+プロジェクト」「編集」「移動」「削除」ボタンを持ち、移動は移動先フォルダ(または組織ルート)をセレクトボックスで選ぶモーダルとした。移動先の選択肢から自分自身とその子孫フォルダを除外することで、フォルダを自分の子孫に移動して循環参照になる操作をUI側で防いでいる(API/sakumock側の循環検証は未確認だが、UIレベルで一般的な誤操作は防止できる)
 - 「組織」タブは他リソースと異なり単数リソース(常に1件、IDパラメータなしでRead/Update)のため、一覧ではなく組織ID・組織名を表示するだけの簡易なカード+編集モーダルとした
 - `internal/iam/service_test.go`にFolder/Project各CRUD+Move、OrganizationのRead/UpdateのGoテストを追加。e2e_server.goの`seedIAM`にフォルダ4件(表示用の親、削除/編集/移動先シナリオ用)・プロジェクト4件(表示用は親フォルダの子として、削除/編集/移動シナリオ用)を追加し、`frontend/e2e/iam.spec.ts`(ツリー表示/フォルダ・プロジェクトの作成・削除・編集・移動/組織の表示・編集、9件追加)・`frontend/e2e-manual/iam.spec.ts`(プロジェクト/フォルダ・組織タブのスクリーンショット追加)・`docs/manual/iam.md`を更新。既存を含むE2Eスイート125件全件パス確認済み
+
+#### タスク4完了メモ
+
+- `sacloud-sdk-go/api/iam/apis/iampolicy`(`IAMPolicyAPI`)は組織/プロジェクト/フォルダの3スコープをそれぞれ`Read*Policy`/`Update*Policy`メソッドとして持つ単一API、`apis/idpolicy`(`IDPolicyAPI`)は組織スコープのみの`ReadOrganizationIdPolicy`/`UpdateOrganizationIdPolicy`しか提供しない(プロジェクト/フォルダへのIDロール割り当ては実API仕様として存在しない)。いずれもPUTはバインディング配列の全量置換で、差分更新APIはない
+- `internal/iam/service.go`にIAM/ID共通のDTOとして`PolicyBindingInfo{RoleID string, Principals []PolicyPrincipalInfo}`を新設し、`GetIAMOrganizationPolicy`/`UpdateIAMOrganizationPolicy`/`GetIAMProjectPolicy`/`UpdateIAMProjectPolicy`/`GetIAMFolderPolicy`/`UpdateIAMFolderPolicy`/`GetIDOrganizationPolicy`/`UpdateIDOrganizationPolicy`の8メソッドを実装。SDK上の`v1.IamPolicy`/`v1.IdPolicy`はRole/Principalsの型がIAM/IDでそれぞれ別型(構造は同一)のため、変換関数もtoIAMPolicyBindingInfos/toIAMPolicies/toIDPolicyBindingInfos/toIDPoliciesと分けて実装した
+- `sakumock/iam`は`handler_policy.go`でこれらのエンドポイントにフル対応しており、ロールID・プリンシパルの存在検証もしていない(サービスプリンシパル作成時のプロジェクトIDと同様、任意の文字列/数値をそのまま保存する)ため、E2E・Goテストとも問題なく書けた
+- UI設計: `IAMList.tsx`に「ポリシー」タブを追加。PUTが全量置換である都合上、画面側は常にそのスコープの全バインディング配列をローカルstateとして保持し、「+バインディング追加」「+プリンシパル追加」「削除」で配列を組み立てた上で「保存する」ボタンで一括Updateする設計にした(個々の追加/削除操作のたびにAPIを呼ばない)。スコープ切り替え(組織/プロジェクト/フォルダ)用のセレクトと、組織スコープのみで有効な「ロール体系」(IAM/ID)セレクトをタブ直下に配置し、プロジェクト/フォルダ選択時は既存の`projectsFolders`タブで使っているprojects/foldersのリストを流用した
+- `internal/iam/service_test.go`に組織/プロジェクト/フォルダそれぞれのIAMポリシーCRUD・組織IDポリシーCRUDのGoテストを追加。e2e_server.goの`seedIAM`に組織IAMポリシー(owner+user:1)・`e2e-project-1`のIAMポリシー(editor+group:1)・`e2e-folder-1`のIAMポリシー(viewer+service-principal:<seed済みSPのID>)・組織IDポリシー(admin+user:1)を追加し、`frontend/e2e/iam.spec.ts`(表示4件+保存1件の5件追加)・`frontend/e2e-manual/iam.spec.ts`(ポリシータブのスクリーンショット追加)・`docs/manual/iam.md`を更新。既存を含むE2Eスイート130件全件パス確認済み
 
 ---
 
