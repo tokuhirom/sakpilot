@@ -694,3 +694,187 @@ func TestService_IDPolicy_Organization(t *testing.T) {
 		t.Fatalf("got = %+v, want 1 binding for role=admin", got)
 	}
 }
+
+func TestService_SSOProfile_CRUD(t *testing.T) {
+	srv := mockiam.NewTestServer(mockiam.Config{})
+	defer srv.Close()
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_IAM", srv.TestURL())
+
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	created, err := service.CreateSSOProfile(context.Background(), "test-sso", "a test sso profile",
+		"https://idp.example.com/metadata", "https://idp.example.com/sso", "https://idp.example.com/slo",
+		"-----BEGIN CERTIFICATE-----test-----END CERTIFICATE-----")
+	if err != nil {
+		t.Fatalf("CreateSSOProfile: %v", err)
+	}
+	if created.Name != "test-sso" || created.Description != "a test sso profile" || created.Assigned {
+		t.Errorf("created = %+v, want Name=test-sso Description=%q Assigned=false", created, "a test sso profile")
+	}
+
+	list, err := service.ListSSOProfiles(context.Background())
+	if err != nil {
+		t.Fatalf("ListSSOProfiles: %v", err)
+	}
+	if len(list) != 1 || list[0].ID != created.ID {
+		t.Fatalf("list = %+v, want 1 item with ID=%d", list, created.ID)
+	}
+
+	got, err := service.GetSSOProfile(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("GetSSOProfile: %v", err)
+	}
+	if got.ID != created.ID || got.Name != "test-sso" {
+		t.Errorf("got = %+v, want ID=%d Name=test-sso", got, created.ID)
+	}
+
+	updated, err := service.UpdateSSOProfile(context.Background(), created.ID, "renamed-sso", "updated description",
+		"https://idp.example.com/metadata2", "https://idp.example.com/sso2", "https://idp.example.com/slo2",
+		"-----BEGIN CERTIFICATE-----updated-----END CERTIFICATE-----")
+	if err != nil {
+		t.Fatalf("UpdateSSOProfile: %v", err)
+	}
+	if updated.Name != "renamed-sso" || updated.Description != "updated description" {
+		t.Errorf("updated = %+v, want Name=renamed-sso Description=%q", updated, "updated description")
+	}
+
+	linked, err := service.LinkSSOProfile(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("LinkSSOProfile: %v", err)
+	}
+	if !linked.Assigned {
+		t.Errorf("linked.Assigned = false, want true")
+	}
+
+	unlinked, err := service.UnlinkSSOProfile(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("UnlinkSSOProfile: %v", err)
+	}
+	if unlinked.Assigned {
+		t.Errorf("unlinked.Assigned = true, want false")
+	}
+
+	if err := service.DeleteSSOProfile(context.Background(), created.ID); err != nil {
+		t.Fatalf("DeleteSSOProfile: %v", err)
+	}
+
+	list, err = service.ListSSOProfiles(context.Background())
+	if err != nil {
+		t.Fatalf("ListSSOProfiles after delete: %v", err)
+	}
+	if len(list) != 0 {
+		t.Fatalf("list after delete = %+v, want empty", list)
+	}
+}
+
+func TestService_ScimConfiguration_CRUD(t *testing.T) {
+	srv := mockiam.NewTestServer(mockiam.Config{})
+	defer srv.Close()
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_IAM", srv.TestURL())
+
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	created, err := service.CreateScimConfiguration(context.Background(), "test-scim")
+	if err != nil {
+		t.Fatalf("CreateScimConfiguration: %v", err)
+	}
+	if created.Name != "test-scim" || created.SecretToken == "" {
+		t.Errorf("created = %+v, want Name=test-scim and a non-empty SecretToken", created)
+	}
+
+	list, err := service.ListScimConfigurations(context.Background())
+	if err != nil {
+		t.Fatalf("ListScimConfigurations: %v", err)
+	}
+	if len(list) != 1 || list[0].ID != created.ID {
+		t.Fatalf("list = %+v, want 1 item with ID=%s", list, created.ID)
+	}
+
+	got, err := service.GetScimConfiguration(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("GetScimConfiguration: %v", err)
+	}
+	if got.ID != created.ID || got.Name != "test-scim" {
+		t.Errorf("got = %+v, want ID=%s Name=test-scim", got, created.ID)
+	}
+
+	updated, err := service.UpdateScimConfiguration(context.Background(), created.ID, "renamed-scim")
+	if err != nil {
+		t.Fatalf("UpdateScimConfiguration: %v", err)
+	}
+	if updated.Name != "renamed-scim" {
+		t.Errorf("updated.Name = %q, want renamed-scim", updated.Name)
+	}
+
+	regenerated, err := service.RegenerateScimConfigurationToken(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("RegenerateScimConfigurationToken: %v", err)
+	}
+	if regenerated == "" || regenerated == created.SecretToken {
+		t.Errorf("regenerated = %q, want a non-empty token different from the initial one %q", regenerated, created.SecretToken)
+	}
+
+	if err := service.DeleteScimConfiguration(context.Background(), created.ID); err != nil {
+		t.Fatalf("DeleteScimConfiguration: %v", err)
+	}
+
+	list, err = service.ListScimConfigurations(context.Background())
+	if err != nil {
+		t.Fatalf("ListScimConfigurations after delete: %v", err)
+	}
+	if len(list) != 0 {
+		t.Fatalf("list after delete = %+v, want empty", list)
+	}
+}
+
+func TestService_ServicePolicy(t *testing.T) {
+	srv := mockiam.NewTestServer(mockiam.Config{})
+	defer srv.Close()
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_IAM", srv.TestURL())
+
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	// sakumockの/service-policy-statusはSDKが期待するフィールド名で状態を返さないため
+	// デコードに失敗し、IsServicePolicyEnabledはフォールバックとしてfalseを返す
+	// (docs/upstream-issues.md参照)。Enable/Disable自体はエラーにならないことを確認する
+	if err := service.EnableServicePolicy(context.Background()); err != nil {
+		t.Fatalf("EnableServicePolicy: %v", err)
+	}
+	enabled, err := service.IsServicePolicyEnabled(context.Background())
+	if err != nil {
+		t.Fatalf("IsServicePolicyEnabled: %v", err)
+	}
+	if enabled {
+		t.Errorf("enabled = true, want false (sakumock does not persist service policy status)")
+	}
+
+	if err := service.DisableServicePolicy(context.Background()); err != nil {
+		t.Fatalf("DisableServicePolicy: %v", err)
+	}
+
+	// sakumockの/service-policy-rule-templatesはページネーション付きオブジェクトではなく
+	// 素の配列を返すためデコードに失敗し、ListServicePolicyRuleTemplatesはフォールバックとして
+	// 空スライスを返す(docs/upstream-issues.md参照)。エラーにならないことのみ確認する
+	templates, err := service.ListServicePolicyRuleTemplates(context.Background())
+	if err != nil {
+		t.Fatalf("ListServicePolicyRuleTemplates: %v", err)
+	}
+	if templates == nil {
+		t.Errorf("templates = nil, want non-nil (possibly empty) slice")
+	}
+}

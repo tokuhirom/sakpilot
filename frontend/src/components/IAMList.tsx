@@ -28,6 +28,21 @@ import {
   UpdateIAMFolderPolicy,
   GetIDOrganizationPolicy,
   UpdateIDOrganizationPolicy,
+  GetIAMSSOProfiles,
+  CreateIAMSSOProfile,
+  UpdateIAMSSOProfile,
+  DeleteIAMSSOProfile,
+  LinkIAMSSOProfile,
+  UnlinkIAMSSOProfile,
+  GetIAMScimConfigurations,
+  CreateIAMScimConfiguration,
+  UpdateIAMScimConfiguration,
+  DeleteIAMScimConfiguration,
+  RegenerateIAMScimConfigurationToken,
+  GetIAMServicePolicyStatus,
+  EnableIAMServicePolicy,
+  DisableIAMServicePolicy,
+  GetIAMServicePolicyRuleTemplates,
 } from '../../wailsjs/go/main/App';
 import { iam } from '../../wailsjs/go/models';
 import { useGlobalReload } from '../hooks/useGlobalReload';
@@ -37,7 +52,7 @@ interface IAMListProps {
   onSelectServicePrincipal: (id: number) => void;
 }
 
-type SubPage = 'users' | 'groups' | 'iamRoles' | 'idRoles' | 'servicePrincipals' | 'projectsFolders' | 'organization' | 'policies';
+type SubPage = 'users' | 'groups' | 'iamRoles' | 'idRoles' | 'servicePrincipals' | 'projectsFolders' | 'organization' | 'policies' | 'sso' | 'scim' | 'servicePolicy';
 
 const TAB_LABEL: Record<SubPage, string> = {
   users: 'ユーザー',
@@ -48,6 +63,9 @@ const TAB_LABEL: Record<SubPage, string> = {
   projectsFolders: 'プロジェクト/フォルダ',
   organization: '組織',
   policies: 'ポリシー',
+  sso: 'SSO',
+  scim: 'SCIM',
+  servicePolicy: 'サービスポリシー',
 };
 
 type PolicyScope = 'organization' | 'project' | 'folder';
@@ -124,6 +142,33 @@ export function IAMList({ profile, onSelectServicePrincipal }: IAMListProps) {
   const [policySaving, setPolicySaving] = useState(false);
   const [policySaveError, setPolicySaveError] = useState<string | null>(null);
 
+  const [ssoProfiles, setSsoProfiles] = useState<iam.SSOProfileInfo[]>([]);
+  const [showCreateSso, setShowCreateSso] = useState(false);
+  const [ssoForm, setSsoForm] = useState<{
+    name: string; description: string; idpEntityId: string; idpLoginUrl: string; idpLogoutUrl: string; idpCertificate: string;
+  }>({ name: '', description: '', idpEntityId: '', idpLoginUrl: '', idpLogoutUrl: '', idpCertificate: '' });
+  const [ssoCreating, setSsoCreating] = useState(false);
+  const [editSsoProfile, setEditSsoProfile] = useState<iam.SSOProfileInfo | null>(null);
+  const [confirmDeleteSso, setConfirmDeleteSso] = useState<iam.SSOProfileInfo | null>(null);
+  const [ssoLinking, setSsoLinking] = useState<number | null>(null);
+  const [ssoFormError, setSsoFormError] = useState<string | null>(null);
+
+  const [scimConfigs, setScimConfigs] = useState<iam.ScimConfigurationInfo[]>([]);
+  const [showCreateScim, setShowCreateScim] = useState(false);
+  const [newScimName, setNewScimName] = useState('');
+  const [scimCreating, setScimCreating] = useState(false);
+  const [scimFormError, setScimFormError] = useState<string | null>(null);
+  const [editScimConfig, setEditScimConfig] = useState<iam.ScimConfigurationInfo | null>(null);
+  const [editScimName, setEditScimName] = useState('');
+  const [confirmDeleteScim, setConfirmDeleteScim] = useState<iam.ScimConfigurationInfo | null>(null);
+  const [regeneratingScimToken, setRegeneratingScimToken] = useState<string | null>(null);
+  const [scimSecretReveal, setScimSecretReveal] = useState<{ id: string; name: string; secretToken: string } | null>(null);
+
+  const [servicePolicyEnabled, setServicePolicyEnabled] = useState(false);
+  const [servicePolicyRuleTemplates, setServicePolicyRuleTemplates] = useState<iam.ServicePolicyRuleTemplateInfo[]>([]);
+  const [servicePolicyToggling, setServicePolicyToggling] = useState(false);
+  const [servicePolicyError, setServicePolicyError] = useState<string | null>(null);
+
   const loadData = useCallback(async () => {
     if (!profile) return;
     setLoading(true);
@@ -145,6 +190,16 @@ export function IAMList({ profile, onSelectServicePrincipal }: IAMListProps) {
         setFolders(f || []);
       } else if (subPage === 'organization') {
         setOrganization(await GetIAMOrganization(profile));
+      } else if (subPage === 'sso') {
+        setSsoProfiles((await GetIAMSSOProfiles(profile)) || []);
+      } else if (subPage === 'scim') {
+        setScimConfigs((await GetIAMScimConfigurations(profile)) || []);
+      } else if (subPage === 'servicePolicy') {
+        const [enabled, templates] = await Promise.all([
+          GetIAMServicePolicyStatus(profile), GetIAMServicePolicyRuleTemplates(profile),
+        ]);
+        setServicePolicyEnabled(enabled);
+        setServicePolicyRuleTemplates(templates || []);
       } else {
         const [p, f, ir, idr] = await Promise.all([
           GetIAMProjects(profile), GetIAMFolders(profile), GetIAMRoles(profile), GetIAMIDRoles(profile),
@@ -360,6 +415,154 @@ export function IAMList({ profile, onSelectServicePrincipal }: IAMListProps) {
 
     if (subPage === 'policies') {
       return renderPolicies();
+    }
+
+    if (subPage === 'sso') {
+      if (ssoProfiles.length === 0) return <div className="empty-state">SSOプロファイルがありません</div>;
+      return (
+        <table className="table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>名前</th>
+              <th>説明</th>
+              <th>割り当て状態</th>
+              <th>作成日</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {ssoProfiles.map(p => (
+              <tr key={p.id}>
+                <td>{p.id}</td>
+                <td>{p.name}</td>
+                <td>{p.description || '-'}</td>
+                <td>
+                  <span className={`status ${p.assigned ? 'up' : 'down'}`}>{p.assigned ? '割り当て済み' : '未割り当て'}</span>
+                </td>
+                <td>{formatDate(p.createdAt)}</td>
+                <td style={{ display: 'flex', gap: '0.4rem' }}>
+                  <button className="btn btn-secondary btn-small" onClick={() => handleEditSsoOpen(p)}>編集</button>
+                  {p.assigned ? (
+                    <button
+                      className="btn btn-secondary btn-small"
+                      onClick={() => handleUnlinkSso(p)}
+                      disabled={ssoLinking === p.id}
+                    >
+                      {ssoLinking === p.id ? '処理中...' : '割り当て解除'}
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-secondary btn-small"
+                      onClick={() => handleLinkSso(p)}
+                      disabled={ssoLinking === p.id}
+                    >
+                      {ssoLinking === p.id ? '処理中...' : '割り当てる'}
+                    </button>
+                  )}
+                  <button className="btn btn-danger btn-small" onClick={() => setConfirmDeleteSso(p)}>削除</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      );
+    }
+
+    if (subPage === 'scim') {
+      if (scimConfigs.length === 0) return <div className="empty-state">ユーザープロビジョニング(SCIM)設定がありません</div>;
+      return (
+        <table className="table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>名前</th>
+              <th>ベースURL</th>
+              <th>作成日</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {scimConfigs.map(c => (
+              <tr key={c.id}>
+                <td>{c.id}</td>
+                <td>{c.name}</td>
+                <td style={{ wordBreak: 'break-all' }}>{c.baseUrl}</td>
+                <td>{formatDate(c.createdAt)}</td>
+                <td style={{ display: 'flex', gap: '0.4rem' }}>
+                  <button className="btn btn-secondary btn-small" onClick={() => handleEditScimOpen(c)}>編集</button>
+                  <button
+                    className="btn btn-secondary btn-small"
+                    onClick={() => handleRegenerateScimToken(c)}
+                    disabled={regeneratingScimToken === c.id}
+                  >
+                    {regeneratingScimToken === c.id ? '再発行中...' : 'トークン再発行'}
+                  </button>
+                  <button className="btn btn-danger btn-small" onClick={() => setConfirmDeleteScim(c)}>削除</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      );
+    }
+
+    if (subPage === 'servicePolicy') {
+      return (
+        <div>
+          <table className="table" style={{ maxWidth: '480px' }}>
+            <tbody>
+              <tr>
+                <td style={{ fontWeight: 600, textAlign: 'left' }}>状態</td>
+                <td style={{ textAlign: 'left' }}>
+                  <span className={`status ${servicePolicyEnabled ? 'up' : 'down'}`}>{servicePolicyEnabled ? '有効' : '無効'}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <button
+            className="btn btn-primary btn-small"
+            style={{ marginTop: '1rem' }}
+            onClick={handleToggleServicePolicy}
+            disabled={servicePolicyToggling}
+          >
+            {servicePolicyToggling ? '処理中...' : (servicePolicyEnabled ? '無効化する' : '有効化する')}
+          </button>
+          {servicePolicyError && (
+            <div style={{ marginTop: '0.5rem', color: '#ff6b6b', fontSize: '0.85rem' }}>エラー: {servicePolicyError}</div>
+          )}
+
+          <h3 style={{ marginTop: '2rem', fontSize: '1rem' }}>ルールテンプレート(参照専用)</h3>
+          {servicePolicyRuleTemplates.length === 0 ? (
+            <div className="empty-state">ルールテンプレートがありません</div>
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>コード</th>
+                  <th>名前</th>
+                  <th>タイプ</th>
+                  <th>ドライラン対応</th>
+                  <th>説明</th>
+                  <th>プレフィックス</th>
+                </tr>
+              </thead>
+              <tbody>
+                {servicePolicyRuleTemplates.map((t, i) => (
+                  <tr key={i}>
+                    <td>{t.code || '-'}</td>
+                    <td>{t.name || '-'}</td>
+                    <td>{t.type || '-'}</td>
+                    <td>{t.supportsDryRun ? 'はい' : 'いいえ'}</td>
+                    <td>{t.description || '-'}</td>
+                    <td>{(t.prefixes || []).join(', ') || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      );
     }
 
     // projectsFolders
@@ -755,6 +958,167 @@ export function IAMList({ profile, onSelectServicePrincipal }: IAMListProps) {
     }
   };
 
+  const handleCreateSsoOpen = () => {
+    setSsoForm({ name: '', description: '', idpEntityId: '', idpLoginUrl: '', idpLogoutUrl: '', idpCertificate: '' });
+    setSsoFormError(null);
+    setEditSsoProfile(null);
+    setShowCreateSso(true);
+  };
+
+  const handleEditSsoOpen = (p: iam.SSOProfileInfo) => {
+    setSsoForm({
+      name: p.name,
+      description: p.description,
+      idpEntityId: p.idpEntityId,
+      idpLoginUrl: p.idpLoginUrl,
+      idpLogoutUrl: p.idpLogoutUrl,
+      idpCertificate: p.idpCertificate,
+    });
+    setSsoFormError(null);
+    setEditSsoProfile(p);
+  };
+
+  const closeSsoForm = () => {
+    setShowCreateSso(false);
+    setEditSsoProfile(null);
+  };
+
+  const handleSsoFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSsoCreating(true);
+    setSsoFormError(null);
+    try {
+      const { name, description, idpEntityId, idpLoginUrl, idpLogoutUrl, idpCertificate } = ssoForm;
+      if (editSsoProfile) {
+        await UpdateIAMSSOProfile(profile, editSsoProfile.id, name, description, idpEntityId, idpLoginUrl, idpLogoutUrl, idpCertificate);
+      } else {
+        await CreateIAMSSOProfile(profile, name, description, idpEntityId, idpLoginUrl, idpLogoutUrl, idpCertificate);
+      }
+      closeSsoForm();
+      await loadData();
+    } catch (err) {
+      setSsoFormError(String(err));
+    } finally {
+      setSsoCreating(false);
+    }
+  };
+
+  const handleDeleteSsoConfirm = async () => {
+    if (!confirmDeleteSso) return;
+    const target = confirmDeleteSso;
+    setConfirmDeleteSso(null);
+    try {
+      await DeleteIAMSSOProfile(profile, target.id);
+      await loadData();
+    } catch (err) {
+      alert(`削除に失敗しました: ${err}`);
+    }
+  };
+
+  const handleLinkSso = async (p: iam.SSOProfileInfo) => {
+    setSsoLinking(p.id);
+    try {
+      await LinkIAMSSOProfile(profile, p.id);
+      await loadData();
+    } catch (err) {
+      alert(`割り当てに失敗しました: ${err}`);
+    } finally {
+      setSsoLinking(null);
+    }
+  };
+
+  const handleUnlinkSso = async (p: iam.SSOProfileInfo) => {
+    setSsoLinking(p.id);
+    try {
+      await UnlinkIAMSSOProfile(profile, p.id);
+      await loadData();
+    } catch (err) {
+      alert(`割り当て解除に失敗しました: ${err}`);
+    } finally {
+      setSsoLinking(null);
+    }
+  };
+
+  const handleCreateScimSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setScimCreating(true);
+    setScimFormError(null);
+    try {
+      const created = await CreateIAMScimConfiguration(profile, newScimName);
+      setShowCreateScim(false);
+      setNewScimName('');
+      setScimSecretReveal({ id: created.id, name: created.name, secretToken: created.secretToken });
+      await loadData();
+    } catch (err) {
+      setScimFormError(String(err));
+    } finally {
+      setScimCreating(false);
+    }
+  };
+
+  const handleEditScimOpen = (c: iam.ScimConfigurationInfo) => {
+    setEditScimName(c.name);
+    setScimFormError(null);
+    setEditScimConfig(c);
+  };
+
+  const handleEditScimSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editScimConfig) return;
+    setScimCreating(true);
+    setScimFormError(null);
+    try {
+      await UpdateIAMScimConfiguration(profile, editScimConfig.id, editScimName);
+      setEditScimConfig(null);
+      await loadData();
+    } catch (err) {
+      setScimFormError(String(err));
+    } finally {
+      setScimCreating(false);
+    }
+  };
+
+  const handleDeleteScimConfirm = async () => {
+    if (!confirmDeleteScim) return;
+    const target = confirmDeleteScim;
+    setConfirmDeleteScim(null);
+    try {
+      await DeleteIAMScimConfiguration(profile, target.id);
+      await loadData();
+    } catch (err) {
+      alert(`削除に失敗しました: ${err}`);
+    }
+  };
+
+  const handleRegenerateScimToken = async (c: iam.ScimConfigurationInfo) => {
+    setRegeneratingScimToken(c.id);
+    try {
+      const secretToken = await RegenerateIAMScimConfigurationToken(profile, c.id);
+      setScimSecretReveal({ id: c.id, name: c.name, secretToken });
+    } catch (err) {
+      alert(`トークン再発行に失敗しました: ${err}`);
+    } finally {
+      setRegeneratingScimToken(null);
+    }
+  };
+
+  const handleToggleServicePolicy = async () => {
+    setServicePolicyToggling(true);
+    setServicePolicyError(null);
+    try {
+      if (servicePolicyEnabled) {
+        await DisableIAMServicePolicy(profile);
+      } else {
+        await EnableIAMServicePolicy(profile);
+      }
+      setServicePolicyEnabled(await GetIAMServicePolicyStatus(profile));
+    } catch (err) {
+      setServicePolicyError(String(err));
+    } finally {
+      setServicePolicyToggling(false);
+    }
+  };
+
   return (
     <>
       <div className="header">
@@ -767,6 +1131,14 @@ export function IAMList({ profile, onSelectServicePrincipal }: IAMListProps) {
             <button className="btn btn-primary btn-small" onClick={() => handleCreateFolderOpen(0)}>+ フォルダ作成</button>
             <button className="btn btn-primary btn-small" onClick={() => handleCreateProjectOpen(0)}>+ プロジェクト作成</button>
           </div>
+        )}
+        {subPage === 'sso' && (
+          <button className="btn btn-primary btn-small" onClick={handleCreateSsoOpen}>+ SSOプロファイル作成</button>
+        )}
+        {subPage === 'scim' && (
+          <button className="btn btn-primary btn-small" onClick={() => { setNewScimName(''); setScimFormError(null); setShowCreateScim(true); }}>
+            + ユーザープロビジョニング作成
+          </button>
         )}
       </div>
 
@@ -1111,6 +1483,226 @@ export function IAMList({ profile, onSelectServicePrincipal }: IAMListProps) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {(showCreateSso || editSsoProfile) && (
+        <div className="modal-overlay" onClick={closeSsoForm} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+            backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+            padding: '20px', minWidth: '320px', maxWidth: '480px',
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>{editSsoProfile ? 'SSOプロファイル編集' : 'SSOプロファイル作成'}</h3>
+            <form onSubmit={handleSsoFormSubmit}>
+              <div className="form-group">
+                <label>名前<span className="required-mark">*</span></label>
+                <input
+                  type="text"
+                  value={ssoForm.name}
+                  onChange={(e) => setSsoForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="my-sso-profile"
+                  autoFocus
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>説明</label>
+                <input
+                  type="text"
+                  value={ssoForm.description}
+                  onChange={(e) => setSsoForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="任意"
+                />
+              </div>
+              <div className="form-group">
+                <label>IdPエンティティID<span className="required-mark">*</span></label>
+                <input
+                  type="text"
+                  value={ssoForm.idpEntityId}
+                  onChange={(e) => setSsoForm(prev => ({ ...prev, idpEntityId: e.target.value }))}
+                  placeholder="https://idp.example.com/metadata"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>IdPログインURL<span className="required-mark">*</span></label>
+                <input
+                  type="text"
+                  value={ssoForm.idpLoginUrl}
+                  onChange={(e) => setSsoForm(prev => ({ ...prev, idpLoginUrl: e.target.value }))}
+                  placeholder="https://idp.example.com/sso"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>IdPログアウトURL</label>
+                <input
+                  type="text"
+                  value={ssoForm.idpLogoutUrl}
+                  onChange={(e) => setSsoForm(prev => ({ ...prev, idpLogoutUrl: e.target.value }))}
+                  placeholder="https://idp.example.com/slo"
+                />
+              </div>
+              <div className="form-group">
+                <label>IdP証明書(PEM)<span className="required-mark">*</span></label>
+                <textarea
+                  value={ssoForm.idpCertificate}
+                  onChange={(e) => setSsoForm(prev => ({ ...prev, idpCertificate: e.target.value }))}
+                  placeholder="-----BEGIN CERTIFICATE-----..."
+                  rows={5}
+                  required
+                />
+              </div>
+              {ssoFormError && (
+                <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                  エラー: {ssoFormError}
+                </div>
+              )}
+              <div className="confirm-actions">
+                <button type="button" className="btn btn-secondary" onClick={closeSsoForm}>キャンセル</button>
+                <button type="submit" className="btn btn-primary" disabled={ssoCreating}>
+                  {ssoCreating ? '保存中...' : (editSsoProfile ? '更新する' : '作成する')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {confirmDeleteSso && (
+        <div className="confirm-overlay" onClick={() => setConfirmDeleteSso(null)}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <p>SSOプロファイル「{confirmDeleteSso.name}」を削除しますか？</p>
+            <p className="confirm-warning">この操作は取り消せません。</p>
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={() => setConfirmDeleteSso(null)}>キャンセル</button>
+              <button className="btn btn-danger" onClick={handleDeleteSsoConfirm}>削除する</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreateScim && (
+        <div className="modal-overlay" onClick={() => setShowCreateScim(false)} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+            backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+            padding: '20px', minWidth: '320px', maxWidth: '420px',
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>ユーザープロビジョニング作成</h3>
+            <form onSubmit={handleCreateScimSubmit}>
+              <div className="form-group">
+                <label>名前<span className="required-mark">*</span></label>
+                <input
+                  type="text"
+                  value={newScimName}
+                  onChange={(e) => setNewScimName(e.target.value)}
+                  placeholder="my-scim-config"
+                  autoFocus
+                  required
+                />
+              </div>
+              {scimFormError && (
+                <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                  エラー: {scimFormError}
+                </div>
+              )}
+              <div className="confirm-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowCreateScim(false)}>キャンセル</button>
+                <button type="submit" className="btn btn-primary" disabled={scimCreating}>
+                  {scimCreating ? '作成中...' : '作成する'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editScimConfig && (
+        <div className="modal-overlay" onClick={() => setEditScimConfig(null)} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+            backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+            padding: '20px', minWidth: '320px', maxWidth: '420px',
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>ユーザープロビジョニング編集</h3>
+            <form onSubmit={handleEditScimSubmit}>
+              <div className="form-group">
+                <label>名前<span className="required-mark">*</span></label>
+                <input
+                  type="text"
+                  value={editScimName}
+                  onChange={(e) => setEditScimName(e.target.value)}
+                  autoFocus
+                  required
+                />
+              </div>
+              {scimFormError && (
+                <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                  エラー: {scimFormError}
+                </div>
+              )}
+              <div className="confirm-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setEditScimConfig(null)}>キャンセル</button>
+                <button type="submit" className="btn btn-primary" disabled={scimCreating}>
+                  {scimCreating ? '保存中...' : '更新する'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {confirmDeleteScim && (
+        <div className="confirm-overlay" onClick={() => setConfirmDeleteScim(null)}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <p>ユーザープロビジョニング「{confirmDeleteScim.name}」を削除しますか？</p>
+            <p className="confirm-warning">この操作は取り消せません。</p>
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={() => setConfirmDeleteScim(null)}>キャンセル</button>
+              <button className="btn btn-danger" onClick={handleDeleteScimConfirm}>削除する</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {scimSecretReveal && (
+        <div className="modal-overlay" onClick={() => setScimSecretReveal(null)} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+            backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+            padding: '20px', minWidth: '320px', maxWidth: '480px',
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>シークレットトークン「{scimSecretReveal.name}」</h3>
+            <p className="confirm-warning">このトークンは今だけ表示されます。閉じると再度確認することはできません。</p>
+            <div className="form-group">
+              <label>シークレットトークン</label>
+              <textarea readOnly value={scimSecretReveal.secretToken} rows={3} onClick={(e) => (e.target as HTMLTextAreaElement).select()} />
+            </div>
+            <div className="confirm-actions">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => navigator.clipboard?.writeText(scimSecretReveal.secretToken)}
+              >
+                コピー
+              </button>
+              <button type="button" className="btn btn-primary" onClick={() => setScimSecretReveal(null)}>閉じる</button>
+            </div>
           </div>
         </div>
       )}

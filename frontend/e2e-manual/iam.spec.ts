@@ -13,9 +13,13 @@ import { shot } from './helpers';
 //   - e2e-service-principal-1: サービスプリンシパルタブ・詳細表示確認用(登録済みキーを1件持つ)
 //   - e2e-folder-1:            プロジェクト/フォルダタブ表示確認用(子にe2e-project-1を持つ)
 //   - e2e-project-1:           プロジェクト/フォルダタブ表示確認用(e2e-folder-1の子)
+//   - e2e-sso-profile-1:       SSOタブ表示確認用
+//   - e2e-scim-config-1:       SCIMタブ表示確認用
 // IAMロール/IDロールはsakumock側の固定定義(owner/editor/viewer/...、admin/member)を利用する。
 // 組織(organization)はsakumock側にデフォルトで1件存在する単数リソース。
 // ポリシータブ用に組織スコープ(IAM)へowner+user:1のバインディングをシード済み。
+// サービスポリシー(servicePolicy)はsakumockが有効/無効状態を永続化しないためシードデータは無く、
+// 状態表示・ルールテンプレート一覧の見た目のみ撮影する。
 //
 // 1つのtest内で連番のスクリーンショットを撮ることで、番号どおりの操作順序を保証する。
 
@@ -82,9 +86,30 @@ test('IAMマニュアル用スクリーンショット', async ({ page }) => {
   await shot(page, RESOURCE, '08-organization.png');
 
   // 09: ポリシータブ(組織スコープ、IAMポリシーバインディング)
-  await page.getByRole('button', { name: 'ポリシー' }).click();
+  await page.getByRole('button', { name: 'ポリシー', exact: true }).click();
   await expect(page.locator('tbody tr').first().getByRole('combobox').first()).toHaveValue('owner');
-  await expect(page.getByRole('button', { name: 'ポリシー' })).toHaveClass(/btn-primary/);
+  await expect(page.getByRole('button', { name: 'ポリシー', exact: true })).toHaveClass(/btn-primary/);
   await page.waitForTimeout(250);
   await shot(page, RESOURCE, '09-policies.png');
+
+  // 10: SSOタブ
+  await page.getByRole('button', { name: 'SSO', exact: true }).click();
+  await expect(page.getByRole('cell', { name: 'e2e-sso-profile-1' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'SSO', exact: true })).toHaveClass(/btn-primary/);
+  await page.waitForTimeout(250);
+  await shot(page, RESOURCE, '10-sso.png');
+
+  // 11: SCIMタブ
+  await page.getByRole('button', { name: 'SCIM', exact: true }).click();
+  await expect(page.getByRole('cell', { name: 'e2e-scim-config-1' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'SCIM', exact: true })).toHaveClass(/btn-primary/);
+  await page.waitForTimeout(250);
+  await shot(page, RESOURCE, '11-scim.png');
+
+  // 12: サービスポリシータブ(状態・ルールテンプレート一覧)
+  await page.getByRole('button', { name: 'サービスポリシー' }).click();
+  await expect(page.getByText('状態')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'サービスポリシー' })).toHaveClass(/btn-primary/);
+  await page.waitForTimeout(250);
+  await shot(page, RESOURCE, '12-servicepolicy.png');
 });
