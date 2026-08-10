@@ -26,6 +26,7 @@
 | KMS | [kms.md](kms.md) |
 | シークレットマネージャー | [secretmanager.md](secretmanager.md) |
 | SimpleMQ | [simplemq.md](simplemq.md) |
+| 簡易通知(Simple Notification) | [simplenotification.md](simplenotification.md) |
 | IAM | [iam.md](iam.md) |
 | AppRun専有型 | [apprun-dedicated.md](apprun-dedicated.md) |
 | AppRun共用型 | [apprun-shared.md](apprun-shared.md) |

@@ -58,6 +58,19 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - 実害: AppRun共用型のVersion Delete API(`handleDeleteVersion`)は「`ListVersions`の先頭要素と同じIDは削除不可(最新版のため)」というチェックを行っているため、この不定性がそのままAPIレスポンスの不定性になる。SakPilot側でVersion Delete機能のテストを書く際、「作成直後のバージョンではない、かつ削除不可能な最新版でもない、中間バージョン」を用意しようとしても`CreatedAt`だけでは判別できず、最終的に「削除を試みて失敗したら次の候補を試す」というフォールバック実装(`internal/apprunshared/service_test.go`の`TestService_DeleteVersion`)で回避する必要があった。内部的には`MemoryStore`が`versionSeq`という単調増加のシーケンス番号を持っており(`Version.Name`のサフィックスに埋め込まれている)、実際の生成順序自体は失われていないため、ソートに使えばこの問題自体は容易に解消できるはずである。
 - 提案: `ListVersions`のソートキーに`CreatedAt`だけでなく`versionSeq`(または相当する単調増加ID)をタイブレーカーとして使う、あるいは`Version.CreatedAt`をより高精度(ナノ秒単位)で記録するようにしてほしい。
 
+### 6. `sakumock/simplenotification` が通知履歴・ソース一覧・ルーティング並び替え・ステータス取得のAPIに未対応
+
+- パッケージ: `github.com/sacloud/sakumock/simplenotification`
+- ファイル: `route.go`(`routeTable`)
+- 内容: `sacloud-sdk-go/api/simple-notification` のOpenAPI定義(`openapi/openapi.yaml`)には以下のエンドポイントが存在するが、sakumockの`routeTable()`には対応するハンドラが登録されていない。
+  - `GET /commonserviceitem/simplenotification/histories`(`ListNotificationHistories`)・`GET /commonserviceitem/simplenotification/histories/{id}`(`GetNotificationHistory`) — 通知履歴の一覧・詳細
+  - `GET /commonserviceitem/simplenotification/sources`(`ListSources`) — ルーティングの発生源(ソース)一覧
+  - `PUT /commonserviceitem/routing/reorder`(`ReorderRouting`) — ルーティングの優先度並び替え
+  - `GET /commonserviceitem/{id}/status`(`GetCommonServiceItemStatus`) — 送信先/グループの有効性ステータス
+  - Destination/Group/Routingの基本CRUD(`POST`/`GET`/`PUT`/`DELETE` `/commonserviceitem`)とGroupへのメッセージ送信(`POST /commonserviceitem/{id}/simplenotification/message`)は実装されている。
+- 実害: SakPilotの簡易通知機能(`internal/simplenotification/`)はDestination/Group/RoutingのCRUD + テストメッセージ送信のみをE2E対象にできた。通知履歴の閲覧、ルーティング作成時のソースID選択UI(現状は数値ID直接入力)、ルーティングの並び替えはUI自体を実装してもE2E検証ができないため、今回のスコープでは見送った(`docs/manual/simplenotification.md`の「未対応の機能」参照)。
+- 提案: 上記4エンドポイントの対応を追加してほしい。特に`ListSources`が使えるようになれば、ルーティング作成フォームでソースIDをID直接入力ではなく選択式にでき、UXが大きく改善する。
+
 ## その他メモ(バグではないが気づいた点)
 
 - `fake.InitDataStore()` / `fake.SwitchFactoryFuncToFake()` はいずれも `sync.Once` でプロセス内1回しか実行されない。同一プロセス内で複数のGoテストが同じデータストアを共有することになるため、テスト間で状態がリークする(SakPilotの `internal/sakura/disk_test.go` ではID/存在ベースの検証に倒すことで対応した)。ドキュメントに明記しておいてもらえると、初見でハマる人が減りそう。

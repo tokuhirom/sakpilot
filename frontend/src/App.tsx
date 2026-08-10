@@ -52,6 +52,7 @@ import { SecretManagerList } from './components/SecretManagerList';
 import { SecretManagerDetail } from './components/SecretManagerDetail';
 import { SimpleMQList } from './components/SimpleMQList';
 import { SimpleMQDetail } from './components/SimpleMQDetail';
+import { SimpleNotificationList } from './components/SimpleNotificationList';
 import { IAMList } from './components/IAMList';
 import { IAMServicePrincipalDetail } from './components/IAMServicePrincipalDetail';
 
@@ -78,6 +79,7 @@ const globalResources = [
   { path: 'kms', label: 'KMS' },
   { path: 'secretmanager', label: 'シークレットマネージャー' },
   { path: 'simplemq', label: 'SimpleMQ' },
+  { path: 'simplenotification', label: '簡易通知' },
   { path: 'iam', label: 'IAM' },
   { path: 'apprun-shared', label: 'AppRun共用型' },
   { path: 'apprun-dedicated', label: 'AppRun専有型' },
@@ -217,6 +219,7 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
               <Route path="secretmanager/:id" element={<SecretManagerBreadcrumb profile={profile} />} />
               <Route path="simplemq" element={<span className="breadcrumb-item active">SimpleMQ</span>} />
               <Route path="simplemq/:id" element={<SimpleMQBreadcrumb profile={profile} />} />
+              <Route path="simplenotification" element={<span className="breadcrumb-item active">簡易通知</span>} />
               <Route path="iam" element={<span className="breadcrumb-item active">IAM</span>} />
               <Route path="iam/serviceprincipals/:id" element={<IAMServicePrincipalBreadcrumb profile={profile} />} />
               <Route path="apprun-dedicated" element={<span className="breadcrumb-item active">AppRun 専有型</span>} />
@@ -331,6 +334,7 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
           <Route path="simplemq/:id" element={
             <SimpleMQDetailWrapper profile={profile} />
           } />
+          <Route path="simplenotification" element={<SimpleNotificationList profile={profile} />} />
           <Route path="iam" element={<IAMListWrapper profile={profile} />} />
           <Route path="iam/serviceprincipals/:id" element={
             <IAMServicePrincipalDetailWrapper profile={profile} />

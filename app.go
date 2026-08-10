@@ -12,6 +12,7 @@ import (
 	"sakpilot/internal/sakura"
 	"sakpilot/internal/secretmanager"
 	"sakpilot/internal/simplemq"
+	"sakpilot/internal/simplenotification"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -2411,4 +2412,109 @@ func (a *App) DeleteSimpleMQMessage(profileName, queueName, apiKey, messageId st
 		return err
 	}
 	return service.DeleteMessage(a.ctx, queueName, apiKey, messageId)
+}
+
+// SimpleNotification
+func (a *App) GetSimpleNotificationDestinations(profileName string) ([]simplenotification.DestinationInfo, error) {
+	service, err := simplenotification.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListDestinations(a.ctx)
+}
+
+func (a *App) CreateSimpleNotificationDestination(profileName, name, description, destType, value string, tags []string) (*simplenotification.DestinationInfo, error) {
+	service, err := simplenotification.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateDestination(a.ctx, name, description, destType, value, tags)
+}
+
+func (a *App) UpdateSimpleNotificationDestination(profileName, id, name, description, destType, value string, tags []string) (*simplenotification.DestinationInfo, error) {
+	service, err := simplenotification.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateDestination(a.ctx, id, name, description, destType, value, tags)
+}
+
+func (a *App) DeleteSimpleNotificationDestination(profileName, id string) error {
+	service, err := simplenotification.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteDestination(a.ctx, id)
+}
+
+func (a *App) GetSimpleNotificationGroups(profileName string) ([]simplenotification.GroupInfo, error) {
+	service, err := simplenotification.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListGroups(a.ctx)
+}
+
+func (a *App) CreateSimpleNotificationGroup(profileName, name, description string, destinationIds, tags []string) (*simplenotification.GroupInfo, error) {
+	service, err := simplenotification.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateGroup(a.ctx, name, description, destinationIds, tags)
+}
+
+func (a *App) UpdateSimpleNotificationGroup(profileName, id, name, description string, destinationIds, tags []string) (*simplenotification.GroupInfo, error) {
+	service, err := simplenotification.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateGroup(a.ctx, id, name, description, destinationIds, tags)
+}
+
+func (a *App) DeleteSimpleNotificationGroup(profileName, id string) error {
+	service, err := simplenotification.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteGroup(a.ctx, id)
+}
+
+func (a *App) SendSimpleNotificationGroupMessage(profileName, id, message string) (bool, error) {
+	service, err := simplenotification.NewService(profileName)
+	if err != nil {
+		return false, err
+	}
+	return service.SendGroupMessage(a.ctx, id, message)
+}
+
+func (a *App) GetSimpleNotificationRoutings(profileName string) ([]simplenotification.RoutingInfo, error) {
+	service, err := simplenotification.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListRoutings(a.ctx)
+}
+
+func (a *App) CreateSimpleNotificationRouting(profileName, name, description, sourceId, targetGroupId string, matchLabels []simplenotification.MatchLabel, priorityRank int, tags []string) (*simplenotification.RoutingInfo, error) {
+	service, err := simplenotification.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateRouting(a.ctx, name, description, sourceId, targetGroupId, matchLabels, priorityRank, tags)
+}
+
+func (a *App) UpdateSimpleNotificationRouting(profileName, id, name, description, sourceId, targetGroupId string, matchLabels []simplenotification.MatchLabel, priorityRank int, tags []string) (*simplenotification.RoutingInfo, error) {
+	service, err := simplenotification.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateRouting(a.ctx, id, name, description, sourceId, targetGroupId, matchLabels, priorityRank, tags)
+}
+
+func (a *App) DeleteSimpleNotificationRouting(profileName, id string) error {
+	service, err := simplenotification.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteRouting(a.ctx, id)
 }

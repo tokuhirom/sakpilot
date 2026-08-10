@@ -46,6 +46,8 @@ import (
 	kmsv1 "github.com/sacloud/sacloud-sdk-go/api/kms/apis/v1"
 	sdksecretmanager "github.com/sacloud/sacloud-sdk-go/api/secretmanager"
 	secretmanagerv1 "github.com/sacloud/sacloud-sdk-go/api/secretmanager/apis/v1"
+	sdksimplenotification "github.com/sacloud/sacloud-sdk-go/api/simple-notification"
+	simplenotificationv1 "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
 	sdksimplemq "github.com/sacloud/sacloud-sdk-go/api/simplemq"
 	simplemqqueue "github.com/sacloud/sacloud-sdk-go/api/simplemq/apis/v1/queue"
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
@@ -56,6 +58,7 @@ import (
 	mockobjectstorage "github.com/sacloud/sakumock/objectstorage"
 	mocksecretmanager "github.com/sacloud/sakumock/secretmanager"
 	mocksimplemq "github.com/sacloud/sakumock/simplemq"
+	mocksimplenotification "github.com/sacloud/sakumock/simplenotification"
 	"github.com/zalando/go-keyring"
 )
 
@@ -153,6 +156,14 @@ func runE2EServer(addr, dist string) error {
 	}
 	if err := seedSimpleMQQueues(); err != nil {
 		return fmt.Errorf("failed to seed SimpleMQ queues: %w", err)
+	}
+
+	simpleNotificationSrv := mocksimplenotification.NewTestServer(mocksimplenotification.Config{})
+	if err := os.Setenv("SAKURA_ENDPOINTS_SIMPLE_NOTIFICATION", simpleNotificationSrv.TestURL()); err != nil {
+		return err
+	}
+	if err := seedSimpleNotification(); err != nil {
+		return fmt.Errorf("failed to seed Simple Notification resources: %w", err)
 	}
 
 	// ObjectStorageのS3互換データプレーン(オブジェクト一覧・ダウンロード)はsakumock側で
@@ -931,6 +942,126 @@ func seedSimpleMQQueues() error {
 		}); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// seedSimpleNotification はsakumockのSimple Notificationサーバーに
+// E2Eシナリオ用の送信先・グループ・ルーティングを投入する。
+func seedSimpleNotification() error {
+	var sc saclient.Client
+	env := append(os.Environ(),
+		"SAKURA_ACCESS_TOKEN="+e2eAccessToken,
+		"SAKURA_ACCESS_TOKEN_SECRET="+e2eSecretToken,
+	)
+	if err := sc.SetEnviron(env); err != nil {
+		return err
+	}
+	client, err := sdksimplenotification.NewClient(&sc)
+	if err != nil {
+		return err
+	}
+	ctx := context.Background()
+
+	destinationOp := sdksimplenotification.NewDestinationOp(client)
+	newDestination := func(name string) (string, error) {
+		created, err := destinationOp.Create(ctx, simplenotificationv1.PostCommonServiceItemRequest{
+			CommonServiceItem: simplenotificationv1.PostCommonServiceItemRequestCommonServiceItem{
+				Name:        name,
+				Description: "E2E: SimpleNotification表示確認シナリオ用",
+				Tags:        []string{"env:e2e"},
+				Icon:        simplenotificationv1.NilCommonServiceItemIcon{Null: true},
+				Settings: simplenotificationv1.CommonServiceItemSettings{
+					Type: simplenotificationv1.DestinationSettingsCommonServiceItemSettings,
+					DestinationSettings: simplenotificationv1.DestinationSettings{
+						Type:  simplenotificationv1.DestinationSettingsTypeEmail,
+						Value: "e2e-alert@example.com",
+					},
+				},
+			},
+		})
+		if err != nil {
+			return "", err
+		}
+		return created.CommonServiceItem.ID, nil
+	}
+
+	destID, err := newDestination("e2e-destination-1")
+	if err != nil {
+		return err
+	}
+	if _, err := newDestination("e2e-destination-doomed"); err != nil {
+		return err
+	}
+	if _, err := newDestination("e2e-destination-editable"); err != nil {
+		return err
+	}
+
+	groupOp := sdksimplenotification.NewGroupOp(client)
+	newGroup := func(name string) (string, error) {
+		created, err := groupOp.Create(ctx, simplenotificationv1.PostCommonServiceItemRequest{
+			CommonServiceItem: simplenotificationv1.PostCommonServiceItemRequestCommonServiceItem{
+				Name:        name,
+				Description: "E2E: SimpleNotification表示確認シナリオ用",
+				Tags:        []string{"env:e2e"},
+				Icon:        simplenotificationv1.NilCommonServiceItemIcon{Null: true},
+				Settings: simplenotificationv1.CommonServiceItemSettings{
+					Type: simplenotificationv1.GroupSettingsCommonServiceItemSettings,
+					GroupSettings: simplenotificationv1.GroupSettings{
+						Destinations: []string{destID},
+					},
+				},
+			},
+		})
+		if err != nil {
+			return "", err
+		}
+		return created.CommonServiceItem.ID, nil
+	}
+
+	groupID, err := newGroup("e2e-group-1")
+	if err != nil {
+		return err
+	}
+	if _, err := newGroup("e2e-group-doomed"); err != nil {
+		return err
+	}
+	if _, err := newGroup("e2e-group-editable"); err != nil {
+		return err
+	}
+
+	routingOp := sdksimplenotification.NewRoutingOp(client)
+	newRouting := func(name string) error {
+		_, err := routingOp.Create(ctx, simplenotificationv1.PostCommonServiceItemRequest{
+			CommonServiceItem: simplenotificationv1.PostCommonServiceItemRequestCommonServiceItem{
+				Name:        name,
+				Description: "E2E: SimpleNotification表示確認シナリオ用",
+				Tags:        []string{"env:e2e"},
+				Icon:        simplenotificationv1.NilCommonServiceItemIcon{Null: true},
+				Settings: simplenotificationv1.CommonServiceItemSettings{
+					Type: simplenotificationv1.RoutingSettingsCommonServiceItemSettings,
+					RoutingSettings: simplenotificationv1.RoutingSettings{
+						MatchLabels: []simplenotificationv1.RoutingSettingsMatchLabelsItem{
+							{Name: "severity", Value: "critical"},
+						},
+						SourceID:      "101122334455",
+						TargetGroupID: groupID,
+						PriorityRank:  1,
+					},
+				},
+			},
+		})
+		return err
+	}
+
+	if err := newRouting("e2e-routing-1"); err != nil {
+		return err
+	}
+	if err := newRouting("e2e-routing-doomed"); err != nil {
+		return err
+	}
+	if err := newRouting("e2e-routing-editable"); err != nil {
+		return err
 	}
 	return nil
 }

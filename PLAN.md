@@ -137,7 +137,11 @@ CLAUDE.mdに既に記載があるサービスだが未着手。`sacloud-sdk-go/a
 - Queue名はAPI側で`^[0-9a-zA-Z]+(-[0-9a-zA-Z]+)*$`・5〜64文字の制約があり、フォームに`pattern`/`minLength`/`maxLength`を設定済み
 - `internal/simplemq/service_test.go`にCRUD一式・APIキー発行〜メッセージ送受信・タイムアウト延長・削除・全削除のGoテストを追加。`frontend/src/components/SimpleMQList.tsx`(一覧・作成・削除)と`SimpleMQDetail.tsx`(基本情報編集・APIキー発行・メッセージ送受信)を新設し、サイドバーのグローバルリソースに追加。Vitestテストを追加、`e2e_server.go`にsakumock simplemqサーバー起動・シード(`seedSimpleMQQueues`)を追加し、`frontend/e2e/simplemq.spec.ts`・`frontend/e2e-manual/simplemq.spec.ts`・`docs/manual/simplemq.md`を新設。既存のE2Eスイート(107件)全件パス確認済み
 
-`simple-notification`は次点候補として未着手のまま残す。
+✅ **`simple-notification`対応済み(2026-08-10)**: `internal/simplenotification/service.go`にDestination(送信先)・Group(グループ)・Routing(ルーティング)のList/Create/Read/Update/Delete、およびGroup.SendMessage(テスト通知送信)を実装。`sacloud-sdk-go/api/simple-notification`もsimplemq同様ogen生成のOpenAPIクライアントで、`saclient.Client`+環境変数注入パターン(`SAKURA_ENDPOINTS_SIMPLE_NOTIFICATION`)がそのまま使える。設計上のポイント:
+- Destination/Group/Routingはいずれも`CommonServiceItem`という共通リソース型の上に成り立つポリモーフィックな設計(`Settings`が`DestinationSettings`/`GroupSettings`/`RoutingSettings`のunion、`Provider.Class`で種別を判別)で、SDK側の`DestinationOp`/`GroupOp`/`RoutingOp`がCreate時に`Provider.Class`/`ServiceClass`/`Settings.Type`を自動設定してくれるため、呼び出し側はペイロード部分(Name/Description/Tags/Settings本体)のみ組み立てればよい
+- `History`(通知履歴)・`ListSources`(ルーティングのソース一覧)・`Routing.Reorder`(並び替え)・`GetCommonServiceItemStatus`(有効性ステータス)の4エンドポイントは`sacloud-sdk-go`にAPIはあるが`sakumock/simplenotification`が未対応(`route.go`の`routeTable()`に存在しない)と判明したため、今回はスコープ外とした(`docs/upstream-issues.md`に改善要望として記録)。ルーティング作成フォームのソースIDは選択式ではなく数値ID直接入力の暫定対応(IAMタスク2のプロジェクトID入力と同様のパターン)
+- UI設計: IAMList.tsxのタブ切り替え1画面パターンを踏襲し、`SimpleNotificationList.tsx`に「送信先」「グループ」「ルーティング」の3タブを実装。詳細ページは作らず、作成・編集はモーダルフォーム、グループへのテスト通知送信も専用モーダルで完結させた。3タブとも相互参照(グループ一覧は送信先名を、ルーティング一覧はグループ名を表示)するため、タブ切り替えに関わらず3リソースをまとめて読み込む設計にした
+- `internal/simplenotification/service_test.go`にDestination/Group/Routing各CRUD一式・SendMessageのGoテストを追加(`sakumock/simplenotification`使用)。`SimpleNotificationList.test.tsx`にVitestテストを追加。`e2e_server.go`にsakumock simplenotificationサーバー起動・シード(`seedSimpleNotification`、各リソース3件ずつ: 表示用/削除シナリオ用(-doomed)/編集シナリオ用(-editable))を追加し、`frontend/e2e/simplenotification.spec.ts`(9件)・`frontend/e2e-manual/simplenotification.spec.ts`・`docs/manual/simplenotification.md`を新設。既存を含むE2Eスイート116件全件パス確認済み
 
 ---
 
