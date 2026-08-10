@@ -1,19 +1,29 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetIAMUsers, GetIAMGroups, GetIAMRoles, GetIAMIDRoles } from '../../wailsjs/go/main/App';
+import {
+  GetIAMUsers,
+  GetIAMGroups,
+  GetIAMRoles,
+  GetIAMIDRoles,
+  GetIAMServicePrincipals,
+  CreateIAMServicePrincipal,
+  DeleteIAMServicePrincipal,
+} from '../../wailsjs/go/main/App';
 import { iam } from '../../wailsjs/go/models';
 import { useGlobalReload } from '../hooks/useGlobalReload';
 
 interface IAMListProps {
   profile: string;
+  onSelectServicePrincipal: (id: number) => void;
 }
 
-type SubPage = 'users' | 'groups' | 'iamRoles' | 'idRoles';
+type SubPage = 'users' | 'groups' | 'iamRoles' | 'idRoles' | 'servicePrincipals';
 
 const TAB_LABEL: Record<SubPage, string> = {
   users: 'ユーザー',
   groups: 'グループ',
   iamRoles: 'IAMロール',
   idRoles: 'IDロール',
+  servicePrincipals: 'サービスプリンシパル',
 };
 
 const formatDate = (dateString: string) => {
@@ -30,14 +40,24 @@ const formatDate = (dateString: string) => {
   return `${Y}/${M}/${D} ${h}:${m}:${s}`;
 };
 
-export function IAMList({ profile }: IAMListProps) {
+export function IAMList({ profile, onSelectServicePrincipal }: IAMListProps) {
   const [subPage, setSubPage] = useState<SubPage>('users');
   const [users, setUsers] = useState<iam.UserInfo[]>([]);
   const [groups, setGroups] = useState<iam.GroupInfo[]>([]);
   const [iamRoles, setIamRoles] = useState<iam.IAMRoleInfo[]>([]);
   const [idRoles, setIdRoles] = useState<iam.IDRoleInfo[]>([]);
+  const [servicePrincipals, setServicePrincipals] = useState<iam.ServicePrincipalInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [confirmDelete, setConfirmDelete] = useState<iam.ServicePrincipalInfo | null>(null);
+  const [deleting, setDeleting] = useState<number | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newProjectId, setNewProjectId] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!profile) return;
@@ -50,8 +70,10 @@ export function IAMList({ profile }: IAMListProps) {
         setGroups((await GetIAMGroups(profile)) || []);
       } else if (subPage === 'iamRoles') {
         setIamRoles((await GetIAMRoles(profile)) || []);
-      } else {
+      } else if (subPage === 'idRoles') {
         setIdRoles((await GetIAMIDRoles(profile)) || []);
+      } else {
+        setServicePrincipals((await GetIAMServicePrincipals(profile)) || []);
       }
     } catch (err) {
       console.error(`[IAMList] loadData error (${subPage}):`, err);
@@ -157,22 +179,63 @@ export function IAMList({ profile }: IAMListProps) {
       );
     }
 
-    if (idRoles.length === 0) return <div className="empty-state">IDロールがありません</div>;
+    if (subPage === 'idRoles') {
+      if (idRoles.length === 0) return <div className="empty-state">IDロールがありません</div>;
+      return (
+        <table className="table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>名前</th>
+              <th>説明</th>
+            </tr>
+          </thead>
+          <tbody>
+            {idRoles.map(r => (
+              <tr key={r.id}>
+                <td>{r.id}</td>
+                <td>{r.name}</td>
+                <td>{r.description || '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      );
+    }
+
+    if (servicePrincipals.length === 0) return <div className="empty-state">サービスプリンシパルがありません</div>;
     return (
       <table className="table">
         <thead>
           <tr>
             <th>ID</th>
             <th>名前</th>
+            <th>プロジェクトID</th>
             <th>説明</th>
+            <th>作成日</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
-          {idRoles.map(r => (
-            <tr key={r.id}>
-              <td>{r.id}</td>
-              <td>{r.name}</td>
-              <td>{r.description || '-'}</td>
+          {servicePrincipals.map(sp => (
+            <tr key={sp.id} onClick={() => onSelectServicePrincipal(sp.id)} style={{ cursor: 'pointer' }}>
+              <td>{sp.id}</td>
+              <td>{sp.name}</td>
+              <td>{sp.projectId}</td>
+              <td>{sp.description || '-'}</td>
+              <td>{formatDate(sp.createdAt)}</td>
+              <td>
+                <button
+                  className="btn btn-danger btn-small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirmDelete(sp);
+                  }}
+                  disabled={deleting === sp.id}
+                >
+                  {deleting === sp.id ? '削除中...' : '削除'}
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -180,10 +243,55 @@ export function IAMList({ profile }: IAMListProps) {
     );
   };
 
+  const handleCreateOpen = () => {
+    setNewProjectId('');
+    setNewName('');
+    setNewDescription('');
+    setCreateError(null);
+    setShowCreate(true);
+  };
+
+  const handleCreateCancel = () => setShowCreate(false);
+
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreating(true);
+    setCreateError(null);
+    try {
+      await CreateIAMServicePrincipal(profile, Number(newProjectId), newName, newDescription);
+      setShowCreate(false);
+      await loadData();
+    } catch (e) {
+      setCreateError(String(e));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDeleteCancel = () => setConfirmDelete(null);
+
+  const handleDeleteConfirm = async () => {
+    if (!confirmDelete) return;
+    const target = confirmDelete;
+    setConfirmDelete(null);
+    setDeleting(target.id);
+    try {
+      await DeleteIAMServicePrincipal(profile, target.id);
+      await loadData();
+    } catch (e) {
+      alert(`削除に失敗しました: ${e}`);
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   return (
     <>
       <div className="header">
         <h2>IAM</h2>
+        {subPage === 'servicePrincipals' && (
+          <button className="btn btn-primary btn-small" onClick={handleCreateOpen}>+ サービスプリンシパル作成</button>
+        )}
       </div>
 
       <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem' }}>
@@ -199,6 +307,77 @@ export function IAMList({ profile }: IAMListProps) {
       </div>
 
       {renderContent()}
+
+      {confirmDelete && (
+        <div className="confirm-overlay" onClick={handleDeleteCancel}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <p>サービスプリンシパル「{confirmDelete.name}」を削除しますか？</p>
+            <p className="confirm-warning">この操作は取り消せません。関連するキーもすべて削除されます。</p>
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={handleDeleteCancel}>キャンセル</button>
+              <button className="btn btn-danger" onClick={handleDeleteConfirm}>削除する</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreate && (
+        <div className="modal-overlay" onClick={handleCreateCancel} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+            backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
+            padding: '20px', minWidth: '320px', maxWidth: '420px',
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>サービスプリンシパル作成</h3>
+            <form onSubmit={handleCreateSubmit}>
+              <div className="form-group">
+                <label>プロジェクトID<span className="required-mark">*</span></label>
+                <input
+                  type="number"
+                  value={newProjectId}
+                  onChange={(e) => setNewProjectId(e.target.value)}
+                  placeholder="1"
+                  autoFocus
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>名前<span className="required-mark">*</span></label>
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="my-service-principal"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>説明</label>
+                <input
+                  type="text"
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  placeholder="任意"
+                />
+              </div>
+              {createError && (
+                <div style={{ marginBottom: '1rem', color: '#ff6b6b', fontSize: '0.85rem' }}>
+                  エラー: {createError}
+                </div>
+              )}
+              <div className="confirm-actions">
+                <button type="button" className="btn btn-secondary" onClick={handleCreateCancel}>キャンセル</button>
+                <button type="submit" className="btn btn-primary" disabled={creating}>
+                  {creating ? '作成中...' : '作成する'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 }

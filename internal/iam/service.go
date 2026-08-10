@@ -7,8 +7,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/google/uuid"
 	sdkiam "github.com/sacloud/sacloud-sdk-go/api/iam"
 	iamgroup "github.com/sacloud/sacloud-sdk-go/api/iam/apis/group"
+	iamserviceprincipal "github.com/sacloud/sacloud-sdk-go/api/iam/apis/serviceprincipal"
 	iamuser "github.com/sacloud/sacloud-sdk-go/api/iam/apis/user"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
@@ -51,12 +53,34 @@ type IDRoleInfo struct {
 	Description string `json:"description"`
 }
 
-// Service IAM API サービス。現状はUser/Group/IAMRole/IDRoleの読み取りのみを公開する
+// ServicePrincipalInfo サービスプリンシパル情報
+type ServicePrincipalInfo struct {
+	ID          int    `json:"id"`
+	ProjectID   int    `json:"projectId"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
+}
+
+// ServicePrincipalKeyInfo サービスプリンシパルキー情報
+type ServicePrincipalKeyInfo struct {
+	ID           string `json:"id"`
+	Kid          string `json:"kid"`
+	Status       string `json:"status"`
+	KeyOrigin    string `json:"keyOrigin"`
+	PublicKey    string `json:"publicKey"`
+	CreatedAt    string `json:"createdAt"`
+	KeyExpiresAt string `json:"keyExpiresAt"`
+}
+
+// Service IAM API サービス。User/Group/IAMRole/IDRoleは読み取りのみ、ServicePrincipalはキー管理まで含めて公開する
 type Service struct {
-	userOp    sdkiam.UserAPI
-	groupOp   sdkiam.GroupAPI
-	iamRoleOp sdkiam.IAMRoleAPI
-	idRoleOp  sdkiam.IDRoleAPI
+	userOp             sdkiam.UserAPI
+	groupOp            sdkiam.GroupAPI
+	iamRoleOp          sdkiam.IAMRoleAPI
+	idRoleOp           sdkiam.IDRoleAPI
+	servicePrincipalOp sdkiam.ServicePrincipalAPI
 }
 
 // profileConfig usacloud プロファイルの設定
@@ -87,10 +111,11 @@ func NewService(profileName string) (*Service, error) {
 	}
 
 	return &Service{
-		userOp:    sdkiam.NewUserOp(client),
-		groupOp:   sdkiam.NewGroupOp(client),
-		iamRoleOp: sdkiam.NewIAMRoleOp(client),
-		idRoleOp:  sdkiam.NewIDRoleOp(client),
+		userOp:             sdkiam.NewUserOp(client),
+		groupOp:            sdkiam.NewGroupOp(client),
+		iamRoleOp:          sdkiam.NewIAMRoleOp(client),
+		idRoleOp:           sdkiam.NewIDRoleOp(client),
+		servicePrincipalOp: sdkiam.NewServicePrincipalOp(client),
 	}, nil
 }
 
@@ -192,6 +217,118 @@ func (s *Service) ListIDRoles(ctx context.Context) ([]IDRoleInfo, error) {
 	return result, nil
 }
 
+// ListServicePrincipals サービスプリンシパル一覧を取得
+func (s *Service) ListServicePrincipals(ctx context.Context) ([]ServicePrincipalInfo, error) {
+	res, err := s.servicePrincipalOp.List(ctx, iamserviceprincipal.ListParams{})
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]ServicePrincipalInfo, 0, len(res.Items))
+	for _, sp := range res.Items {
+		result = append(result, *toServicePrincipalInfo(&sp))
+	}
+	return result, nil
+}
+
+// GetServicePrincipal サービスプリンシパルの詳細を取得
+func (s *Service) GetServicePrincipal(ctx context.Context, id int) (*ServicePrincipalInfo, error) {
+	sp, err := s.servicePrincipalOp.Read(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return toServicePrincipalInfo(sp), nil
+}
+
+// CreateServicePrincipal サービスプリンシパルを新規作成する
+func (s *Service) CreateServicePrincipal(ctx context.Context, projectID int, name, description string) (*ServicePrincipalInfo, error) {
+	sp, err := s.servicePrincipalOp.Create(ctx, iamserviceprincipal.CreateParams{
+		ProjectID:   projectID,
+		Name:        name,
+		Description: description,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return toServicePrincipalInfo(sp), nil
+}
+
+// UpdateServicePrincipal サービスプリンシパルの名前・説明を更新する
+func (s *Service) UpdateServicePrincipal(ctx context.Context, id int, name, description string) (*ServicePrincipalInfo, error) {
+	req := iamserviceprincipal.UpdateParams{Name: name}
+	if description != "" {
+		req.Description = v1.NewOptString(description)
+	}
+	sp, err := s.servicePrincipalOp.Update(ctx, id, req)
+	if err != nil {
+		return nil, err
+	}
+	return toServicePrincipalInfo(sp), nil
+}
+
+// DeleteServicePrincipal サービスプリンシパルを削除する
+func (s *Service) DeleteServicePrincipal(ctx context.Context, id int) error {
+	return s.servicePrincipalOp.Delete(ctx, id)
+}
+
+// ListServicePrincipalKeys サービスプリンシパルのキー一覧を取得
+func (s *Service) ListServicePrincipalKeys(ctx context.Context, id int) ([]ServicePrincipalKeyInfo, error) {
+	res, err := s.servicePrincipalOp.ListKeys(ctx, id, iamserviceprincipal.ListKeysParams{})
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]ServicePrincipalKeyInfo, 0, len(res.Items))
+	for _, k := range res.Items {
+		result = append(result, *toServicePrincipalKeyInfo(&k))
+	}
+	return result, nil
+}
+
+// UploadServicePrincipalKey サービスプリンシパルに公開鍵を登録する
+func (s *Service) UploadServicePrincipalKey(ctx context.Context, id int, publicKey string) (*ServicePrincipalKeyInfo, error) {
+	key, err := s.servicePrincipalOp.UploadKey(ctx, id, v1.ServiceprincipalKeyPublicKey(publicKey))
+	if err != nil {
+		return nil, err
+	}
+	return toServicePrincipalKeyInfo(key), nil
+}
+
+// EnableServicePrincipalKey サービスプリンシパルキーを有効化する
+func (s *Service) EnableServicePrincipalKey(ctx context.Context, id int, keyID string) (*ServicePrincipalKeyInfo, error) {
+	parsedKeyID, err := uuid.Parse(keyID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid key id: %w", err)
+	}
+	key, err := s.servicePrincipalOp.EnableKey(ctx, id, parsedKeyID)
+	if err != nil {
+		return nil, err
+	}
+	return toServicePrincipalKeyInfo(key), nil
+}
+
+// DisableServicePrincipalKey サービスプリンシパルキーを無効化する
+func (s *Service) DisableServicePrincipalKey(ctx context.Context, id int, keyID string) (*ServicePrincipalKeyInfo, error) {
+	parsedKeyID, err := uuid.Parse(keyID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid key id: %w", err)
+	}
+	key, err := s.servicePrincipalOp.DisableKey(ctx, id, parsedKeyID)
+	if err != nil {
+		return nil, err
+	}
+	return toServicePrincipalKeyInfo(key), nil
+}
+
+// DeleteServicePrincipalKey サービスプリンシパルキーを削除する
+func (s *Service) DeleteServicePrincipalKey(ctx context.Context, id int, keyID string) error {
+	parsedKeyID, err := uuid.Parse(keyID)
+	if err != nil {
+		return fmt.Errorf("invalid key id: %w", err)
+	}
+	return s.servicePrincipalOp.DeleteKey(ctx, id, parsedKeyID)
+}
+
 // toUserInfo v1.User を UserInfo に変換
 func toUserInfo(u *v1.User) *UserInfo {
 	return &UserInfo{
@@ -214,5 +351,30 @@ func toGroupInfo(g *v1.Group) *GroupInfo {
 		Description: g.Description,
 		CreatedAt:   g.CreatedAt,
 		UpdatedAt:   g.UpdatedAt,
+	}
+}
+
+// toServicePrincipalInfo v1.ServicePrincipal を ServicePrincipalInfo に変換
+func toServicePrincipalInfo(sp *v1.ServicePrincipal) *ServicePrincipalInfo {
+	return &ServicePrincipalInfo{
+		ID:          sp.ID,
+		ProjectID:   sp.ProjectID,
+		Name:        sp.Name,
+		Description: sp.Description,
+		CreatedAt:   sp.CreatedAt.Value,
+		UpdatedAt:   sp.UpdatedAt.Value,
+	}
+}
+
+// toServicePrincipalKeyInfo v1.ServicePrincipalKey を ServicePrincipalKeyInfo に変換
+func toServicePrincipalKeyInfo(k *v1.ServicePrincipalKey) *ServicePrincipalKeyInfo {
+	return &ServicePrincipalKeyInfo{
+		ID:           k.ID.String(),
+		Kid:          k.Kid,
+		Status:       string(k.Status),
+		KeyOrigin:    string(k.KeyOrigin),
+		PublicKey:    string(k.PublicKey),
+		CreatedAt:    k.CreatedAt,
+		KeyExpiresAt: k.KeyExpiresAt.Value,
 	}
 }

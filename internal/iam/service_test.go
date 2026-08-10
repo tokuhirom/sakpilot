@@ -248,3 +248,130 @@ func TestService_ListIDRoles(t *testing.T) {
 		t.Errorf("admin role not found in %+v", roles)
 	}
 }
+
+func TestService_ServicePrincipal_CRUD(t *testing.T) {
+	srv := mockiam.NewTestServer(mockiam.Config{})
+	defer srv.Close()
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_IAM", srv.TestURL())
+
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	created, err := service.CreateServicePrincipal(context.Background(), 1, "test-sp", "a test service principal")
+	if err != nil {
+		t.Fatalf("CreateServicePrincipal: %v", err)
+	}
+	if created.ProjectID != 1 || created.Name != "test-sp" || created.Description != "a test service principal" {
+		t.Errorf("created = %+v, want ProjectID=1 Name=test-sp Description=%q", created, "a test service principal")
+	}
+
+	list, err := service.ListServicePrincipals(context.Background())
+	if err != nil {
+		t.Fatalf("ListServicePrincipals: %v", err)
+	}
+	if len(list) != 1 || list[0].ID != created.ID {
+		t.Fatalf("list = %+v, want 1 item with ID=%d", list, created.ID)
+	}
+
+	got, err := service.GetServicePrincipal(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("GetServicePrincipal: %v", err)
+	}
+	if got.ID != created.ID || got.Name != "test-sp" {
+		t.Errorf("got = %+v, want ID=%d Name=test-sp", got, created.ID)
+	}
+
+	updated, err := service.UpdateServicePrincipal(context.Background(), created.ID, "renamed-sp", "updated description")
+	if err != nil {
+		t.Fatalf("UpdateServicePrincipal: %v", err)
+	}
+	if updated.Name != "renamed-sp" || updated.Description != "updated description" {
+		t.Errorf("updated = %+v, want Name=renamed-sp Description=%q", updated, "updated description")
+	}
+
+	if err := service.DeleteServicePrincipal(context.Background(), created.ID); err != nil {
+		t.Fatalf("DeleteServicePrincipal: %v", err)
+	}
+
+	list, err = service.ListServicePrincipals(context.Background())
+	if err != nil {
+		t.Fatalf("ListServicePrincipals after delete: %v", err)
+	}
+	if len(list) != 0 {
+		t.Fatalf("list after delete = %+v, want empty", list)
+	}
+}
+
+func TestService_ServicePrincipal_KeyLifecycle(t *testing.T) {
+	srv := mockiam.NewTestServer(mockiam.Config{})
+	defer srv.Close()
+
+	profileName := writeUsacloudProfile(t, "dummy", "dummy")
+	t.Setenv("SAKURA_ENDPOINTS_IAM", srv.TestURL())
+
+	service, err := iam.NewService(profileName)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	sp, err := service.CreateServicePrincipal(context.Background(), 1, "test-sp", "")
+	if err != nil {
+		t.Fatalf("CreateServicePrincipal: %v", err)
+	}
+
+	keys, err := service.ListServicePrincipalKeys(context.Background(), sp.ID)
+	if err != nil {
+		t.Fatalf("ListServicePrincipalKeys: %v", err)
+	}
+	if len(keys) != 0 {
+		t.Fatalf("keys = %+v, want empty before upload", keys)
+	}
+
+	uploaded, err := service.UploadServicePrincipalKey(context.Background(), sp.ID, "-----BEGIN PUBLIC KEY-----test-----END PUBLIC KEY-----")
+	if err != nil {
+		t.Fatalf("UploadServicePrincipalKey: %v", err)
+	}
+	if uploaded.Status != "enabled" {
+		t.Errorf("uploaded.Status = %q, want enabled", uploaded.Status)
+	}
+
+	keys, err = service.ListServicePrincipalKeys(context.Background(), sp.ID)
+	if err != nil {
+		t.Fatalf("ListServicePrincipalKeys after upload: %v", err)
+	}
+	if len(keys) != 1 || keys[0].ID != uploaded.ID {
+		t.Fatalf("keys = %+v, want 1 item with ID=%s", keys, uploaded.ID)
+	}
+
+	disabled, err := service.DisableServicePrincipalKey(context.Background(), sp.ID, uploaded.ID)
+	if err != nil {
+		t.Fatalf("DisableServicePrincipalKey: %v", err)
+	}
+	if disabled.Status != "disabled" {
+		t.Errorf("disabled.Status = %q, want disabled", disabled.Status)
+	}
+
+	enabled, err := service.EnableServicePrincipalKey(context.Background(), sp.ID, uploaded.ID)
+	if err != nil {
+		t.Fatalf("EnableServicePrincipalKey: %v", err)
+	}
+	if enabled.Status != "enabled" {
+		t.Errorf("enabled.Status = %q, want enabled", enabled.Status)
+	}
+
+	if err := service.DeleteServicePrincipalKey(context.Background(), sp.ID, uploaded.ID); err != nil {
+		t.Fatalf("DeleteServicePrincipalKey: %v", err)
+	}
+
+	keys, err = service.ListServicePrincipalKeys(context.Background(), sp.ID)
+	if err != nil {
+		t.Fatalf("ListServicePrincipalKeys after delete: %v", err)
+	}
+	if len(keys) != 0 {
+		t.Fatalf("keys after delete = %+v, want empty", keys)
+	}
+}
