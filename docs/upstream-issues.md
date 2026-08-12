@@ -55,6 +55,8 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 
 ### 5. AppRun専有型 `version.CreateParams.CPU` / SDK内の `Version.CPU` の単位がコード上どこにもドキュメント化されていない
 
+- **報告済み**
+
 - パッケージ: `github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/version`
 - 該当: `version.go` の `CreateParams.CPU int64` / `Version.CPU int64`(`json:"cpu"`)
 - 内容: フィールドのコメントが無く、「vCPU」なのか「ミリvCPU(1000 = 1vCPU)」なのか型定義だけでは分からない。`version_test.go` のフィクスチャ(`CPU: 1000`, `CPU: 100` 等)から逆算してミリvCPU単位だと推測するしかなかった。
@@ -62,6 +64,8 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - 提案: `CPU int64` フィールドに `// CPU ミリvCPU単位のCPU割り当て(例: 1000 = 1 vCPU)` のようなdocコメントを追加してほしい。可能なら `Memory` 等の他の数値フィールドも単位を明記してほしい。
 
 ### 6. `sakumock/objectstorage` のS3データプレーンが、control planeで発行したアクセスキーを検証しないため、キー発行込みの結合テストができない
+
+- **報告済み**
 
 - パッケージ: `github.com/sacloud/sakumock/objectstorage`
 - 参照: [README「Data plane (S3)」](https://github.com/sacloud/sakumock/tree/main/objectstorage#data-plane-s3)
@@ -101,6 +105,8 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - 報告時の提案: `injectFilterMiddleware`が生成するミドルウェアが実際に`saclient`のミドルウェアチェーンに乗っているか(`WithMiddleware`オプションの適用順序、複数回の`DupWith`呼び出しでの上書き等)を調査してほしい。可能であれば`client_test.go`に「`RawQuery`が期待通り設定されているか」を検証するテストケースを追加すると再発を防げる。
 
 ### 10. `sacloud-sdk-go/api/apigw` の `Service.ConnectTimeout`/`WriteTimeout`/`ReadTimeout` のGodocが「秒数」だが、実際の単位はミリ秒
+
+- **報告済み**
 
 - パッケージ: `github.com/sacloud/sacloud-sdk-go/api/apigw`
 - ファイル: `apis/v1/oas_schemas_gen.go`(`ServiceDetailRequest`/`ServiceDetail`/`ServiceDetailResponse`の`ConnectTimeout`/`WriteTimeout`/`ReadTimeout`フィールド、コメントはそれぞれ「接続タイムアウト秒数」「書き込みタイムアウト秒数」「読み込みタイムアウト秒数」)
