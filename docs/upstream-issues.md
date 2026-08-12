@@ -10,6 +10,8 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 
 ### 1. `iaas/fake` の `ProxyLBOp.SetCertificates` がnilポインタ参照でpanicする
 
+- **対応済み**: https://github.com/sacloud/sacloud-sdk-go/pull/216#discussion_r3764158222
+
 - パッケージ: `github.com/sacloud/sacloud-sdk-go/api/iaas/fake`
 - ファイル: `ops_proxy_lb.go` (`SetCertificates`, 211行目付近)、`functions.go` (`copySameNameField`, 189行目)
 - 再現: `iaas.NewProxyLBOp(nil).SetCertificates(ctx, id, &iaas.ProxyLBSetCertificatesRequest{PrimaryCerts: &iaas.ProxyLBPrimaryCert{ServerCertificate: "...", IntermediateCertificate: "...", PrivateKey: "..."}})` をfakeドライバ切り替え後(`fake.SwitchFactoryFuncToFake()`)に呼ぶと、100%再現する。
