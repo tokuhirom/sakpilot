@@ -26,6 +26,8 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 
 ### 2. `iaas/fake` の `DatabaseOp.GetParameter` が `Conf` フィールドのnilチェックをしておらずpanicする
 
+- **提案中**: https://github.com/sacloud/sacloud-sdk-go/pull/218
+
 - パッケージ: `github.com/sacloud/sacloud-sdk-go/api/iaas/fake`
 - ファイル: `ops_database.go`(`GetParameter`、314行目付近)
 - 再現: fakeドライバのデータストアに `Conf` フィールドが `nil` の `*iaas.Database` を(`fake.DataStore.Put` などで直接、あるいは `Conf` を指定しない `DatabaseCreateRequest` 経由で)投入した状態で `DatabaseOp.GetParameter` を呼ぶと、`if v.Conf.DatabaseName == "postgres"` の行でnilポインタ参照によりpanicする。
