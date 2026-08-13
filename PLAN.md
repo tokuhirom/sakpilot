@@ -146,7 +146,7 @@ CLAUDE.mdに既に記載があるサービスだが未着手。`sacloud-sdk-go/a
 
 > **2026-08-10時点の注記**: `webaccel`は`sacloud-sdk-go`側にAPIはあるが、`sakumock`(`github.com/sacloud/sakumock`)側に対応パッケージが存在しない。SakPilotのE2Eテスト運用はsakumockのテストサーバーに依存しているため、このままではE2E(`frontend/e2e/`)・マニュアル撮影(`frontend/e2e-manual/`)が書けない。同様にsakumock未対応なのは `nosql` / `dedicated-storage` / `security-control` / `service-endpoint-gateway` / `addon`(Tier C/D相当)。着手する場合はGoテスト(sakumock無しでSDKのHTTPクライアントを直接叩くfake実装が必要)とE2Eの扱いを先に決めること。sakumockに対応が追加されるまでは優先度を下げ、Tier Bの中では`simplemq`/`simple-notification`を先に着手するのが妥当。
 >
-> **2026-08-13追記**: sakumock 0.8.0で`cloudhsm`パッケージが追加された(PR#158)。上記リストから`cloudhsm`を除外。E2E着手可能になったが、SakPilot側の実装(Go/RPC/フロントエンド)は未着手。
+> **2026-08-13追記**: sakumock 0.8.0で`cloudhsm`パッケージが追加された(PR#158)。上記リストから`cloudhsm`を除外。E2E着手可能になったため、同日中にTier Dの`cloudhsm`として実装完了(詳細は下記Tier D参照)。
 
 ## Tier B: simplemq / simple-notification
 
@@ -187,7 +187,14 @@ CLAUDE.mdに既に記載があるサービスだが未着手。`sacloud-sdk-go/a
 個別ドメイン知識が必要、または既存資産との親和性が低いもの。ニーズが顕在化してから着手を検討する。
 
 - `dedicated-storage`: disk/contract
-- `cloudhsm`: certificate/peer/license — sakumock 0.8.0で対応パッケージ追加済み(2026-08-13時点、着手は未定)
+- `cloudhsm`: certificate/peer/license — ✅ **対応済み（2026-08-13）**: 専有型HSM(ハードウェアセキュリティモジュール)。`sacloud-sdk-go/api/cloudhsm`はogen生成のOpenAPIクライアントで、KMS/secretmanager等と同型の`saclient.Client`+環境変数(`SAKURA_ENDPOINTS_CLOUDHSM`)パターンがそのまま使える。設計上のポイント:
+  - CloudHSMは物理的にis1bゾーンにのみ設置されるため、SDK内部で`DefaultZone = "is1b"`に固定されている。ユーザーが選択中のゾーンとは独立した完全なグローバルリソースとして扱い、`internal/cloudhsm/service.go`はKMS/secretmanagerと同じ「プロファイルのAPIキーのみで認証するグローバルサービス」の実装パターンを踏襲した
+  - 4リソースのうちHSM本体(`CloudHSMAPI`)とソフトウェアライセンス(`LicenseAPI`)はトップレベルリソースで`NewService`時に1度だけ生成できるが、接続クライアント(`ClientAPI`)とピア(`PeerAPI`)はHSMごとにネストし、`cloudhsm.NewClientOp(client, hsm)`/`cloudhsm.NewPeerOp(client, hsm)`のように親の`*v1.CloudHSM`オブジェクトを渡して都度生成する設計(いずれも対象HSMが`Availability: available`でないとエラーになる)。secretmanagerの「Serviceが`*v1.Client`を保持し、Vaultごとに`NewSecretOp(client, vaultID)`を都度生成する」パターンと同型のため、`Service`に`*v1.Client`を保持させ`clientOpFor(ctx, hsmID)`/`peerOpFor(ctx, hsmID)`ヘルパー(内部で`hsmOp.Read`してから`NewClientOp`/`NewPeerOp`)を用意して対応した
+  - HSM本体の`Ipv4NetworkAddress`/`Ipv4PrefixLength`(サブネット定義)は実運用上不変のフィールドだがUpdate APIには毎回必須で送る必要があるため、KMSの`KeyOrigin`やsecretmanagerの`KmsKeyID`と同様に事前Readで現在値を引き継ぐ設計にした
+  - **sakumockの挙動差異を発見**: `ClientOp.Update`(SDK内、`certificate.go`)は更新リクエストに`Certificate`を含めない設計(SDKのコメントで「更新できないフィールド」と明記)だが、`sakumock/cloudhsm`は受け取った空の`Certificate`をそのままレコードに上書き保存してしまうため、名前だけ変更したつもりでも証明書が空文字になって返ってくる(`docs/upstream-issues.md`参照)。実APIでの挙動は未検証(検証環境なし)だが、SDK側の設計意図と矛盾するためsakumock側の実装ミスの可能性が高いと判断し、`internal/cloudhsm/service_test.go`の`TestService_ClientCRUD`ではこの挙動をそのまま期待値として固定した
+  - sakumockのモック実装では、CreateしたCloudHSMは即座に`Availability: available`になる(実クラウドの非同期プロビジョニング待ちが無い)ため、Client/Peer作成前のポーリング処理は不要と判断し実装していない
+  - UI設計はWorkflowsList/WorkflowDetailの「一覧+詳細ページ、詳細ページ内でタブ切り替えによりネストしたサブリソースを扱う」パターンを踏襲。`CloudHSMList.tsx`はHSM一覧とソフトウェアライセンス一覧(HSM本体とは独立したリソースだが、専用の詳細ページを持たせるほどの複雑さが無いため同一画面内のタブとして統合)をタブ切り替えで表示し、`CloudHSMDetail.tsx`で基本情報編集+「接続クライアント」「ピア」タブを実装
+  - Goテスト(`internal/cloudhsm/service_test.go`、`sakumock/cloudhsm`の`NewTestServer`使用、HSM/Client/Peer/LicenseそれぞれのCRUDを検証)・Vitest(`CloudHSMList.test.tsx`/`CloudHSMDetail.test.tsx`)・E2E(`frontend/e2e/cloudhsm.spec.ts`、7件、`e2e_server.go`の`seedCloudHSM`でHSM3件(うち1件はClient/Peer付き)・ライセンス3件を投入)・マニュアル(`docs/manual/cloudhsm.md`)まで対応し、既存E2E(177件)含め全件パス確認済み
 - `security-control`: evaluation_rules/automated_actions/activation
 - `service-endpoint-gateway`: エンドポイント管理 — ✅ **対応済み（2026-08-10）**: プライベート接続からオブジェクトストレージ/コンテナレジストリ/モニタリングスイート/AppRun専有型コントロールプレーンへ到達するためのゲートウェイアプライアンス。`sacloud-sdk-go/api/service-endpoint-gateway`はogen生成のOpenAPIクライアントで、認証はKMS等と同型(`saclient`標準パターン)だが、サーバー/ディスクと同じくゾーン依存リソースである点が他の新規対応サービス(apigw/eventbus/workflows等、いずれもゾーン非依存)と異なる。`internal/serviceendpointgateway/service.go`にList/Get/Create/Update/Apply/Delete/ReadInterface/ReadPowerStatus/PowerOn/Shutdown/Resetを実装。設計上のポイント:
   - **sakumockが本サービス未対応**のため(`~/go/pkg/mod/github.com/sacloud/sakumock@v0.7.2/`に対応パッケージなし、Go Module Proxy上の最新版0.7.2でも同じ)、Goテストは`net/http/httptest`+Go1.22の`http.ServeMux`パターンマッチングで自作したfakeサーバー(`internal/serviceendpointgateway/fake_server_test.go`)を用いる方針にした。sakumock対応が追加され次第、切り替えを検討する

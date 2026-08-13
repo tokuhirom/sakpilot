@@ -24,6 +24,7 @@
 | NFS | [nfs.md](nfs.md) |
 | コンテナレジストリ | [containerregistry.md](containerregistry.md) |
 | KMS | [kms.md](kms.md) |
+| CloudHSM | [cloudhsm.md](cloudhsm.md) |
 | シークレットマネージャー | [secretmanager.md](secretmanager.md) |
 | SimpleMQ | [simplemq.md](simplemq.md) |
 | 簡易通知(Simple Notification) | [simplenotification.md](simplenotification.md) |

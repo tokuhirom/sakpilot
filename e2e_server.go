@@ -46,6 +46,8 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/version"
 	sharedv1 "github.com/sacloud/sacloud-sdk-go/api/apprun/apis/v1"
 	"github.com/google/uuid"
+	sdkcloudhsm "github.com/sacloud/sacloud-sdk-go/api/cloudhsm"
+	cloudhsmv1 "github.com/sacloud/sacloud-sdk-go/api/cloudhsm/apis/v1"
 	sdkeventbus "github.com/sacloud/sacloud-sdk-go/api/eventbus"
 	eventbusv1 "github.com/sacloud/sacloud-sdk-go/api/eventbus/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
@@ -73,6 +75,7 @@ import (
 	mockapigw "github.com/sacloud/sakumock/apigw"
 	mockapprunshared "github.com/sacloud/sakumock/apprun"
 	mockapprundedicated "github.com/sacloud/sakumock/apprundedicated"
+	mockcloudhsm "github.com/sacloud/sakumock/cloudhsm"
 	mockeventbus "github.com/sacloud/sakumock/eventbus"
 	mockiam "github.com/sacloud/sakumock/iam"
 	mockkms "github.com/sacloud/sakumock/kms"
@@ -142,6 +145,14 @@ func runE2EServer(addr, dist string) error {
 	}
 	if err := seedEnhancedDBs(); err != nil {
 		return fmt.Errorf("failed to seed enhanced DBs: %w", err)
+	}
+
+	cloudHSMSrv := mockcloudhsm.NewTestServer(mockcloudhsm.Config{})
+	if err := os.Setenv("SAKURA_ENDPOINTS_CLOUDHSM", cloudHSMSrv.TestURL()); err != nil {
+		return err
+	}
+	if err := seedCloudHSM(); err != nil {
+		return fmt.Errorf("failed to seed CloudHSM resources: %w", err)
 	}
 
 	kmsSrv := mockkms.NewTestServer(mockkms.Config{})
@@ -931,6 +942,97 @@ func seedEnhancedDBs() error {
 	}); err != nil {
 		return err
 	}
+	return nil
+}
+
+// seedCloudHSM はsakumockのCloudHSMサーバーにE2Eシナリオ用のHSM・接続クライアント・
+// ピア・ソフトウェアライセンスを投入する。CloudHSMはis1bゾーン固定のグローバル
+// リソースなので、他のゾーン依存リソースとは独立して投入できる。
+func seedCloudHSM() error {
+	var sc saclient.Client
+	env := append(os.Environ(),
+		"SAKURA_ACCESS_TOKEN="+e2eAccessToken,
+		"SAKURA_ACCESS_TOKEN_SECRET="+e2eSecretToken,
+	)
+	if err := sc.SetEnviron(env); err != nil {
+		return err
+	}
+	client, err := sdkcloudhsm.NewClient(&sc)
+	if err != nil {
+		return err
+	}
+	ctx := context.Background()
+
+	hsmOp := sdkcloudhsm.NewCloudHSMOp(client)
+	newHSM := func(name, ipv4NetworkAddress string) (*cloudhsmv1.CreateCloudHSM, error) {
+		return hsmOp.Create(ctx, sdkcloudhsm.CloudHSMCreateParams{
+			Name:               name,
+			Description:        strPtr("E2E: CloudHSM表示確認シナリオ用"),
+			Tags:               []string{"env:e2e"},
+			Ipv4NetworkAddress: ipv4NetworkAddress,
+			Ipv4PrefixLength:   24,
+		})
+	}
+
+	display, err := newHSM("e2e-cloudhsm-1", "192.168.101.0")
+	if err != nil {
+		return err
+	}
+	if _, err := newHSM("e2e-cloudhsm-doomed", "192.168.102.0"); err != nil {
+		return err
+	}
+	if _, err := newHSM("e2e-cloudhsm-editable", "192.168.103.0"); err != nil {
+		return err
+	}
+
+	displayHSM, err := hsmOp.Read(ctx, display.ID)
+	if err != nil {
+		return err
+	}
+
+	clientOp, err := sdkcloudhsm.NewClientOp(client, displayHSM)
+	if err != nil {
+		return err
+	}
+	const e2eClientCertPEM = `-----BEGIN CERTIFICATE-----
+MIIBhTCCASugAwIBAgIQIeZQ7dGVJ8W2yhWgHu2XjTAKBggqhkjOPQQDAjASMRAw
+DgYDVQQKEwdzYWtwaWxvdDAeFw0yNTAxMDEwMDAwMDBaFw0zNTAxMDEwMDAwMDBa
+MBIxEDAOBgNVBAoTB3Nha3BpbG90MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE
+6d0aY+huGKq0Sm3xkbaAaZpWWfziuxxEQFwPWY3G/1kkiVWnDwj1kIcS+9tWr4uv
+0V6oQpZv9EnBw9UkakLhoaNGMEQwDgYDVR0PAQH/BAQDAgWgMBMGA1UdJQQMMAoG
+CCsGAQUFBwMCMB0GA1UdDgQWBBRTeSN9nAK1YB1PguoBIyF+VuvcHzAKBggqhkjO
+PQQDAgNIADBFAiAlA3ExampleExampleExampleExampleExampleExampleExam
+pleAiEA1ExampleExampleExampleExampleExampleExampleExampleExample==
+-----END CERTIFICATE-----`
+	if _, err := clientOp.Create(ctx, sdkcloudhsm.CloudHSMClientCreateParams{
+		Name:        "e2e-client-1",
+		Certificate: e2eClientCertPEM,
+	}); err != nil {
+		return err
+	}
+
+	peerOp, err := sdkcloudhsm.NewPeerOp(client, displayHSM)
+	if err != nil {
+		return err
+	}
+	if err := peerOp.Create(ctx, sdkcloudhsm.CloudHSMPeerCreateParams{
+		RouterID:  "112233445566",
+		SecretKey: "e2e-peer-secret-key",
+	}); err != nil {
+		return err
+	}
+
+	licenseOp := sdkcloudhsm.NewLicenseOp(client)
+	for _, name := range []string{"e2e-license-1", "e2e-doomed-license", "e2e-editable-license"} {
+		if _, err := licenseOp.Create(ctx, sdkcloudhsm.CloudHSMSoftwareLicenseCreateParams{
+			Name:        name,
+			Description: strPtr("E2E: CloudHSMライセンス表示確認シナリオ用"),
+			Tags:        []string{"env:e2e"},
+		}); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

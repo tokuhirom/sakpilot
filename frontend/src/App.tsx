@@ -57,6 +57,8 @@ import { IAMList } from './components/IAMList';
 import { IAMServicePrincipalDetail } from './components/IAMServicePrincipalDetail';
 import { WorkflowsList } from './components/WorkflowsList';
 import { WorkflowDetail } from './components/WorkflowDetail';
+import { CloudHSMList } from './components/CloudHSMList';
+import { CloudHSMDetail } from './components/CloudHSMDetail';
 import { EventBusList } from './components/EventBusList';
 import { ApigwList } from './components/ApigwList';
 import { ApigwServiceDetail } from './components/ApigwServiceDetail';
@@ -85,6 +87,7 @@ const globalResources = [
   { path: 'object-storage', label: 'オブジェクトストレージ' },
   { path: 'enhanced-db', label: 'エンハンスドDB' },
   { path: 'kms', label: 'KMS' },
+  { path: 'cloudhsm', label: 'CloudHSM' },
   { path: 'secretmanager', label: 'シークレットマネージャー' },
   { path: 'simplemq', label: 'SimpleMQ' },
   { path: 'simplenotification', label: '簡易通知' },
@@ -228,6 +231,8 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
               <Route path="enhanced-db/:id" element={<EnhancedDBBreadcrumb profile={profile} />} />
               <Route path="kms" element={<span className="breadcrumb-item active">KMS</span>} />
               <Route path="kms/:id" element={<KMSBreadcrumb profile={profile} />} />
+              <Route path="cloudhsm" element={<span className="breadcrumb-item active">CloudHSM</span>} />
+              <Route path="cloudhsm/:id" element={<CloudHSMBreadcrumb profile={profile} />} />
               <Route path="secretmanager" element={<span className="breadcrumb-item active">シークレットマネージャー</span>} />
               <Route path="secretmanager/:id" element={<SecretManagerBreadcrumb profile={profile} />} />
               <Route path="simplemq" element={<span className="breadcrumb-item active">SimpleMQ</span>} />
@@ -349,6 +354,10 @@ function AppContent({ profiles, zones, authInfo, authError, loading, onProfileCh
           <Route path="kms" element={<KMSListWrapper profile={profile} />} />
           <Route path="kms/:id" element={
             <KMSDetailWrapper profile={profile} />
+          } />
+          <Route path="cloudhsm" element={<CloudHSMListWrapper profile={profile} />} />
+          <Route path="cloudhsm/:id" element={
+            <CloudHSMDetailWrapper profile={profile} />
           } />
           <Route path="secretmanager" element={<SecretManagerListWrapper profile={profile} />} />
           <Route path="secretmanager/:id" element={
@@ -632,6 +641,22 @@ function KMSDetailWrapper({ profile }: { profile: string }) {
   return <KMSDetail profile={profile} keyId={id} />;
 }
 
+function CloudHSMListWrapper({ profile }: { profile: string }) {
+  const navigate = useNavigate();
+  return (
+    <CloudHSMList
+      profile={profile}
+      onSelectCloudHSM={(id) => navigate(`/${profile}/cloudhsm/${id}`)}
+    />
+  );
+}
+
+function CloudHSMDetailWrapper({ profile }: { profile: string }) {
+  const { id } = useParams<{ id: string }>();
+  if (!id) return null;
+  return <CloudHSMDetail profile={profile} hsmId={id} />;
+}
+
 function IAMListWrapper({ profile }: { profile: string }) {
   const navigate = useNavigate();
   return (
@@ -888,6 +913,19 @@ function KMSBreadcrumb({ profile }: { profile: string }) {
     <>
       <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/${profile}/kms`)}>
         KMS
+      </span>
+      <span className="breadcrumb-separator">/</span>
+      <span className="breadcrumb-item active">詳細</span>
+    </>
+  );
+}
+
+function CloudHSMBreadcrumb({ profile }: { profile: string }) {
+  const navigate = useNavigate();
+  return (
+    <>
+      <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/${profile}/cloudhsm`)}>
+        CloudHSM
       </span>
       <span className="breadcrumb-separator">/</span>
       <span className="breadcrumb-item active">詳細</span>

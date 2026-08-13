@@ -8,6 +8,7 @@ import (
 	"sakpilot/internal/apigw"
 	"sakpilot/internal/apprun"
 	"sakpilot/internal/apprunshared"
+	"sakpilot/internal/cloudhsm"
 	"sakpilot/internal/eventbus"
 	"sakpilot/internal/iam"
 	"sakpilot/internal/kms"
@@ -3506,4 +3507,141 @@ func (a *App) ResetServiceEndpointGateway(profileName, zone, id string) error {
 		return err
 	}
 	return service.Reset(a.ctx, id)
+}
+
+// CloudHSM
+func (a *App) GetCloudHSMs(profileName string) ([]cloudhsm.CloudHSMInfo, error) {
+	service, err := cloudhsm.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListCloudHSMs(a.ctx)
+}
+
+func (a *App) GetCloudHSM(profileName, id string) (*cloudhsm.CloudHSMInfo, error) {
+	service, err := cloudhsm.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetCloudHSM(a.ctx, id)
+}
+
+func (a *App) CreateCloudHSM(profileName, name, description string, tags []string, ipv4NetworkAddress string, ipv4PrefixLength int) (*cloudhsm.CloudHSMInfo, error) {
+	service, err := cloudhsm.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateCloudHSM(a.ctx, name, description, tags, ipv4NetworkAddress, ipv4PrefixLength)
+}
+
+func (a *App) UpdateCloudHSM(profileName, id, name, description string, tags []string) (*cloudhsm.CloudHSMInfo, error) {
+	service, err := cloudhsm.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateCloudHSM(a.ctx, id, name, description, tags)
+}
+
+func (a *App) DeleteCloudHSM(profileName, id string) error {
+	service, err := cloudhsm.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteCloudHSM(a.ctx, id)
+}
+
+func (a *App) GetCloudHSMClients(profileName, hsmId string) ([]cloudhsm.ClientInfo, error) {
+	service, err := cloudhsm.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListClients(a.ctx, hsmId)
+}
+
+func (a *App) CreateCloudHSMClient(profileName, hsmId, name, certificate string) (*cloudhsm.ClientInfo, error) {
+	service, err := cloudhsm.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateClient(a.ctx, hsmId, name, certificate)
+}
+
+func (a *App) UpdateCloudHSMClient(profileName, hsmId, clientId, name string) (*cloudhsm.ClientInfo, error) {
+	service, err := cloudhsm.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateClient(a.ctx, hsmId, clientId, name)
+}
+
+func (a *App) DeleteCloudHSMClient(profileName, hsmId, clientId string) error {
+	service, err := cloudhsm.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteClient(a.ctx, hsmId, clientId)
+}
+
+func (a *App) GetCloudHSMPeers(profileName, hsmId string) ([]cloudhsm.PeerInfo, error) {
+	service, err := cloudhsm.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListPeers(a.ctx, hsmId)
+}
+
+func (a *App) CreateCloudHSMPeer(profileName, hsmId, routerId, secretKey string) error {
+	service, err := cloudhsm.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.CreatePeer(a.ctx, hsmId, routerId, secretKey)
+}
+
+func (a *App) DeleteCloudHSMPeer(profileName, hsmId, peerId string) error {
+	service, err := cloudhsm.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeletePeer(a.ctx, hsmId, peerId)
+}
+
+func (a *App) GetCloudHSMLicenses(profileName string) ([]cloudhsm.LicenseInfo, error) {
+	service, err := cloudhsm.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.ListLicenses(a.ctx)
+}
+
+func (a *App) GetCloudHSMLicense(profileName, id string) (*cloudhsm.LicenseInfo, error) {
+	service, err := cloudhsm.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.GetLicense(a.ctx, id)
+}
+
+func (a *App) CreateCloudHSMLicense(profileName, name, description string, tags []string) (*cloudhsm.LicenseInfo, error) {
+	service, err := cloudhsm.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.CreateLicense(a.ctx, name, description, tags)
+}
+
+func (a *App) UpdateCloudHSMLicense(profileName, id, name, description string, tags []string) (*cloudhsm.LicenseInfo, error) {
+	service, err := cloudhsm.NewService(profileName)
+	if err != nil {
+		return nil, err
+	}
+	return service.UpdateLicense(a.ctx, id, name, description, tags)
+}
+
+func (a *App) DeleteCloudHSMLicense(profileName, id string) error {
+	service, err := cloudhsm.NewService(profileName)
+	if err != nil {
+		return err
+	}
+	return service.DeleteLicense(a.ctx, id)
 }
