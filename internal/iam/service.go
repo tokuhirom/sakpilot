@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/google/uuid"
 	sdkiam "github.com/sacloud/sacloud-sdk-go/api/iam"
@@ -788,12 +787,6 @@ func (s *Service) RegenerateScimConfigurationToken(ctx context.Context, id strin
 func (s *Service) IsServicePolicyEnabled(ctx context.Context) (bool, error) {
 	enabled, err := s.servicePolicyOp.IsEnabled(ctx)
 	if err != nil {
-		// sakumockの/service-policy-statusはSDKが期待するフィールド名"enabled"ではなく
-		// "is_active"を返すため、SDK側のデコードが常に失敗する(docs/upstream-issues.md参照)。
-		// 有効状態を確認できないため無効(false)として扱う
-		if strings.Contains(err.Error(), "enabled (field required)") {
-			return false, nil
-		}
 		return false, err
 	}
 	return enabled, nil
@@ -813,12 +806,6 @@ func (s *Service) DisableServicePolicy(ctx context.Context) error {
 func (s *Service) ListServicePolicyRuleTemplates(ctx context.Context) ([]ServicePolicyRuleTemplateInfo, error) {
 	res, err := s.servicePolicyOp.ListRuleTemplates(ctx, sdkservicepolicy.ListRuleTemplatesParams{})
 	if err != nil {
-		// sakumockの/service-policy-rule-templatesはページネーション付きオブジェクトではなく
-		// 素の配列を返すため、SDK側のデコードが常に失敗する(docs/upstream-issues.md参照)。
-		// 一覧を取得できないため空として扱う
-		if strings.Contains(err.Error(), "ServicePolicyRuleTemplatesGetOK") {
-			return []ServicePolicyRuleTemplateInfo{}, nil
-		}
 		return nil, err
 	}
 

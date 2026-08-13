@@ -84,6 +84,7 @@ SakPilotは現状「単一アカウント（プロファイル）に対する各
 3. ✅ **対応済み（2026-08-10）**: `project`/`folder`/`organization` の階層表示
 4. ✅ **対応済み（2026-08-10）**: `iampolicy` のポリシーバインディング表示・編集
 5. ✅ **対応済み（2026-08-10、user2faを除く3リソース）**: `sso`/`scim`/`servicepolicy`(`user2fa`はsakumock未対応のためスコープ外)
+6. 🔓 **未着手（2026-08-13時点でsakumock 0.8.0によりブロック解消）**: `user2fa`。sakumock PR#162でOTP無効化・信頼済みデバイス一覧/削除/全削除・セキュリティキー管理の各エンドポイントが実装され、E2E可能になった(`docs/upstream-issues.md`項目11参照)。着手時期は未定
 
 #### タスク1完了メモ
 
@@ -143,7 +144,9 @@ SakPilotは現状「単一アカウント（プロファイル）に対する各
 
 CLAUDE.mdに既に記載があるサービスだが未着手。`sacloud-sdk-go/api/webaccel` の操作一覧を確認の上、サイト管理・キャッシュパージ等の主要機能から着手する。
 
-> **2026-08-10時点の注記**: `webaccel`は`sacloud-sdk-go`側にAPIはあるが、`sakumock`(`github.com/sacloud/sakumock`)側に対応パッケージが存在しない。SakPilotのE2Eテスト運用はsakumockのテストサーバーに依存しているため、このままではE2E(`frontend/e2e/`)・マニュアル撮影(`frontend/e2e-manual/`)が書けない。同様にsakumock未対応なのは `nosql` / `cloudhsm` / `dedicated-storage` / `security-control` / `service-endpoint-gateway` / `addon`(Tier C/D相当)。着手する場合はGoテスト(sakumock無しでSDKのHTTPクライアントを直接叩くfake実装が必要)とE2Eの扱いを先に決めること。sakumockに対応が追加されるまでは優先度を下げ、Tier Bの中では`simplemq`/`simple-notification`を先に着手するのが妥当。
+> **2026-08-10時点の注記**: `webaccel`は`sacloud-sdk-go`側にAPIはあるが、`sakumock`(`github.com/sacloud/sakumock`)側に対応パッケージが存在しない。SakPilotのE2Eテスト運用はsakumockのテストサーバーに依存しているため、このままではE2E(`frontend/e2e/`)・マニュアル撮影(`frontend/e2e-manual/`)が書けない。同様にsakumock未対応なのは `nosql` / `dedicated-storage` / `security-control` / `service-endpoint-gateway` / `addon`(Tier C/D相当)。着手する場合はGoテスト(sakumock無しでSDKのHTTPクライアントを直接叩くfake実装が必要)とE2Eの扱いを先に決めること。sakumockに対応が追加されるまでは優先度を下げ、Tier Bの中では`simplemq`/`simple-notification`を先に着手するのが妥当。
+>
+> **2026-08-13追記**: sakumock 0.8.0で`cloudhsm`パッケージが追加された(PR#158)。上記リストから`cloudhsm`を除外。E2E着手可能になったが、SakPilot側の実装(Go/RPC/フロントエンド)は未着手。
 
 ## Tier B: simplemq / simple-notification
 
@@ -184,7 +187,7 @@ CLAUDE.mdに既に記載があるサービスだが未着手。`sacloud-sdk-go/a
 個別ドメイン知識が必要、または既存資産との親和性が低いもの。ニーズが顕在化してから着手を検討する。
 
 - `dedicated-storage`: disk/contract
-- `cloudhsm`: certificate/peer/license
+- `cloudhsm`: certificate/peer/license — sakumock 0.8.0で対応パッケージ追加済み(2026-08-13時点、着手は未定)
 - `security-control`: evaluation_rules/automated_actions/activation
 - `service-endpoint-gateway`: エンドポイント管理 — ✅ **対応済み（2026-08-10）**: プライベート接続からオブジェクトストレージ/コンテナレジストリ/モニタリングスイート/AppRun専有型コントロールプレーンへ到達するためのゲートウェイアプライアンス。`sacloud-sdk-go/api/service-endpoint-gateway`はogen生成のOpenAPIクライアントで、認証はKMS等と同型(`saclient`標準パターン)だが、サーバー/ディスクと同じくゾーン依存リソースである点が他の新規対応サービス(apigw/eventbus/workflows等、いずれもゾーン非依存)と異なる。`internal/serviceendpointgateway/service.go`にList/Get/Create/Update/Apply/Delete/ReadInterface/ReadPowerStatus/PowerOn/Shutdown/Resetを実装。設計上のポイント:
   - **sakumockが本サービス未対応**のため(`~/go/pkg/mod/github.com/sacloud/sakumock@v0.7.2/`に対応パッケージなし、Go Module Proxy上の最新版0.7.2でも同じ)、Goテストは`net/http/httptest`+Go1.22の`http.ServeMux`パターンマッチングで自作したfakeサーバー(`internal/serviceendpointgateway/fake_server_test.go`)を用いる方針にした。sakumock対応が追加され次第、切り替えを検討する

@@ -849,9 +849,6 @@ func TestService_ServicePolicy(t *testing.T) {
 		t.Fatalf("NewService: %v", err)
 	}
 
-	// sakumockの/service-policy-statusはSDKが期待するフィールド名で状態を返さないため
-	// デコードに失敗し、IsServicePolicyEnabledはフォールバックとしてfalseを返す
-	// (docs/upstream-issues.md参照)。Enable/Disable自体はエラーにならないことを確認する
 	if err := service.EnableServicePolicy(context.Background()); err != nil {
 		t.Fatalf("EnableServicePolicy: %v", err)
 	}
@@ -859,17 +856,21 @@ func TestService_ServicePolicy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("IsServicePolicyEnabled: %v", err)
 	}
-	if enabled {
-		t.Errorf("enabled = true, want false (sakumock does not persist service policy status)")
+	if !enabled {
+		t.Errorf("enabled = false, want true")
 	}
 
 	if err := service.DisableServicePolicy(context.Background()); err != nil {
 		t.Fatalf("DisableServicePolicy: %v", err)
 	}
+	enabled, err = service.IsServicePolicyEnabled(context.Background())
+	if err != nil {
+		t.Fatalf("IsServicePolicyEnabled: %v", err)
+	}
+	if enabled {
+		t.Errorf("enabled = true, want false")
+	}
 
-	// sakumockの/service-policy-rule-templatesはページネーション付きオブジェクトではなく
-	// 素の配列を返すためデコードに失敗し、ListServicePolicyRuleTemplatesはフォールバックとして
-	// 空スライスを返す(docs/upstream-issues.md参照)。エラーにならないことのみ確認する
 	templates, err := service.ListServicePolicyRuleTemplates(context.Background())
 	if err != nil {
 		t.Fatalf("ListServicePolicyRuleTemplates: %v", err)
