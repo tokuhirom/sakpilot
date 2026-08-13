@@ -73,7 +73,7 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 
 ### 6. `sakumock/objectstorage` のS3データプレーンが、control planeで発行したアクセスキーを検証しないため、キー発行込みの結合テストができない
 
-- **対応済み**: https://github.com/sacloud/sakumock/pull/153 (sakumock v0.8.0)。control planeで発行したアクセスキー/シークレットがdata plane(versitygw)のIAMサービスへミラーされ、実際のアプリと同じ資格情報でS3操作を検証できるようになった。SakPilot側はまだ`--enable-data-plane`を有効化しておらず、`frontend/e2e/objectstorage.spec.ts`もバケット/アクセスキー管理のみを対象としたまま(2026-08-13時点、versitygwの導入・E2E拡張は別途着手が必要)。
+- **対応済み**: https://github.com/sacloud/sakumock/pull/153 (sakumock v0.8.0)。control planeで発行したアクセスキー/シークレットがdata plane(versitygw)のIAMサービスへミラーされ、実際のアプリと同じ資格情報でS3操作を検証できるようになった。SakPilot側は`mise run demo`(`SAKPILOT_ENABLE_OBJECTSTORAGE_DATA_PLANE=1`)実行時に限り`--enable-data-plane`を有効化し、control planeが返す本番向けS3エンドポイントをローカルのversitygwアドレスへ`SAKURA_OBJECT_STORAGE_S3_ENDPOINT_OVERRIDE`で差し替えることで、バケット作成〜アクセスキー発行〜アップロード/一覧取得/ダウンロードまでを実際のアプリと同じ資格情報で動作確認できるようにした(`e2e_server.go`の`setupObjectStorage`、versitygwは`.mise.toml`でgo installツールとして導入、2026-08-13対応)。CI用の`go run -tags e2e .`単体実行やPlaywright E2E(`frontend/e2e/objectstorage.spec.ts`)ではこの環境変数を設定しておらず、従来通りdata plane無効・バケット/アクセスキー管理のみが対象(CI環境にversitygwが無いため)。
 
 - パッケージ: `github.com/sacloud/sakumock/objectstorage`
 - 参照: [README「Data plane (S3)」](https://github.com/sacloud/sakumock/tree/main/objectstorage#data-plane-s3)

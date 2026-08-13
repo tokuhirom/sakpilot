@@ -150,7 +150,7 @@ wails dev
 mise run demo
 ```
 
-起動したら `http://127.0.0.1:34199` をブラウザで開いてください。裏では `go run -tags e2e .` でE2Eテスト用サーバー(詳細は [ADR 0001](docs/adr/0001-e2e-testing-strategy.md))が起動しており、サーバー・DNS・GSLB等の各種リソースに `e2e-` プレフィックスのシードデータが投入された状態で操作を確認できます。
+起動したら `http://127.0.0.1:34199` をブラウザで開いてください。裏では `go run -tags e2e .` でE2Eテスト用サーバー(詳細は [ADR 0001](docs/adr/0001-e2e-testing-strategy.md))が起動しており、サーバー・DNS・GSLB等の各種リソースに `e2e-` プレフィックスのシードデータが投入された状態で操作を確認できます。ObjectStorageはS3互換データプレーン([versitygw](https://github.com/versity/versitygw)、`mise install` で導入済み)にも接続されるため、バケット作成・アクセスキー発行・オブジェクトのアップロード/ダウンロードまで一気通貫で確認できます。
 
 ### ビルド
 

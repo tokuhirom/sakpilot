@@ -1,11 +1,14 @@
 [tools]
 go = "1.25.5"
 "go:github.com/wailsapp/wails/v2/cmd/wails" = "v2.13.0"
+# ObjectStorageのS3互換データプレーン(mise run demo)がsakumock経由で使う。
+# sakumock自体はversitygwを同梱しないため、PATH上に別途用意する必要がある。
+"go:github.com/versity/versitygw/cmd/versitygw" = "v1.7.0"
 
 [tasks.demo]
 description = "実クラウドに接続せず、sakumock/fakeのシードデータでGUIをブラウザ確認する (http://127.0.0.1:34199)"
 run = """
 set -e
 (cd frontend && npm run build)
-go run -tags e2e .
+SAKPILOT_ENABLE_OBJECTSTORAGE_DATA_PLANE=1 go run -tags e2e .
 """
