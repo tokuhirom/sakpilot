@@ -4,7 +4,7 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 
 対象バージョン(`go.mod`):
 - `github.com/sacloud/sacloud-sdk-go v0.0.1`
-- `github.com/sacloud/sakumock v0.7.2`
+- `github.com/sacloud/sakumock v0.8.0`
 
 ## 確認済みバグ
 
@@ -45,6 +45,8 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - 報告時の提案: `handleGetSubscription` で未契約時は `MonthAppliedPlan` キー自体を省略する(値を送らない)、またはOpenAPI仕様側で `MonthAppliedPlan` に `nullable: true` を追加してSDKを再生成するかのいずれかで解消できる。
 
 ### 4. `sakumock/iam` の `servicepolicy` 系エンドポイント2件がSDKの期待するレスポンス形式と食い違っており、デコードが常に失敗する
+
+- **対応済み**: https://github.com/sacloud/sakumock/pull/155 (sakumock v0.8.0)。`GET /service-policy-status`は`enabled`フィールドで実際の状態を返し、Enable/Disableもストアへ反映されるようになった。`GET /service-policy-rule-templates`もページネーション付きオブジェクトを返すようになった。SakPilot側は`internal/iam/service.go`のフォールバック(`IsServicePolicyEnabled`/`ListServicePolicyRuleTemplates`)を削除し、`internal/iam/service_test.go`のアサーションを実際の状態遷移を検証する内容に更新した。
 
 - パッケージ: `github.com/sacloud/sakumock/iam`
 - ファイル: `handler_servicepolicy.go`(`handleServicePolicyStatus`、`handleServicePolicyRuleTemplates`)
@@ -120,6 +122,8 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - 提案: Godocのコメントを「ミリ秒」に修正するか、可能であればOpenAPI定義(`openapi/openapi.json`)のフィールド説明・`example`値を実態に合わせてほしい。
 
 ### 11. `sakumock/iam` が `user2fa`(2要素認証管理)のAPIに未対応
+
+- **対応済み**: https://github.com/sacloud/sakumock/pull/162 (sakumock v0.8.0)。OTP無効化・信頼済みデバイス一覧/削除/全削除・セキュリティキー管理の各エンドポイントが実装され、`route.go`に登録されている。SakPilot側のuser2fa実装(Go/RPC/フロントエンド)は本コミット時点では未着手。着手を検討する。
 
 - パッケージ: `github.com/sacloud/sakumock/iam`
 - ファイル: `route.go`(`routeTable`)

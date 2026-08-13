@@ -6,10 +6,11 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.43.4
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.34
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.107.0
+	github.com/go-faster/jx v1.2.0
 	github.com/google/go-containerregistry v0.21.9
 	github.com/google/uuid v1.6.0
 	github.com/sacloud/sacloud-sdk-go v0.0.1
-	github.com/sacloud/sakumock v0.7.2
+	github.com/sacloud/sakumock v0.8.0
 	github.com/wailsapp/wails/v2 v2.13.0
 	github.com/zalando/go-keyring v0.2.8
 )
@@ -41,7 +42,6 @@ require (
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-faster/errors v0.7.1 // indirect
-	github.com/go-faster/jx v1.2.0 // indirect
 	github.com/go-faster/yaml v0.4.6 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
