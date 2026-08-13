@@ -28,6 +28,7 @@ import (
 	"log"
 	"math/big"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -211,14 +212,9 @@ func runE2EServer(addr, dist string) error {
 		return fmt.Errorf("failed to seed Apigw resources: %w", err)
 	}
 
-	// ObjectStorageのS3互換データプレーン(オブジェクト一覧・ダウンロード)はsakumock側で
-	// `--enable-data-plane`により提供可能だが、外部プロセス(versitygw、PATH上に別途
-	// インストールが必要)への委譲であり、かつcontrol planeで発行したアクセスキーが
-	// data plane側では検証されない設計のため、ここでは有効化せずバケット/アクセスキーの
-	// 管理API(control plane)のみE2E対象とする。詳細は docs/upstream-issues.md 参照。
-	objectStorageSrv := mockobjectstorage.NewTestServer(mockobjectstorage.Config{})
-	if err := os.Setenv("SAKURA_ENDPOINTS_OBJECT_STORAGE", objectStorageSrv.TestURL()); err != nil {
-		return err
+	objectStorageCleanup, err := setupObjectStorage()
+	if err != nil {
+		return fmt.Errorf("failed to set up ObjectStorage mock: %w", err)
 	}
 
 	apprunDedicatedSrv := mockapprundedicated.NewTestServer(mockapprundedicated.Config{})
@@ -276,6 +272,10 @@ func runE2EServer(addr, dist string) error {
 				log.Printf("coverage.WriteCountersDir: %v", err)
 			}
 		}
+		// versitygw(ObjectStorage data plane)は外部プロセスのため、明示的に
+		// 止めないと孤児プロセスとしてポートを保持し続け、次回起動時の
+		// bindに失敗する。
+		objectStorageCleanup()
 		_ = srv.Close()
 	}()
 
@@ -284,6 +284,58 @@ func runE2EServer(addr, dist string) error {
 		return err
 	}
 	return nil
+}
+
+// objectStorageDataPlaneAddr はsakumockのObjectStorage S3互換データプレーン(versitygw)の
+// listenアドレス。sakumock CLIのデフォルト(control planeポート+10000)に倣う。
+const objectStorageDataPlaneAddr = "127.0.0.1:28086"
+
+// setupObjectStorage はsakumockのObjectStorageサーバー(control plane)を起動する。
+//
+// S3互換データプレーンは、環境変数SAKPILOT_ENABLE_OBJECTSTORAGE_DATA_PLANEが
+// 設定されている場合のみ有効化する(`mise run demo`が設定する。通常の
+// `go run -tags e2e .`単体実行やCIのPlaywright E2Eでは無効のまま)。データプレーンは
+// 外部プロセスversitygwへの委譲であり、CI環境にはインストールされていないため。
+//
+// sakumock 0.8.0でcontrol planeが発行したアクセスキー/シークレットがdata plane(versitygw)の
+// IAMへミラーされるようになった(docs/upstream-issues.md #6参照)ため、有効化すると
+// 実際のアプリと同じ資格情報でバケット一覧・オブジェクトのアップロード/ダウンロード/削除まで
+// 動作確認できる。ただしcontrol planeが返すS3エンドポイントは本番向けの固定値
+// (例: s3.isk01.objectstorage.sakurastorage.jp)のままなので、内部パッケージ側の
+// SAKURA_OBJECT_STORAGE_S3_ENDPOINT_OVERRIDEでローカルのversitygwアドレスへ差し替える。
+// 戻り値のcleanup関数は、シャットダウン時に呼ぶこと。有効化したdata plane
+// (versitygw)は外部プロセスのため、これを呼ばないとプロセス終了後も孤児として
+// 残り、次回起動時にポートをbindできなくなる。
+func setupObjectStorage() (cleanup func(), _ error) {
+	cfg := mockobjectstorage.Config{}
+	enableDataPlane := os.Getenv("SAKPILOT_ENABLE_OBJECTSTORAGE_DATA_PLANE") != ""
+	if enableDataPlane {
+		cfg.EnableDataPlane = true
+		cfg.DataPlaneAddr = objectStorageDataPlaneAddr
+		cfg.DataPlaneRegion = "jp-north-1"
+	}
+
+	handler, err := mockobjectstorage.NewHandler(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("versitygw is required when SAKPILOT_ENABLE_OBJECTSTORAGE_DATA_PLANE is set (run `mise install`, see https://github.com/versity/versitygw): %w", err)
+	}
+	srv := httptest.NewServer(handler)
+	cleanup = func() {
+		srv.Close()
+		handler.Close()
+	}
+	if err := os.Setenv("SAKURA_ENDPOINTS_OBJECT_STORAGE", srv.URL); err != nil {
+		cleanup()
+		return nil, err
+	}
+
+	if enableDataPlane {
+		if err := os.Setenv("SAKURA_OBJECT_STORAGE_S3_ENDPOINT_OVERRIDE", "http://"+objectStorageDataPlaneAddr); err != nil {
+			cleanup()
+			return nil, err
+		}
+	}
+	return cleanup, nil
 }
 
 // setupFakeHome はHOMEを一時ディレクトリに差し替え、usacloud互換の

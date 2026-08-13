@@ -192,12 +192,23 @@ func (s *ObjectStorageService) ListSites(ctx context.Context) ([]SiteInfo, error
 		return nil, err
 	}
 
+	// SAKURA_OBJECT_STORAGE_S3_ENDPOINT_OVERRIDEは、sakumockのdemo/E2E環境向けの
+	// 開発用フックである。sakumockのcontrol planeは本番向けの固定S3エンドポイント
+	// (s3.xxx.objectstorage.sakurastorage.jp)しか返さないため、ローカルのversitygw
+	// (S3互換data plane)へ向けさせるにはこの上書きが必要になる(e2e_server.goのdemo経路
+	// でのみ設定される。実運用のSakura Cloud API接続では未設定のため影響しない)。
+	endpointOverride := os.Getenv("SAKURA_OBJECT_STORAGE_S3_ENDPOINT_OVERRIDE")
+
 	result := make([]SiteInfo, 0, len(sites))
 	for _, site := range sites {
+		endpoint := site.S3Endpoint.Or("")
+		if endpointOverride != "" {
+			endpoint = endpointOverride
+		}
 		result = append(result, SiteInfo{
 			ID:          site.ID.Or(""),
 			DisplayName: site.DisplayNameJa.Or(""),
-			Endpoint:    site.S3Endpoint.Or(""),
+			Endpoint:    endpoint,
 		})
 	}
 	return result, nil
