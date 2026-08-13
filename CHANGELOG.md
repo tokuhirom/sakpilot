@@ -1,5 +1,28 @@
 # Changelog
 
+## [v0.0.19](https://github.com/tokuhirom/sakpilot/compare/v0.0.18...v0.0.19) - 2026-08-13
+- docs: 未実装14サービスの実装計画をPLAN.mdに立て直し by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/184
+- feat: secretmanager(シークレットマネージャー)のVault/Secret管理を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/186
+- docs: シークレットマネージャーのユーザーマニュアルを新設 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/187
+- feat: IAM(ユーザー/グループ/ロール)の読み取り専用一覧を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/188
+- feat: IAMサービスプリンシパルの一覧・詳細・キー管理を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/189
+- feat: SimpleMQのQueue管理・メッセージ送受信を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/190
+- feat: 簡易通知(SimpleNotification)の送信先・グループ・ルーティング管理を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/191
+- feat: IAMにプロジェクト/フォルダの階層表示・組織設定を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/192
+- feat: IAMにポリシーバインディング(iampolicy/idpolicy)の表示・編集を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/193
+- feat: Workflowsサービス(ワークフロー管理)への対応を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/194
+- feat: EventBus(トリガー・スケジュール・実行設定)への対応を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/195
+- feat: apigw(APIゲートウェイ)サービスへの対応を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/196
+- feat: IAM sso/scim/servicepolicy(SSO・SCIM・サービスポリシー)への対応を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/197
+- feat: service-endpoint-gateway(サービスエンドポイントゲートウェイ)への対応を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/198
+- docs: upstream-issues.mdに報告済みステータスを追記 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/199
+- docs: 項目1(ProxyLB SetCertificates)を対応済みとしてマーク by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/200
+- docs: 項目2(Database GetParameter)にPR提案中の旨を追記 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/201
+- chore: sakumockを0.8.0へアップグレード by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/202
+- chore: sakumock 0.8.0で解消済みの残りのワークアラウンドを削除 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/203
+- mise run demoでObjectStorageをsakumockのversitygwデータプレーンへ接続 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/204
+- feat: CloudHSM対応を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/205
+
 ## [v0.0.18](https://github.com/tokuhirom/sakpilot/compare/v0.0.17...v0.0.18) - 2026-08-09
 - feat: AppRun専有型のCluster Createを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/131
 - feat: AppRun専有型のASG(AutoScalingGroup) Createを追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/133
