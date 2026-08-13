@@ -37,6 +37,8 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 
 ### 3. `sakumock/workflows` の `GET /subscriptions` が未契約時に非nullable仕様の `MonthAppliedPlan` へ `null` を返し、SDKのデコードが失敗する
 
+- **対応済み**: https://github.com/sacloud/sakumock/pull/160 (sakumock v0.8.0)。未契約時は`MonthAppliedPlan`キー自体を省略するようになった。SakPilot側は`internal/workflows/service.go`の`GetSubscription`のフォールバックを削除した。
+
 - パッケージ: `github.com/sacloud/sakumock/workflows`
 - ファイル: `handler.go`(`handleGetSubscription`、795行目付近)
 - 内容: OpenAPI仕様(`sacloud-sdk-go/api/workflows/openapi/openapi.json`)上、`GET /subscriptions` レスポンスの `MonthAppliedPlan` は(`CurrentPlan`と異なり)`nullable: true` が付いていないオブジェクト型。にもかかわらず `handleGetSubscription` は未契約(`sub == nil`)の場合に `CurrentPlan`/`MonthAppliedPlan` 双方へ素の `nil` を設定してJSONエンコードするため、`"MonthAppliedPlan": null` が返る。SDKが生成する `OptGetSubscriptionOKMonthAppliedPlan`(`OptNil`ではなく`Opt`)はnullのデコードに対応しておらず、`SubscriptionAPI.Read` が `decode field "MonthAppliedPlan": ... unexpected byte 110 'n'` のようなエラーで必ず失敗する。
@@ -71,7 +73,7 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 
 ### 6. `sakumock/objectstorage` のS3データプレーンが、control planeで発行したアクセスキーを検証しないため、キー発行込みの結合テストができない
 
-- **報告済み**
+- **対応済み**: https://github.com/sacloud/sakumock/pull/153 (sakumock v0.8.0)。control planeで発行したアクセスキー/シークレットがdata plane(versitygw)のIAMサービスへミラーされ、実際のアプリと同じ資格情報でS3操作を検証できるようになった。SakPilot側はまだ`--enable-data-plane`を有効化しておらず、`frontend/e2e/objectstorage.spec.ts`もバケット/アクセスキー管理のみを対象としたまま(2026-08-13時点、versitygwの導入・E2E拡張は別途着手が必要)。
 
 - パッケージ: `github.com/sacloud/sakumock/objectstorage`
 - 参照: [README「Data plane (S3)」](https://github.com/sacloud/sakumock/tree/main/objectstorage#data-plane-s3)
@@ -82,6 +84,8 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 
 ### 7. `sakumock/apprun` のバージョン `CreatedAt` が秒単位に丸められており、短時間に複数回更新すると「最新バージョン」の判定順が不定になる
 
+- **対応済み**: https://github.com/sacloud/sakumock/pull/161 (sakumock v0.8.0)。`ListVersions`のソートが作成シーケンス番号を考慮するようになり、同一秒内に複数バージョンを作成しても順序が決定的になった。SakPilot側は`internal/apprunshared/service_test.go`の`TestService_DeleteVersion`の「削除を試みて失敗したら次の候補を試す」フォールバックを削除し、`versions[0]`が常に最新版であることを前提にした決定的なテストへ変更した。
+
 - パッケージ: `github.com/sacloud/sakumock/apprun`
 - ファイル: `store_memory.go` の `createVersionLocked`(`time.Now().UTC().Truncate(time.Second)`)、`ListVersions`(`sort.Slice` で `CreatedAt` の降順ソート、デフォルト`SortOrder=desc`)
 - 内容: `Application` を`PATCH`(`ApplicationOp.Update`)するたびに新しい `Version` が暗黙生成される仕様だが、`Version.CreatedAt` は秒未満が切り捨てられるため、同一の壁時計秒内に複数回`Update`を呼ぶと生成された複数バージョンの`CreatedAt`が完全に一致する。`ListVersions`のソートは`CreatedAt`の前後関係のみで比較しており、同値の場合の順序保証(安定ソートや採番順への フォールバック)が無いため、「どのバージョンが`ListVersions`の先頭(＝最新版)として返るか」がリクエストごとに不定になりうる。
@@ -89,6 +93,8 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 - 提案: `ListVersions`のソートキーに`CreatedAt`だけでなく`versionSeq`(または相当する単調増加ID)をタイブレーカーとして使う、あるいは`Version.CreatedAt`をより高精度(ナノ秒単位)で記録するようにしてほしい。
 
 ### 8. `sakumock/simplenotification` が通知履歴・ソース一覧・ルーティング並び替え・ステータス取得のAPIに未対応
+
+- **対応済み**: https://github.com/sacloud/sakumock/pull/159 (sakumock v0.8.0)。`ListNotificationHistories`/`GetNotificationHistory`/`ListSources`/`ReorderRouting`/`GetCommonServiceItemStatus`が`route.go`に追加された。SakPilot側のUI実装(通知履歴閲覧、ソース選択式UI、並び替え)はまだ未着手(2026-08-13時点)。
 
 - パッケージ: `github.com/sacloud/sakumock/simplenotification`
 - ファイル: `route.go`(`routeTable`)

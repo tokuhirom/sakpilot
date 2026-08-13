@@ -271,26 +271,24 @@ func TestService_DeleteVersion(t *testing.T) {
 	}
 	trafficTargetName := traffics[0].VersionName
 
-	// 3つ目に作ったバージョンのうち、トラフィック分散対象(作成直後のv1)以外の
-	// 2つが削除の候補。作成時刻がすべて同一秒に丸められうるため、
-	// どちらが「最新バージョン」判定されるかは保証されない。最新版は
-	// 削除できないため、削除できる方を実際に試して確認する。
-	var candidates []apprunshared.VersionInfo
+	// ListVersionsは作成順(生成シーケンス)の降順で返るため、versions[0]が常に最新版。
+	// 最新版とトラフィック分散対象(作成直後のv1)は削除できないため、残る中間の
+	// バージョンが削除対象として一意に決まる。
+	latest := versions[0]
+	var deletable apprunshared.VersionInfo
+	found := false
 	for _, v := range versions {
-		if v.Name != trafficTargetName {
-			candidates = append(candidates, v)
+		if v.Name != trafficTargetName && v.ID != latest.ID {
+			deletable = v
+			found = true
+			break
 		}
 	}
-	if len(candidates) != 2 {
-		t.Fatalf("got %d deletable candidates, want 2: %+v", len(candidates), candidates)
+	if !found {
+		t.Fatalf("no deletable version candidate found: %+v", versions)
 	}
-
-	deletable := candidates[0]
 	if err := service.DeleteVersion(context.Background(), created.ID, deletable.ID); err != nil {
-		deletable = candidates[1]
-		if err := service.DeleteVersion(context.Background(), created.ID, deletable.ID); err != nil {
-			t.Fatalf("DeleteVersion: both candidates failed, last error: %v", err)
-		}
+		t.Fatalf("DeleteVersion: %v", err)
 	}
 
 	remaining, err := service.ListVersions(context.Background(), created.ID)

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	sdkworkflows "github.com/sacloud/sacloud-sdk-go/api/workflows"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/workflows/apis/v1"
@@ -440,13 +439,6 @@ func (s *Service) ListPlans(ctx context.Context) ([]PlanInfo, error) {
 func (s *Service) GetSubscription(ctx context.Context) (*SubscriptionInfo, error) {
 	resp, err := s.subscriptionOp.Read(ctx)
 	if err != nil {
-		// 未契約時、sakumockはOpenAPI仕様上non-nullableな"MonthAppliedPlan"にnullを
-		// 返すためSDKのデコードに失敗する(docs/upstream-issues.md参照)。この場合は
-		// CurrentPlanも常にnullで未契約状態であることが確定しているため、そのまま
-		// 未契約として扱う
-		if strings.Contains(err.Error(), "MonthAppliedPlan") {
-			return &SubscriptionInfo{Subscribed: false}, nil
-		}
 		return nil, err
 	}
 	current, ok := resp.CurrentPlan.Get()
