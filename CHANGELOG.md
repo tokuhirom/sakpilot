@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.0.20](https://github.com/tokuhirom/sakpilot/compare/v0.0.19...v0.0.20) - 2026-08-17
+- chore: sacloud-sdk-go/sakumockを最新コミットへ更新 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/206
+- docs: upstream-issues.mdから取り込み済み項目を削除 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/208
+- docs: eventbus Provider.Classフィルタ不具合を報告済みに更新 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/209
+
 ## [v0.0.19](https://github.com/tokuhirom/sakpilot/compare/v0.0.18...v0.0.19) - 2026-08-13
 - docs: 未実装14サービスの実装計画をPLAN.mdに立て直し by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/184
 - feat: secretmanager(シークレットマネージャー)のVault/Secret管理を追加 by @tokuhirom in https://github.com/tokuhirom/sakpilot/pull/186
