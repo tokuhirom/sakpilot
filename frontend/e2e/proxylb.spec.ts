@@ -88,15 +88,30 @@ test('ELB詳細で待ち受けポート・実サーバーを編集できる', as
   await expect(page.getByText('HTTP', { exact: true })).toBeVisible();
 });
 
-// SSL証明書の設定(SetCertificates)はIaaS fakeドライバ(sacloud-sdk-go)側のバグにより
-// E2E化できない: fakeの実装が `copySameNameField` でリクエストの `PrimaryCerts`
-// フィールドを結果側の `PrimaryCert` にコピーしようとするが、フィールド名の単数/複数が
-// 一致せずコピーに失敗し、その後 `cert.PrimaryCert.CertificateCommonName = ...` で
-// nilポインタ参照によりpanicする(sakpilot側の呼び出しコードは正しい実装で、SDKが
-// 定義するフィールド名をそのまま使っている)。証明書を更新/削除するUIも
-// primaryCertが存在する場合にのみ表示されるため、この経路のE2E化は現状不可能。
-// Goの単体テストレベルでは影響を受けないため、`ProxyLBList.test.tsx`(vitest、
-// バインディングをモック)で引き続きカバーする。
+// SSL証明書の設定(SetCertificates)は、sacloud-sdk-go の fake ドライバのnilポインタ
+// panicバグ(docs/upstream-issues.md の1番、PR #216で修正済み)によりE2E化できなかったが、
+// sacloud-sdk-go v0.0.2以降(pseudo-version)へ更新したことで解消したためテストを追加する。
+test('ELB詳細でSSL証明書を設定・削除できる', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'ELB' }).click();
+  await card(page, 'e2e-elb').click();
+
+  await expect(page.getByText('証明書が設定されていません')).toBeVisible();
+
+  await page.getByRole('button', { name: '証明書を設定' }).click();
+  await page.getByLabel('プライマリ証明書 サーバー証明書 (PEM)').fill('dummy-server-cert');
+  await page.getByLabel('プライマリ証明書 中間証明書 (PEM)').fill('dummy-intermediate-cert');
+  await page.getByLabel('プライマリ証明書 秘密鍵 (PEM)').fill('dummy-private-key');
+  await page.getByRole('button', { name: '保存' }).click();
+
+  await expect(page.getByText('dummy-common-name.org')).toBeVisible();
+
+  await page.getByRole('button', { name: '証明書を削除' }).click();
+  await expect(page.getByText('SSL証明書を削除しますか？')).toBeVisible();
+  await page.getByRole('button', { name: '削除する' }).click();
+
+  await expect(page.getByText('証明書が設定されていません')).toBeVisible();
+});
 
 test('ELBを削除すると一覧から消える', async ({ page }) => {
   await page.goto('/');

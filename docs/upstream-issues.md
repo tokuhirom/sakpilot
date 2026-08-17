@@ -3,8 +3,8 @@
 SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk-go` / `sakumock` 側の不具合・改善要望のメモ。まだupstreamには未報告。issue化する際はここから起こす。
 
 対象バージョン(`go.mod`):
-- `github.com/sacloud/sacloud-sdk-go v0.0.1`
-- `github.com/sacloud/sakumock v0.8.0`
+- `github.com/sacloud/sacloud-sdk-go v0.0.2-0.20260814002005-eb1580006797`(2026-08-17時点で新しいタグが未リリースのためpseudo-version。`v0.0.1`タグから64コミット先行、#1・#2のバグ修正を含む)
+- `github.com/sacloud/sakumock v0.8.1-0.20260814053102-2d61a37ed29e`(同上、`v0.8.0`タグから5コミット先行。コメント整理とobjectstorageのアクセスキー上限チェック追加のみで、このメモに関わる修正は無し)
 
 ## 確認済みバグ
 
@@ -21,12 +21,12 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
   - キー名が一致しないため `json.Unmarshal` はこのフィールドを黙って無視し、`cert.PrimaryCert` は `nil` のまま。
   - 直後の `cert.PrimaryCert.CertificateCommonName = "dummy-common-name.org"`(`ops_proxy_lb.go:222`付近)が nil ポインタ参照でpanicする。
 - 影響: fakeドライバ経由でProxyLB(ELB)の証明書設定をテストしようとすると必ずクラッシュする。SakPilot側の呼び出しコード(`internal/sakura/proxylb.go`)はSDKが定義したフィールド名をそのまま使っているだけで、SakPilot側に問題はない。
-- SakPilotでの回避: E2Eテストの対象から証明書設定フロー(`SetCertificates`/それに依存する`証明書を更新`・`証明書を削除`ボタン)を除外した(`frontend/e2e/proxylb.spec.ts` 参照)。Go単体テスト・vitestレベルでは影響を受けないため `ProxyLBList.test.tsx` で引き続きカバーしている。
+- SakPilotでの回避: E2Eテストの対象から証明書設定フロー(`SetCertificates`/それに依存する`証明書を更新`・`証明書を削除`ボタン)を除外していたが、2026-08-17に`sacloud-sdk-go`をこの修正を含むpseudo-versionへ更新し、`internal/sakura/proxylb_test.go`にGo回帰テストを追加、`frontend/e2e/proxylb.spec.ts`にも証明書設定・削除のE2Eシナリオを復活させた。
 - 報告時の提案: `copySameNameField` を `mapconv` 対応にするか、少なくとも `ProxyLBOp.SetCertificates` 内で `cert.PrimaryCert` がnilの場合はガードする(他のリクエスト/レスポンスの構造体ペアでも同種のフィールド名不一致(単数/複数、大文字小文字違い等)が無いか横断的に監査する価値がありそう)。
 
 ### 2. `iaas/fake` の `DatabaseOp.GetParameter` が `Conf` フィールドのnilチェックをしておらずpanicする
 
-- **提案中**: https://github.com/sacloud/sacloud-sdk-go/pull/218
+- **対応済み**: https://github.com/sacloud/sacloud-sdk-go/pull/218 (2026-08-17に取り込み済みのpseudo-versionに反映済み)
 
 - パッケージ: `github.com/sacloud/sacloud-sdk-go/api/iaas/fake`
 - ファイル: `ops_database.go`(`GetParameter`、314行目付近)
