@@ -20,6 +20,8 @@ SakPilotの開発・E2Eテスト整備(2026-08-08)で見つけた、`sacloud-sdk
 
 ### 9. `sacloud-sdk-go/api/eventbus` の `Provider.Class` クエリ注入ミドルウェアが実際のリクエストに反映されず、`Trigger`/`Schedule`/`ProcessConfiguration`のList APIが常に全件を返す
 
+- **報告済み**([sacloud/sacloud-sdk-go#222](https://github.com/sacloud/sacloud-sdk-go/pull/222))
+
 - パッケージ: `github.com/sacloud/sacloud-sdk-go/api/eventbus`
 - ファイル: `filter.go`(`injectFilterMiddleware`/`injectFilterToRequest`)、`triggers.go`/`schedules.go`/`process_configurations.go`(各`List`メソッド)
 - 内容: Trigger/Schedule/ProcessConfigurationは同一の`GET /commonserviceitem`エンドポイントを共有しており、種別ごとの絞り込みは`injectFilterMiddleware`が生成する`saclient.Middleware`が`req.URL.RawQuery`に`{"Filter":{"Provider.Class":"eventbustrigger"}}`のようなJSONクエリを注入する仕組みで実現される設計になっている(sakumock側は`providerClassFilter`でこの形式を正しくパースでき、直接HTTPリクエストを組み立てて検証した限りではフィルタは機能する)。しかし実際にSDKの`TriggerOp.List`/`ScheduleOp.List`/`ProcessConfigurationOp.List`経由で呼び出すと、ミドルウェアが呼ばれていないのか`RawQuery`が最終的なリクエストに反映されず、常に空文字列のまま送信される(プロキシを挟んでリクエストを観測して確認)。結果として`GET /commonserviceitem`は種別を問わず全件を返し、SDK単体では`ScheduleAPI.List`を呼んでもTrigger/ProcessConfigurationを含む全アイテムが返ってくる。
