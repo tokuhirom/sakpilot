@@ -43,6 +43,30 @@ func TestProxyLBService_ChangePlan(t *testing.T) {
 	}
 }
 
+func TestProxyLBService_SetCertificates(t *testing.T) {
+	service := newTestProxyLBService(t)
+	ctx := context.Background()
+
+	created, err := createTestProxyLB(ctx)
+	if err != nil {
+		t.Fatalf("createTestProxyLB: %v", err)
+	}
+
+	certs, err := service.SetCertificates(ctx, created.ID.String(), &ProxyLBSetCertificatesInput{
+		PrimaryCert: ProxyLBCertInput{
+			ServerCertificate:       "dummy-server-cert",
+			IntermediateCertificate: "dummy-intermediate-cert",
+			PrivateKey:              "dummy-private-key",
+		},
+	})
+	if err != nil {
+		t.Fatalf("SetCertificates: %v", err)
+	}
+	if certs.PrimaryCert == nil {
+		t.Fatal("SetCertificates: got nil PrimaryCert, want non-nil")
+	}
+}
+
 func TestProxyLBService_MonitorConnection(t *testing.T) {
 	service := newTestProxyLBService(t)
 	ctx := context.Background()
